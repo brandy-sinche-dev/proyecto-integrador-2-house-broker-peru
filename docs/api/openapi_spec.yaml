@@ -1,0 +1,1448 @@
+openapi: 3.0.3
+info:
+  title: API REST - HouseBroker Perú
+  description: >-
+    Contrato de interfaz OpenAPI 3.0 para el Sistema Web Inteligente de Gestión
+    Inmobiliaria de HouseBroker Perú. Cubre Propiedades y Búsqueda, CRM y Citas,
+    Autenticación y Seguridad, Chat Unificado/Asistente Virtual y Administración.
+    Alineado con la sección 9 de docs/02_Arquitectura.md y el SRS (01_requerimientos.md).
+  version: 2.0.0
+servers:
+  - url: https://api.housebrokerperu.com/api/v1
+    description: Servidor de Producción / Staging
+  - url: http://localhost:8000/api/v1
+    description: Entorno de Desarrollo Local
+
+tags:
+  - name: Autenticación
+    description: Registro, inicio de sesión, sesiones JWT y recuperación de contraseña
+  - name: Propiedades
+    description: Catálogo, filtros, gestión de propiedades y favoritos
+  - name: Citas
+    description: Agendamiento, disponibilidad y gestión de visitas (CRM)
+  - name: CRM
+    description: Leads comerciales y pipeline Kanban
+  - name: Conversaciones
+    description: Chat unificado, recomendaciones IA y transferencia a agente humano
+  - name: Administración
+    description: Dashboard, usuarios, reportes y auditoría
+
+security:
+  - cookieAuth: []
+  - bearerAuth: []
+
+paths:
+  # ==========================================
+  # MÓDULO DE AUTENTICACIÓN (TASK-ARC-SEC-01)
+  # ==========================================
+  /auth/register/:
+    post:
+      summary: Registrar un nuevo cliente
+      operationId: registerClient
+      tags:
+        - Autenticación
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterInput'
+      responses:
+        '201':
+          description: Cliente registrado correctamente. Se establece la sesión.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: access=...; Path=/; HttpOnly; Secure; SameSite=Lax
+        '400':
+          description: Datos inválidos o correo ya registrado.
+
+  /auth/login/:
+    post:
+      summary: Iniciar sesión
+      operationId: login
+      tags:
+        - Autenticación
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+      responses:
+        '200':
+          description: Sesión iniciada. Se asigna cookie HttpOnly y se devuelve el rol.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  role:
+                    type: string
+                    enum: [CLIENTE, AGENTE, ADMINISTRADOR]
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Credenciales incorrectas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/refresh/:
+    post:
+      summary: Renovar el token de sesión
+      operationId: refreshSession
+      tags:
+        - Autenticación
+      responses:
+        '200':
+          description: Sesión renovada correctamente.
+        '401':
+          description: El refresh token no es válido o expiró.
+
+  /auth/logout/:
+    post:
+      summary: Cerrar sesión
+      operationId: logout
+      tags:
+        - Autenticación
+      responses:
+        '204':
+          description: Sesión finalizada y cookies eliminadas.
+
+  /auth/password-reset/:
+    post:
+      summary: Solicitar recuperación de contraseña
+      operationId: requestPasswordReset
+      tags:
+        - Autenticación
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '202':
+          description: Token de recuperación enviado por correo.
+        '400':
+          description: Formato de correo inválido.
+
+  /auth/password-reset/confirm/:
+    post:
+      summary: Confirmar cambio de contraseña con token
+      operationId: confirmPasswordReset
+      tags:
+        - Autenticación
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, new_password]
+              properties:
+                token:
+                  type: string
+                new_password:
+                  type: string
+                  minLength: 8
+      responses:
+        '200':
+          description: Contraseña actualizada correctamente.
+        '400':
+          description: Token inválido o contraseña demasiado débil.
+
+  /auth/me/:
+    get:
+      summary: Consultar el usuario autenticado
+      operationId: getCurrentUser
+      tags:
+        - Autenticación
+      responses:
+        '200':
+          description: Datos del usuario actual.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: No autenticado.
+
+  # ==========================================
+  # MÓDULO DE PROPIEDADES (TASK-ARC-PROP-01)
+  # ==========================================
+  /properties/:
+    get:
+      summary: Búsqueda y filtrado de propiedades
+      operationId: listProperties
+      tags:
+        - Propiedades
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: district
+          in: query
+          schema:
+            type: string
+        - name: min_price
+          in: query
+          schema:
+            type: number
+        - name: max_price
+          in: query
+          schema:
+            type: number
+        - name: property_type
+          in: query
+          schema:
+            type: string
+            enum: [casa, departamento, local]
+        - name: operation
+          in: query
+          schema:
+            type: string
+            enum: [venta, alquiler]
+        - name: bedrooms
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+        - name: bathrooms
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+        - name: parking
+          in: query
+          schema:
+            type: boolean
+        - name: pets_allowed
+          in: query
+          schema:
+            type: boolean
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [DRAFT, AVAILABLE, RESERVED, RENTED, SOLD, SUSPENDED]
+      responses:
+        '200':
+          description: Lista paginada de propiedades encontradas.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  next:
+                    type: string
+                    nullable: true
+                  previous:
+                    type: string
+                    nullable: true
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Property'
+        '400':
+          description: Parámetros de búsqueda inválidos.
+
+    post:
+      summary: Creación de una nueva propiedad
+      operationId: createProperty
+      tags:
+        - Propiedades
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PropertyCreateInput'
+      responses:
+        '201':
+          description: Propiedad creada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
+        '400':
+          description: Datos de entrada no válidos.
+        '403':
+          description: Requiere rol AGENTE o ADMINISTRADOR.
+
+  /properties/{id}/:
+    get:
+      summary: Detalle de una propiedad
+      operationId: getPropertyDetail
+      tags:
+        - Propiedades
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detalle completo de la propiedad.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PropertyDetail'
+        '404':
+          description: Propiedad no encontrada.
+
+    patch:
+      summary: Edición parcial de una propiedad
+      operationId: updateProperty
+      tags:
+        - Propiedades
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PropertyUpdateInput'
+      responses:
+        '200':
+          description: Propiedad actualizada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
+        '403':
+          description: Sin permisos sobre esta propiedad.
+        '404':
+          description: Propiedad no encontrada.
+
+    delete:
+      summary: Eliminación lógica de una propiedad
+      operationId: deleteProperty
+      tags:
+        - Propiedades
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Propiedad inactivada correctamente (eliminación lógica).
+        '403':
+          description: Sin permisos.
+        '404':
+          description: Propiedad no encontrada.
+
+  /properties/{id}/favorite/:
+    post:
+      summary: Agregar o retirar una propiedad de los favoritos del cliente
+      operationId: toggleFavorite
+      tags:
+        - Propiedades
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Estado del favorito alternado correctamente.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  is_favorite:
+                    type: boolean
+        '401':
+          description: Se requiere autenticación de cliente.
+
+  # ==========================================
+  # MÓDULO CRM Y LEADS (TASK-ARC-CRM-01)
+  # ==========================================
+  /crm/leads/:
+    get:
+      summary: Obtener listado de leads para el CRM
+      operationId: listLeads
+      tags:
+        - CRM
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [NUEVO, CONTACTADO, VISITA_AGENDADA, GANADO, PERDIDO]
+        - name: agent_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lista de leads para el tablero Kanban.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Lead'
+    post:
+      summary: Registrar nuevo lead
+      operationId: createLead
+      tags:
+        - CRM
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeadCreateInput'
+      responses:
+        '201':
+          description: Lead registrado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+
+  /crm/leads/{id}/status/:
+    patch:
+      summary: Actualizar estado de lead en el pipeline Kanban
+      operationId: updateLeadStatus
+      tags:
+        - CRM
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [NUEVO, CONTACTADO, VISITA_AGENDADA, GANADO, PERDIDO]
+      responses:
+        '200':
+          description: Estado del lead actualizado correctamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+        '403':
+          description: Sin permisos para modificar el lead.
+
+  # ==========================================
+  # MÓDULO DE CITAS (TASK-ARC-CRM-01)
+  # ==========================================
+  /appointments/availability/:
+    get:
+      summary: Consulta de disponibilidad horaria de agentes
+      operationId: getAgentAvailability
+      tags:
+        - Citas
+      parameters:
+        - name: agent_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Horarios libres disponibles para agendamiento.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agent_id:
+                    type: string
+                    format: uuid
+                  date:
+                    type: string
+                    format: date
+                  slots:
+                    type: array
+                    items:
+                      type: string
+                      format: date-time
+        '400':
+          description: Agente o fecha inválidos.
+
+  /appointments/:
+    get:
+      summary: Listar citas autorizadas para el usuario
+      operationId: listAppointments
+      tags:
+        - Citas
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      responses:
+        '200':
+          description: Citas del usuario según su rol.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Appointment'
+    post:
+      summary: Reserva atómica de cita (Manejo con select_for_update)
+      operationId: createAppointment
+      tags:
+        - Citas
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppointmentCreateInput'
+      responses:
+        '201':
+          description: Cita agendada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Appointment'
+        '409':
+          description: Conflicto de concurrencia. El horario ya fue reservado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: El horario solicita un bloque no asignado al agente.
+
+  /appointments/{id}/:
+    patch:
+      summary: Confirmar, cancelar, reprogramar o registrar resultado de una cita
+      operationId: updateAppointment
+      tags:
+        - Citas
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppointmentUpdateInput'
+      responses:
+        '200':
+          description: Cita actualizada correctamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Appointment'
+        '403':
+          description: Sin permisos sobre esta cita.
+        '404':
+          description: Cita no encontrada.
+
+  # ==========================================
+  # MÓDULO CHAT UNIFICADO Y ASISTENTE VIRTUAL
+  # ==========================================
+  /conversations/:
+    post:
+      summary: Iniciar el chat único en modo virtual
+      operationId: startConversation
+      tags:
+        - Conversaciones
+      responses:
+        '201':
+          description: Conversación iniciada en modo BOT_ACTIVE.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+    get:
+      summary: Listar conversaciones del usuario
+      operationId: listConversations
+      tags:
+        - Conversaciones
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      responses:
+        '200':
+          description: Conversaciones según el rol del usuario.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Conversation'
+
+  /conversations/{id}/:
+    get:
+      summary: Consultar estado y participante actual de la conversación
+      operationId: getConversation
+      tags:
+        - Conversaciones
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Estado de la conversación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '403':
+          description: No participa en esta conversación.
+        '404':
+          description: Conversación no encontrada.
+
+  /conversations/{id}/messages/:
+    get:
+      summary: Consultar historial paginado de mensajes
+      operationId: listMessages
+      tags:
+        - Conversaciones
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: Historial de mensajes paginado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  next:
+                    type: string
+                    nullable: true
+                  previous:
+                    type: string
+                    nullable: true
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Message'
+
+  /conversations/{id}/recommendations/:
+    get:
+      summary: Consultar las recomendaciones de la IA de la conversación
+      operationId: listRecommendations
+      tags:
+        - Conversaciones
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Recomendaciones generadas por la IA.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Recommendation'
+
+  /conversations/{id}/handoff/:
+    post:
+      summary: Solicitar atención humana en el mismo chat
+      operationId: requestHandoff
+      tags:
+        - Conversaciones
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Transferencia solicitada. Estado pasa a WAITING_AGENT.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: WAITING_AGENT
+                  message:
+                    type: string
+                    example: Un agente se comunicará contigo en breve por este mismo chat.
+
+  /conversations/{id}/handoff/cancel/:
+    post:
+      summary: Cancelar la espera y regresar al asistente virtual
+      operationId: cancelHandoff
+      tags:
+        - Conversaciones
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Solicitud de agente cancelada. Estado vuelve a BOT_ACTIVE.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: BOT_ACTIVE
+
+  /agent/conversations/{id}/accept/:
+    post:
+      summary: Permitir que un agente acepte la conversación
+      operationId: acceptConversation
+      tags:
+        - Conversaciones
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Conversación aceptada por el agente. Estado pasa a HUMAN_ACTIVE.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '409':
+          description: La conversación ya fue tomada por otro agente.
+
+  /agent/conversations/{id}/close/:
+    post:
+      summary: Finalizar la atención humana de la conversación
+      operationId: closeConversation
+      tags:
+        - Conversaciones
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Atención finalizada. Estado pasa a CLOSED.
+
+  # ==========================================
+  # WEBSOCKETS (Chat en tiempo real)
+  # ==========================================
+  /ws/conversations/{id}/:
+    get:
+      summary: Canal WebSocket de mensajería en tiempo real de una conversación
+      operationId: wsConversation
+      tags:
+        - Conversaciones
+      description: >-
+        Conexión WebSocket para enviar y recibir mensajes, indicadores de escritura
+        y confirmación de lectura. El historial se persiste en PostgreSQL.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '101':
+          description: Protocolo de cambio a WebSocket.
+        '401':
+          description: Sesión no válida.
+
+  /ws/agent/queue/:
+    get:
+      summary: Canal WebSocket que notifica conversaciones en espera de agente
+      operationId: wsAgentQueue
+      tags:
+        - Conversaciones
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      responses:
+        '101':
+          description: Protocolo de cambio a WebSocket.
+        '403':
+          description: Requiere rol AGENTE o ADMINISTRADOR.
+
+  /ws/notifications/:
+    get:
+      summary: Canal WebSocket de notificaciones personales en tiempo real
+      operationId: wsNotifications
+      tags:
+        - Administración
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      responses:
+        '101':
+          description: Protocolo de cambio a WebSocket.
+
+  # ==========================================
+  # MÓDULO DE ADMINISTRACIÓN
+  # ==========================================
+  /admin/dashboard/:
+    get:
+      summary: Métricas generales para el panel administrativo
+      operationId: getDashboard
+      tags:
+        - Administración
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      responses:
+        '200':
+          description: Resumen global de métricas operativas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+        '403':
+          description: Requiere rol ADMINISTRADOR.
+
+  /admin/users/:
+    get:
+      summary: Gestión de usuarios (clientes, agentes, administradores)
+      operationId: listUsers
+      tags:
+        - Administración
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      responses:
+        '200':
+          description: Lista de usuarios del sistema.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '403':
+          description: Requiere rol ADMINISTRADOR.
+
+  /admin/users/{id}/status/:
+    patch:
+      summary: Activar o suspender un usuario
+      operationId: updateUserStatus
+      tags:
+        - Administración
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [is_active]
+              properties:
+                is_active:
+                  type: boolean
+      responses:
+        '200':
+          description: Estado del usuario actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '403':
+          description: Requiere rol ADMINISTRADOR.
+
+  /admin/agents/presence/:
+    get:
+      summary: Consultar el estado de conexión de los agentes
+      operationId: getAgentsPresence
+      tags:
+        - Administración
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      responses:
+        '200':
+          description: Estado de presencia de agentes (conectado, ausente, desconectado).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    agent_id:
+                      type: string
+                      format: uuid
+                    presence:
+                      type: string
+                      enum: [conectado, ausente, desconectado]
+
+  /admin/reports/:
+    get:
+      summary: Consultar reportes administrativos
+      operationId: getReports
+      tags:
+        - Administración
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      responses:
+        '200':
+          description: Reportes de ventas, alquileres, citas y efectividad de agentes.
+        '403':
+          description: Requiere rol ADMINISTRADOR.
+
+  /admin/audit/:
+    get:
+      summary: Consultar registro de auditoría de operaciones sensibles
+      operationId: getAuditLog
+      tags:
+        - Administración
+      security:
+        - cookieAuth: []
+          bearerAuth: []
+      responses:
+        '200':
+          description: Registro de auditoría.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditEntry'
+        '403':
+          description: Requiere rol ADMINISTRADOR.
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access
+      description: Token JWT de sesión almacenado en cookie HttpOnly.
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [CLIENTE, AGENTE, ADMINISTRADOR]
+        is_active:
+          type: boolean
+        last_login:
+          type: string
+          format: date-time
+          nullable: true
+
+    RegisterInput:
+      type: object
+      required: [email, password, first_name, last_name]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        first_name:
+          type: string
+        last_name:
+          type: string
+        phone:
+          type: string
+          nullable: true
+
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    Property:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        title:
+          type: string
+        property_type:
+          type: string
+          enum: [casa, departamento, local]
+        operation:
+          type: string
+          enum: [venta, alquiler]
+        price:
+          type: number
+        currency:
+          type: string
+          example: PEN
+        district:
+          type: string
+        address:
+          type: string
+        bedrooms:
+          type: integer
+        bathrooms:
+          type: integer
+        parking:
+          type: boolean
+        area:
+          type: number
+        pets_allowed:
+          type: boolean
+        status:
+          type: string
+          enum: [DRAFT, AVAILABLE, RESERVED, RENTED, SOLD, SUSPENDED]
+        agent_id:
+          type: string
+          format: uuid
+
+    PropertyDetail:
+      allOf:
+        - $ref: '#/components/schemas/Property'
+        - type: object
+          properties:
+            description:
+              type: string
+            features:
+              type: array
+              items:
+                type: string
+            images:
+              type: array
+              items:
+                $ref: '#/components/schemas/PropertyImage'
+            is_favorite:
+              type: boolean
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+
+    PropertyImage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+        order:
+          type: integer
+        alt_text:
+          type: string
+
+    PropertyCreateInput:
+      type: object
+      required: [title, property_type, operation, price, district, status]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        property_type:
+          type: string
+          enum: [casa, departamento, local]
+        operation:
+          type: string
+          enum: [venta, alquiler]
+        price:
+          type: number
+        currency:
+          type: string
+          default: PEN
+        district:
+          type: string
+        address:
+          type: string
+        bedrooms:
+          type: integer
+          default: 0
+        bathrooms:
+          type: integer
+          default: 0
+        parking:
+          type: boolean
+          default: false
+        area:
+          type: number
+        pets_allowed:
+          type: boolean
+          default: false
+        status:
+          type: string
+          enum: [DRAFT, AVAILABLE, RESERVED, RENTED, SOLD, SUSPENDED]
+        agent_id:
+          type: string
+          format: uuid
+        images:
+          type: array
+          items:
+            type: string
+            format: binary
+
+    PropertyUpdateInput:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        district:
+          type: string
+        bedrooms:
+          type: integer
+        bathrooms:
+          type: integer
+        parking:
+          type: boolean
+        pets_allowed:
+          type: boolean
+        status:
+          type: string
+          enum: [DRAFT, AVAILABLE, RESERVED, RENTED, SOLD, SUSPENDED]
+
+    Lead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+          format: uuid
+        agent_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [NUEVO, CONTACTADO, VISITA_AGENDADA, GANADO, PERDIDO]
+        notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    LeadCreateInput:
+      type: object
+      required: [client_id]
+      properties:
+        client_id:
+          type: string
+          format: uuid
+        agent_id:
+          type: string
+          format: uuid
+        notes:
+          type: string
+
+    Appointment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+          format: uuid
+        agent_id:
+          type: string
+          format: uuid
+        property_id:
+          type: string
+          format: uuid
+        date_time:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [pendiente, confirmada, completada, cancelada, reprogramada, no_asistio]
+        observations:
+          type: string
+          nullable: true
+
+    AppointmentCreateInput:
+      type: object
+      required: [property_id, agent_id, date_time]
+      properties:
+        property_id:
+          type: string
+          format: uuid
+        agent_id:
+          type: string
+          format: uuid
+        date_time:
+          type: string
+          format: date-time
+
+    AppointmentUpdateInput:
+      type: object
+      properties:
+        date_time:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [pendiente, confirmada, completada, cancelada, reprogramada, no_asistio]
+        observations:
+          type: string
+
+    Conversation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+          format: uuid
+        agent_id:
+          type: string
+          format: uuid
+          nullable: true
+        mode:
+          type: string
+          enum: [BOT_ACTIVE, WAITING_AGENT, HUMAN_ACTIVE, CLOSED]
+        created_at:
+          type: string
+          format: date-time
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        conversation_id:
+          type: string
+          format: uuid
+        sender_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        read_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    Recommendation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        property:
+          $ref: '#/components/schemas/Property'
+        match_percent:
+          type: integer
+          minimum: 0
+          maximum: 100
+        position:
+          type: integer
+        explanation:
+          type: string
+
+    Dashboard:
+      type: object
+      properties:
+        total_properties:
+          type: integer
+        total_sales:
+          type: integer
+        total_rentals:
+          type: integer
+        total_appointments:
+          type: integer
+        conversion_rate:
+          type: number
+        active_agents:
+          type: integer
+        pending_messages:
+          type: integer
+
+    AuditEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        entity:
+          type: string
+        entity_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+          example: SLOT_ALREADY_BOOKED
+        error:
+          type: string
+          example: El horario seleccionado ya se encuentra ocupado.
