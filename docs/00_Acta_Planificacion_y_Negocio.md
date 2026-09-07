@@ -26,7 +26,6 @@ El proyecto se desarrollará de manera incremental. Los **APF 1, APF 2 y APF 3**
 | **Yohan Ñato** | **Analista / Frontend Developer** | Modelamiento de PostgreSQL, desarrollo de Django REST Framework, lógica de negocio y servicios de integración. |
 | **Anderson Villanes** | **Frontend / QA Engineer** | Desarrollo React + TypeScript, prototipado UX/UI, pruebas funcionales y criterios básicos de accesibilidad. |
 
-> **Nota:** Los nombres de los integrantes pendientes deberán reemplazarse cuando el equipo los confirme.
 
 ## 1.2. Compromisos del equipo
 
@@ -425,15 +424,31 @@ El cliente no deberá iniciar una segunda conversación para comunicarse con el 
 
 Los requerimientos completos se encuentran en `01_requerimientos.md`.
 
-## 14.1. Historias representativas
+## 14.1. Historias de Usuario (Product Backlog)
 
-| ID | Épica | Historia | Estimación |
-|---|---|---|:---:|
-| **HU-PROP-01** | EPIC-PROP | Como cliente, quiero filtrar propiedades por distrito, precio y mascotas para encontrar opciones adecuadas. | M |
-| **HU-CRM-01** | EPIC-CRM | Como cliente, quiero agendar una visita en un horario disponible para conocer la propiedad. | L |
-| **HU-SEC-01** | EPIC-SEC | Como usuario, quiero iniciar sesión de forma segura para acceder según mi rol. | S |
-| **HU-AI-01** | EPIC-AI | Como cliente, quiero conversar con una asistente virtual 24/7 para recibir recomendaciones personalizadas. | XL |
-| **HU-AI-02** | EPIC-AI | Como cliente, quiero solicitar un agente humano sin perder la conversación. | M |
+| ID | Épica | Historia |
+|---|---|---|
+| **HU-PROP-01** | EPIC-PROP | Registrar y editar propiedades |
+| **HU-PROP-02** | EPIC-PROP | Consultar catálogo de propiedades |
+| **HU-PROP-03** | EPIC-PROP | Buscar propiedades mediante filtros |
+| **HU-PROP-04** | EPIC-PROP | Gestionar disponibilidad de propiedades |
+| **HU-PROP-05** | EPIC-PROP | Guardar propiedades favoritas |
+| **HU-CRM-01** | EPIC-CRM | Agendar una visita |
+| **HU-CRM-02** | EPIC-CRM | Gestionar citas |
+| **HU-CRM-03** | EPIC-CRM | Consultar ficha e historial del cliente |
+| **HU-CRM-04** | EPIC-CRM | Registrar observaciones de atención |
+| **HU-CRM-05** | EPIC-CRM | Consultar dashboard y reportes |
+| **HU-SEC-01** | EPIC-SEC | Registrarse e iniciar sesión |
+| **HU-SEC-02** | EPIC-SEC | Recuperar contraseña |
+| **HU-SEC-03** | EPIC-SEC | Comunicarse con un agente mediante chat |
+| **HU-SEC-04** | EPIC-SEC | Visualizar estado de conexión |
+| **HU-SEC-05** | EPIC-SEC | Recibir notificaciones |
+| **HU-SEC-06** | EPIC-SEC | Supervisar y auditar conversaciones |
+| **HU-AI-01** | EPIC-AI | Conversar con el asistente virtual 24/7 |
+| **HU-AI-02** | EPIC-AI | Guardar preferencias y contexto |
+| **HU-AI-03** | EPIC-AI | Recibir recomendaciones personalizadas |
+| **HU-AI-04** | EPIC-AI | Solicitar atención de un agente humano |
+| **HU-AI-05** | EPIC-AI | Supervisar el funcionamiento del asistente IA |
 
 ---
 

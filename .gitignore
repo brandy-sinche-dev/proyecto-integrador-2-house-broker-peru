@@ -1,0 +1,30 @@
+# Skills (no deben subirse al repositorio)
+skills/
+skills/**
+!skills/README.md
+
+# Python / Django
+backend/.venv/
+__pycache__/
+*.pyc
+*.sqlite3
+backend/staticfiles/
+
+# Node / React (Vite)
+node_modules/
+dist/
+*.local
+
+# Entornos y configuraciones locales
+.env
+.env.*
+*.local
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
