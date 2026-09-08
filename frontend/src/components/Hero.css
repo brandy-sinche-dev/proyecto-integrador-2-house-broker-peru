@@ -1,0 +1,62 @@
+.hhero {
+  background:
+    radial-gradient(900px 420px at 12% -10%, rgba(176, 141, 82, 0.55), transparent 60%),
+    radial-gradient(700px 380px at 88% 110%, rgba(58, 44, 20, 0.9), transparent 65%),
+    linear-gradient(180deg, #2c2112 0%, #3a2c14 55%, #2c2112 100%);
+  color: #fff;
+  padding: 72px 0 84px;
+  position: relative;
+  overflow: hidden;
+}
+
+.hhero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.14) 1px, transparent 1px);
+  background-size: 26px 26px;
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.hhero__inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  position: relative;
+  z-index: 1;
+}
+
+.hhero__eyebrow {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--brand-gold);
+  margin-bottom: 12px;
+}
+
+.hhero__title {
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  max-width: 720px;
+}
+
+.hhero__subtitle {
+  font-size: 17px;
+  color: rgba(255, 255, 255, 0.78);
+  max-width: 620px;
+  margin-top: 14px;
+}
+
+@media (max-width: 640px) {
+  .hhero {
+    padding: 48px 0 56px;
+  }
+
+  .hhero__title {
+    font-size: 30px;
+  }
+}

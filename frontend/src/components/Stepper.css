@@ -1,0 +1,83 @@
+.hstepper {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+.hstepper__item {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+
+.hstepper__dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
+  border: 2px solid var(--line);
+  background: var(--white);
+  color: var(--muted-light);
+}
+
+.hstepper__label {
+  font-size: 13px;
+  font-weight: 700;
+  margin-left: 9px;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.hstepper__line {
+  flex: 1 1 100%;
+  height: 2px;
+  min-width: 22px;
+  margin: 0 12px;
+  background: var(--line);
+  border-radius: 2px;
+}
+
+.hstepper__item--active .hstepper__dot {
+  border-color: var(--brand-bronze);
+  background: var(--brand-bronze);
+  color: #fff;
+  box-shadow: var(--shadow-btn);
+}
+
+.hstepper__item--active .hstepper__label {
+  color: var(--ink);
+}
+
+.hstepper__item--done .hstepper__dot {
+  border-color: var(--brand-bronze);
+  background: var(--brand-bronze);
+  color: #fff;
+}
+
+.hstepper__item--done .hstepper__label {
+  color: var(--muted);
+}
+
+.hstepper__item--done ~ .hstepper__item .hstepper__line,
+.hstepper__item--done .hstepper__line {
+  background: var(--brand-bronze);
+}
+
+@media (max-width: 700px) {
+  .hstepper__label {
+    display: none;
+  }
+
+  .hstepper__line {
+    min-width: 12px;
+    margin: 0 8px;
+  }
+}
