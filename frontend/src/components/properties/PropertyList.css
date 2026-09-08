@@ -1,0 +1,146 @@
+.hprops {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.hprops__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+  padding: 12px;
+  flex-wrap: wrap;
+}
+
+.hprops__search {
+  position: relative;
+  flex: 1 1 300px;
+}
+
+.hprops__search-icon {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: var(--muted-light);
+}
+
+.hprops__search-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px 0 38px;
+  background: var(--field);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 14px;
+  color: var(--ink);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.hprops__search-input:hover {
+  border-color: var(--line);
+}
+
+.hprops__search-input:focus {
+  outline: none;
+  border-color: var(--brand-bronze);
+  background: var(--white);
+}
+
+.hprops__search-input::placeholder {
+  color: #9a918a;
+}
+
+.hprops__filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hprops__select {
+  height: 42px;
+  padding: 0 12px;
+  background: var(--field);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.hprops__select:hover {
+  border-color: var(--line);
+}
+
+.hprops__select:focus {
+  outline: none;
+  border-color: var(--brand-bronze);
+  background: var(--white);
+}
+
+.hprops__count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.hprops__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 22px;
+}
+
+.hprops__grid--skeleton .hprops__skeleton {
+  height: 300px;
+  border-radius: var(--radius);
+  background: linear-gradient(100deg, #eeebea 40%, #f7f5f4 50%, #eeebea 60%);
+  background-size: 200% 100%;
+  animation: hprops-shimmer 1.4s linear infinite;
+}
+
+@keyframes hprops-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.hprops__state {
+  text-align: center;
+  padding: 56px 24px;
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+
+.hprops__state-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.hprops__state-sub {
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.hprops__state-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 18px;
+}

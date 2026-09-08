@@ -1,0 +1,19 @@
+.hstatus {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.hstatus--active {
+  color: #1c7c3c;
+  background: rgba(28, 124, 60, 0.12);
+}
+
+.hstatus--inactive {
+  color: var(--muted);
+  background: var(--chip);
+}

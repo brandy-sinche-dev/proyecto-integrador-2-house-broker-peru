@@ -1,120 +1,59 @@
 import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { Button } from './components/Button'
+import { Header } from './components/Header'
+import { Hero } from './components/Hero'
+import { PropertyForm } from './components/properties/PropertyForm'
+import { PropertyList } from './components/properties/PropertyList'
+import type { Property } from './services/types'
+
+type View = { name: 'list' } | { name: 'form'; property?: Property }
+
+const NEW_KEY = crypto.randomUUID()
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [view, setView] = useState<View>({ name: 'list' })
+
+  const navigate = (target: 'list' | 'form') => {
+    if (target === 'list') setView({ name: 'list' })
+    else setView({ name: 'form' })
+  }
 
   return (
     <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+      <Header current={view.name} onNavigate={navigate} />
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
+      {view.name === 'list' ? (
+        <>
+          <Hero
+            title={`Encuentra el inmueble ideal\ndonde quieras vivir`}
+            subtitle="Explora departamentos, casas, terrenos y oficinas gestionados por HouseBroker Perú."
+          />
+          <main className="hmain">
+            <PropertyList
+              onNew={() => navigate('form')}
+              onEdit={(property) => setView({ name: 'form', property })}
+            />
+          </main>
+        </>
+      ) : (
+        <main className="hmain">
+          <div className="hform-heading">
+            <p className="hform-heading__eyebrow">HouseBroker Perú</p>
+            <h2 className="hform-heading__title">
+              {view.property ? 'Editar propiedad' : 'Registrar propiedad'}
+            </h2>
+            <Button variant="ghost" onClick={() => navigate('list')}>
+              ← Volver al listado
+            </Button>
+          </div>
+          <PropertyForm
+            key={view.property?.id ?? NEW_KEY}
+            property={view.property}
+            onCancel={() => navigate('list')}
+            onSaved={() => navigate('list')}
+          />
+        </main>
+      )}
     </>
   )
 }

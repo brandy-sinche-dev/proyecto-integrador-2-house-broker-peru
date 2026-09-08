@@ -1,0 +1,25 @@
+.hselect {
+  height: 40px;
+  padding: 0 12px;
+  background: var(--field);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 14px;
+  color: var(--ink);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.hselect:hover {
+  border-color: var(--line);
+}
+
+.hselect:focus {
+  outline: none;
+  border-color: var(--brand-bronze);
+  background: var(--white);
+}
+
+.hselect--invalid {
+  border-color: #b3261e;
+}

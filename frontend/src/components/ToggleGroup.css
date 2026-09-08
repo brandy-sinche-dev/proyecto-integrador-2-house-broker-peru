@@ -1,0 +1,28 @@
+.htoggle {
+  display: inline-flex;
+  background: var(--field);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  gap: 2px;
+}
+
+.htoggle__item {
+  border: none;
+  background: transparent;
+  padding: 6px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.htoggle__item:hover {
+  color: var(--ink);
+}
+
+.htoggle__item--active {
+  background: var(--white);
+  color: var(--ink);
+  box-shadow: var(--shadow-soft);
+}
