@@ -82,6 +82,7 @@ export function PropertyList({ onNew, onEdit }: PropertyListProps) {
           </svg>
           <input
             type="search"
+            aria-label="Buscar propiedades"
             className="hprops__search-input"
             placeholder="Buscar por título, distrito o tipo…"
             value={query}
@@ -91,6 +92,7 @@ export function PropertyList({ onNew, onEdit }: PropertyListProps) {
         <div className="hprops__filters">
           <select
             className="hprops__select"
+            aria-label="Filtrar por tipo de propiedad"
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
           >
@@ -103,6 +105,7 @@ export function PropertyList({ onNew, onEdit }: PropertyListProps) {
           </select>
           <select
             className="hprops__select"
+            aria-label="Filtrar por estado de la propiedad"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >

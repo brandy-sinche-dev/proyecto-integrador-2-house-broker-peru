@@ -44,7 +44,7 @@ export function PropertyForm({ property, onCancel, onSaved }: PropertyFormProps)
         )}
       </div>
 
-      {form.submitError && <p className="hform__error">{form.submitError}</p>}
+      {form.submitError && <p className="hform__error" aria-live="polite" role="alert">{form.submitError}</p>}
 
       <div className="hform__footer">
         <Button type="button" variant="neutral" onClick={form.step > 0 ? form.goBack : onCancel}>
