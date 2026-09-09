@@ -42,10 +42,10 @@ export function PropertyCard({ property, onEdit, onDelete }: PropertyCardProps) 
         </div>
         <p className="hpc__address">{property.address}</p>
         <div className="hpc__actions">
-          <Button size="sm" variant="neutral" onClick={() => onEdit(property)}>
+          <Button size="sm" variant="neutral" onClick={() => onEdit(property)} aria-label={`Editar propiedad ${property.title}`}>
             Editar
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => onDelete(property)}>
+          <Button size="sm" variant="ghost" onClick={() => onDelete(property)} aria-label={`Eliminar propiedad ${property.title}`}>
             Eliminar
           </Button>
         </div>
