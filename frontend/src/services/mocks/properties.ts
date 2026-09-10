@@ -1,6 +1,6 @@
 import type { AxiosHeaders, AxiosRequestConfig } from 'axios'
 import fixtures from './data/properties'
-import { PROPERTY_TYPES, type Property, type PropertyInput } from '../types'
+import { PROPERTY_TYPES, TRANSACTION_MODES, type Property, type PropertyInput } from '../types'
 
 // Persistencia simulada en memoria (vive durante toda la sesión del navegador)
 let store: Property[] = fixtures.map((p) => ({ ...p }))
@@ -27,6 +27,9 @@ const validate = (input: PropertyInput): string[] => {
   if (!input.address?.trim()) errors.push('El campo "address" es obligatorio.')
   if (!PROPERTY_TYPES.includes(input.property_type)) {
     errors.push(`El campo "property_type" debe ser uno de: ${PROPERTY_TYPES.join(', ')}.`)
+  }
+  if (!TRANSACTION_MODES.includes(input.mode)) {
+    errors.push(`El campo "mode" debe ser uno de: ${TRANSACTION_MODES.join(', ')}.`)
   }
   return errors
 }
@@ -71,6 +74,8 @@ export const createProperty = (config: Config): Reply => {
     id: crypto.randomUUID(),
     title: body.title.trim(),
     price: body.price,
+    moneda: body.moneda ?? 'PEN',
+    mode: body.mode,
     address: body.address.trim(),
     property_type: body.property_type,
     is_active: true,
@@ -91,6 +96,8 @@ export const updateProperty = (config: Config, id: string): Reply => {
     ...store[index],
     title: body.title.trim(),
     price: body.price,
+    moneda: body.moneda ?? store[index].moneda,
+    mode: body.mode,
     address: body.address.trim(),
     property_type: body.property_type,
   }
