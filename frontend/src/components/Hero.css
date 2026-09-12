@@ -42,6 +42,7 @@
   letter-spacing: -0.02em;
   line-height: 1.1;
   max-width: 720px;
+  white-space: pre-line;
 }
 
 .hhero__subtitle {

@@ -1,6 +1,12 @@
 import { useState } from 'react'
 import { createProperty, updateProperty } from '../../services/properties'
-import type { Property, PropertyInput, PropertyType } from '../../services/types'
+import type {
+  Moneda,
+  Property,
+  PropertyInput,
+  PropertyType,
+  TransactionMode,
+} from '../../services/types'
 import type { BasicData } from './steps/basic'
 import type { FeaturesData } from './steps/features'
 import type { MediaData } from './steps/media'
@@ -13,7 +19,6 @@ export const FORM_STEPS = [
   { id: 'pricing', label: 'Precio y cierre' },
 ]
 
-type Mode = 'VENTA' | 'ALQUILER'
 type Errors = Partial<Record<keyof BasicData, string>>
 
 export interface UsePropertyFormOptions {
@@ -23,7 +28,7 @@ export interface UsePropertyFormOptions {
 
 export function usePropertyForm({ property, onSaved }: UsePropertyFormOptions) {
   const [step, setStep] = useState(0)
-  const [mode, setMode] = useState<Mode>('VENTA')
+  const [mode, setMode] = useState<TransactionMode>(property?.mode ?? 'VENTA')
   const [basic, setBasic] = useState<BasicData>({
     title: property?.title ?? '',
     address: property?.address ?? '',
@@ -42,7 +47,7 @@ export function usePropertyForm({ property, onSaved }: UsePropertyFormOptions) {
   })
   const [pricing, setPricing] = useState<PricingData>({
     price: property ? String(property.price) : '',
-    moneda: 'PEN',
+    moneda: property?.moneda ?? 'PEN',
     negociable: false,
     destacado: false,
   })
@@ -82,6 +87,8 @@ export function usePropertyForm({ property, onSaved }: UsePropertyFormOptions) {
       title: basic.title.trim(),
       address: basic.address.trim(),
       price,
+      moneda: pricing.moneda as Moneda,
+      mode,
       property_type: basic.property_type as PropertyType,
     }
 

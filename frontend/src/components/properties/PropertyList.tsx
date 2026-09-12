@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '../../components/Button'
 import { PropertyCard } from './PropertyCard'
 import { getProperties, deleteProperty } from '../../services/properties'
-import { PROPERTY_TYPES } from '../../services/types'
+import { PROPERTY_TYPE_LABELS, PROPERTY_TYPES, TRANSACTION_MODE_LABELS, TRANSACTION_MODES } from '../../services/types'
 import type { Property } from '../../services/types'
 import './PropertyList.css'
 
@@ -19,7 +19,9 @@ export function PropertyList({ onNew, onEdit }: PropertyListProps) {
   const [properties, setProperties] = useState<Property[]>([])
   const [query, setQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('')
+  const [modeFilter, setModeFilter] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>('')
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
   const fetchData = useCallback(() => {
     getProperties()
@@ -43,11 +45,16 @@ export function PropertyList({ onNew, onEdit }: PropertyListProps) {
     fetchData()
   }
 
-  const handleDelete = (property: Property) => {
-    if (!confirm(`¿Eliminar "${property.title}"?`)) return
+  const handleDeleteRequest = (property: Property) => {
+    setConfirmingId(property.id)
+  }
+
+  const handleConfirmDelete = () => {
+    if (!confirmingId) return
     setStatus('loading')
     setError(null)
-    deleteProperty(property.id)
+    setConfirmingId(null)
+    deleteProperty(confirmingId)
       .then(reload)
       .catch((err) => {
         setError(err?.message ?? 'No se pudo eliminar la propiedad.')
@@ -55,10 +62,15 @@ export function PropertyList({ onNew, onEdit }: PropertyListProps) {
       })
   }
 
+  const handleCancelDelete = () => {
+    setConfirmingId(null)
+  }
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return properties.filter((p) => {
       if (typeFilter && p.property_type !== typeFilter) return false
+      if (modeFilter && p.mode !== modeFilter) return false
       if (statusFilter === 'active' && !p.is_active) return false
       if (statusFilter === 'inactive' && p.is_active) return false
       if (
@@ -68,9 +80,9 @@ export function PropertyList({ onNew, onEdit }: PropertyListProps) {
         return false
       return true
     })
-  }, [properties, query, typeFilter, statusFilter])
+  }, [properties, query, typeFilter, modeFilter, statusFilter])
 
-  const hasFilters = Boolean(query.trim() || typeFilter || statusFilter)
+  const hasFilters = Boolean(query.trim() || typeFilter || modeFilter || statusFilter)
 
   return (
     <div className="hprops">
@@ -99,7 +111,20 @@ export function PropertyList({ onNew, onEdit }: PropertyListProps) {
             <option value="">Tipo: todos</option>
             {PROPERTY_TYPES.map((t) => (
               <option key={t} value={t}>
-                {t.charAt(0) + t.slice(1).toLowerCase()}
+                {PROPERTY_TYPE_LABELS[t]}
+              </option>
+            ))}
+          </select>
+          <select
+            className="hprops__select"
+            aria-label="Filtrar por modalidad de la propiedad"
+            value={modeFilter}
+            onChange={(e) => setModeFilter(e.target.value)}
+          >
+            <option value="">Modalidad: todas</option>
+            {TRANSACTION_MODES.map((m) => (
+              <option key={m} value={m}>
+                {TRANSACTION_MODE_LABELS[m]}
               </option>
             ))}
           </select>
@@ -114,7 +139,7 @@ export function PropertyList({ onNew, onEdit }: PropertyListProps) {
             <option value="inactive">Inactivo</option>
           </select>
           {hasFilters && (
-            <Button variant="ghost" size="sm" onClick={() => { setQuery(''); setTypeFilter(''); setStatusFilter('') }}>
+            <Button variant="ghost" size="sm" onClick={() => { setQuery(''); setTypeFilter(''); setModeFilter(''); setStatusFilter('') }}>
               Limpiar
             </Button>
           )}
@@ -122,7 +147,7 @@ export function PropertyList({ onNew, onEdit }: PropertyListProps) {
       </div>
 
       {status === 'loading' && (
-        <div className="hprops__grid hprops__grid--skeleton">
+        <div className="hprops__grid hprops__grid--skeleton" aria-hidden="true">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="hprops__skeleton" />
           ))}
@@ -147,7 +172,7 @@ export function PropertyList({ onNew, onEdit }: PropertyListProps) {
           </p>
           <div className="hprops__state-actions">
             {hasFilters ? (
-              <Button variant="neutral" onClick={() => { setQuery(''); setTypeFilter(''); setStatusFilter('') }}>
+              <Button variant="neutral" onClick={() => { setQuery(''); setTypeFilter(''); setModeFilter(''); setStatusFilter('') }}>
                 Limpiar filtros
               </Button>
             ) : (
@@ -168,7 +193,10 @@ export function PropertyList({ onNew, onEdit }: PropertyListProps) {
                 key={p.id}
                 property={p}
                 onEdit={onEdit}
-                onDelete={handleDelete}
+                onDelete={handleDeleteRequest}
+                confirming={confirmingId === p.id}
+                onConfirmDelete={handleConfirmDelete}
+                onCancelDelete={handleCancelDelete}
               />
             ))}
           </div>
