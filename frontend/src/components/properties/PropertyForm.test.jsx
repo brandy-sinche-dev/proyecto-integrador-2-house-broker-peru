@@ -181,12 +181,62 @@ describe('PropertyForm', () => {
       // submit() es asíncrono: waitFor espera a que la promesa resuelva.
       await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
       // Se verifica que createProperty se llamó con el payload correcto,
-      // tal como lo define el contrato (PropertyInput).
+      // tal como lo define el contrato (PropertyInput) incluyendo los
+      // campos adicionales recopilados en el wizard.
       expect(createProperty).toHaveBeenCalledWith({
         title: 'Departamento en Miraflores',
         address: 'Av. La Paz 250, Miraflores',
         price: 520000,
         property_type: 'DEPARTAMENTO',
+        operacion_type: 'VENTA',
+        moneda: 'PEN',
+        negociable: false,
+        destacado: false,
+      })
+    })
+
+    it('envía todos los datos recopilados en el wizard', async () => {
+      const user = userEvent.setup()
+      const onSaved = jest.fn()
+      render(<PropertyForm onCancel={jest.fn()} onSaved={onSaved} />)
+
+      await fillFirstStep(user, {
+        title: 'Casa en San Isidro',
+        address: 'Av. Los Conquistadores 300, San Isidro',
+        type: 'CASA',
+      })
+      // Finalidad "Alquiler".
+      await user.click(screen.getByRole('button', { name: 'Alquiler' }))
+      await user.click(screen.getByRole('button', { name: 'Continuar' }))
+
+      // Paso 2: métricas opcionales.
+      await user.type(screen.getByLabelText(/Área total/), '150')
+      await user.type(screen.getByLabelText(/Dormitorios/), '3')
+      await user.click(screen.getByRole('button', { name: 'Continuar' }))
+
+      // Paso 3: multimedia.
+      await user.type(screen.getByLabelText(/Link de galería/), 'https://fotos/album')
+      await user.click(screen.getByRole('button', { name: 'Continuar' }))
+
+      // Paso 4: precio, moneda y condiciones.
+      await user.type(screen.getByLabelText(/Precio/), '420000')
+      await user.selectOptions(screen.getByLabelText(/Moneda/), 'USD')
+      await user.click(screen.getByLabelText(/El precio es negociable/))
+      await user.click(screen.getByRole('button', { name: 'Publicar propiedad' }))
+
+      await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+      expect(createProperty).toHaveBeenCalledWith({
+        title: 'Casa en San Isidro',
+        address: 'Av. Los Conquistadores 300, San Isidro',
+        price: 420000,
+        property_type: 'CASA',
+        operacion_type: 'ALQUILER',
+        area_total: 150,
+        dormitorios: 3,
+        link_galeria: 'https://fotos/album',
+        moneda: 'USD',
+        negociable: true,
+        destacado: false,
       })
     })
 
@@ -211,8 +261,10 @@ describe('PropertyForm', () => {
       // ni se llama al servicio ni se dispara onSaved.
       expect(createProperty).not.toHaveBeenCalled()
       expect(onSaved).not.toHaveBeenCalled()
-      // Y la prueba confirma que el usuario se queda en el campo precio.
+      // Y la prueba confirma que el error ahora es visible y el usuario
+      // permanece en el paso del precio.
       expect(screen.getByLabelText(/Precio/)).toBeInTheDocument()
+      expect(screen.getByText('El precio es obligatorio.')).toBeInTheDocument()
     })
 
     it('edita una propiedad existente llamando a updateProperty', async () => {
@@ -246,6 +298,10 @@ describe('PropertyForm', () => {
         address: 'Av. El Derby 123, San Isidro',
         price: 850000,
         property_type: 'DEPARTAMENTO',
+        operacion_type: 'VENTA',
+        moneda: 'PEN',
+        negociable: false,
+        destacado: false,
       })
     })
   })

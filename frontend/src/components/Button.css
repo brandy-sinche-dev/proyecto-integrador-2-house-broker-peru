@@ -3,54 +3,70 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: none;
+  border: 1px solid transparent;
   border-radius: 999px;
   font-weight: 700;
   font-family: var(--font);
   line-height: 1;
-  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+  letter-spacing: 0.01em;
+  transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease,
+    border-color 0.18s ease, color 0.18s ease;
 }
 
 .hbtn--md {
-  height: 44px;
-  padding: 0 20px;
+  height: 46px;
+  padding: 0 24px;
   font-size: 14px;
 }
 
 .hbtn--sm {
-  height: 34px;
-  padding: 0 15px;
+  height: 36px;
+  padding: 0 16px;
   font-size: 13px;
 }
 
 .hbtn--primary {
-  background: linear-gradient(180deg, var(--brand-gold) 0%, var(--brand-bronze) 100%);
-  color: #fff;
+  background: var(--ink);
+  color: var(--white);
   box-shadow: var(--shadow-btn);
 }
 
 .hbtn--primary:hover {
-  background: linear-gradient(180deg, #c39e63 0%, var(--brand-bronze-dark) 100%);
+  background: var(--ink-soft);
   transform: translateY(-1px);
 }
 
 .hbtn--neutral {
-  background: var(--chip);
+  background: var(--white);
   color: var(--ink);
+  border-color: var(--line);
   box-shadow: var(--shadow-soft);
 }
 
 .hbtn--neutral:hover {
-  background: #e4e0dc;
+  border-color: var(--line-strong);
+  background: var(--surface-2);
 }
 
 .hbtn--ghost {
   background: transparent;
-  color: var(--ink);
+  color: var(--muted);
 }
 
 .hbtn--ghost:hover {
   background: var(--chip);
+  color: var(--ink);
+}
+
+.hbtn--danger {
+  background: #a52a20;
+  color: #fff;
+  box-shadow: 0 12px 26px -14px rgba(165, 42, 32, 0.8);
+}
+
+.hbtn--danger:hover {
+  background: #8c1f16;
+  transform: translateY(-1px);
 }
 
 .hbtn:disabled {

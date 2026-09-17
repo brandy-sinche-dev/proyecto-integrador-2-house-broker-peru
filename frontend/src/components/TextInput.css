@@ -1,13 +1,14 @@
 .hinput {
-  height: 40px;
-  padding: 0 12px;
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
   background: var(--field);
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   font-family: var(--font);
   font-size: 14px;
   color: var(--ink);
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .hinput::placeholder {
@@ -15,17 +16,24 @@
 }
 
 .hinput:hover {
-  border-color: var(--line);
+  border-color: var(--line-strong);
 }
 
 .hinput:focus {
   outline: none;
-  border-color: var(--brand-bronze);
+  border-color: var(--brand-gold);
   background: var(--white);
+  box-shadow: var(--ring);
 }
 
 .hinput--invalid {
-  border-color: #b3261e;
+  border-color: var(--danger);
+  background: rgba(179, 38, 30, 0.04);
+}
+
+.hinput--invalid:focus {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(179, 38, 30, 0.18);
 }
 
 .hinput:read-only {

@@ -1,0 +1,191 @@
+.hai {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.hai > * {
+  pointer-events: auto;
+}
+
+.hai__dock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hai__card {
+  width: 349.56px;
+  height: 56px;
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  animation: hfade-up 0.35s ease both;
+}
+
+.hai__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.hai__dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: var(--brand-bronze);
+}
+
+.hai__msg {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hai__btn {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 12px;
+  background: var(--brand-bronze);
+  color: var(--white);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.hai__btn:hover {
+  background: var(--brand-bronze-dark);
+  transform: translateY(-1px);
+}
+
+.hai__btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.hai__panel {
+  width: 349.56px;
+  padding: 16px;
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  animation: hfade-up 0.3s ease both;
+}
+
+.hai__panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.hai__panel-title {
+  flex: 1;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.hai__close {
+  border: none;
+  background: none;
+  padding: 4px;
+  display: grid;
+  place-items: center;
+  color: var(--muted-light);
+}
+
+.hai__close svg {
+  width: 12px;
+  height: 12px;
+}
+
+.hai__close:hover {
+  color: var(--ink);
+}
+
+.hai__messages {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.hai__bubble {
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--field);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink);
+}
+
+.hai__quick {
+  display: flex;
+  gap: 8px;
+}
+
+.hai__quick button {
+  flex: 1;
+  height: 36px;
+  border: 1px solid var(--brand-bronze);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--brand-bronze);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.hai__quick button:hover {
+  background: var(--field);
+}
+
+@media (max-width: 520px) {
+  .hai {
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    align-items: stretch;
+  }
+
+  .hai__dock {
+    justify-content: flex-end;
+  }
+
+  .hai__card {
+    width: auto;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .hai__panel {
+    width: auto;
+  }
+}

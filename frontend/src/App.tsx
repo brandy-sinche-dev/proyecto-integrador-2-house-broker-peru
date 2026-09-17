@@ -1,74 +1,87 @@
-import { useState, lazy, Suspense } from 'react'
-import { Button } from './components/Button'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { Header } from './components/Header'
-import { Hero } from './components/Hero'
-import type { Property } from './services/types'
+import type { NavTarget, Section } from './components/Header'
+import { Footer } from './components/Footer'
+import { AssistantWidget } from './components/AssistantWidget'
 
-const PropertyForm = lazy(() => import('./components/properties/PropertyForm').then(m => ({ default: m.PropertyForm })))
 const PropertyList = lazy(() => import('./components/properties/PropertyList').then(m => ({ default: m.PropertyList })))
 
-type View = { name: 'list' } | { name: 'form'; property?: Property }
-
-const NEW_KEY = crypto.randomUUID()
+const readList = (key: string): string[] => {
+  try {
+    const raw = localStorage.getItem(key)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []
+  } catch {
+    return []
+  }
+}
 
 function App() {
-  const [view, setView] = useState<View>({ name: 'list' })
+  const [section, setSection] = useState<Section>('inicio')
+  const [assistantOpen, setAssistantOpen] = useState(false)
+  const [saved, setSaved] = useState<string[]>(() => readList('hb_saved'))
+  const [visits, setVisits] = useState<string[]>(() => readList('hb_visits'))
 
-  const navigate = (target: 'list' | 'form') => {
-    if (target === 'list') setView({ name: 'list' })
-    else setView({ name: 'form' })
+  useEffect(() => {
+    localStorage.setItem('hb_saved', JSON.stringify(saved))
+  }, [saved])
+
+  useEffect(() => {
+    localStorage.setItem('hb_visits', JSON.stringify(visits))
+  }, [visits])
+
+  const toggleSave = (id: string) =>
+    setSaved((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+
+  const toggleVisit = (id: string) =>
+    setVisits((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+
+  const navigate = (target: NavTarget) => {
+    if (target === 'concierge') {
+      setAssistantOpen(true)
+      return
+    }
+    setSection(target)
   }
 
   return (
     <>
-      <Header current={view.name} onNavigate={navigate} />
+      <Header
+        current={section}
+        conciergeOpen={assistantOpen}
+        savedCount={saved.length}
+        visitsCount={visits.length}
+        onNavigate={navigate}
+      />
 
-      {view.name === 'list' ? (
-        <>
-          <Hero
-            title={`Encuentra el inmueble ideal\ndonde quieras vivir`}
-            subtitle="Explora departamentos, casas, terrenos y oficinas gestionados por HouseBroker Perú."
-          />
-          <main className="hmain">
-            <Suspense fallback={
-              <div className="hprops__grid hprops__grid--skeleton" aria-hidden="true">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="hprops__skeleton" />
-                ))}
-              </div>
-            }>
-              <PropertyList
-                onNew={() => navigate('form')}
-                onEdit={(property) => setView({ name: 'form', property })}
-              />
-            </Suspense>
-          </main>
-        </>
-      ) : (
+      <Suspense fallback={
         <main className="hmain">
-          <div className="hform-heading">
-            <p className="hform-heading__eyebrow">HouseBroker Perú</p>
-            <h2 className="hform-heading__title">
-              {view.property ? 'Editar propiedad' : 'Registrar propiedad'}
-            </h2>
-            <Button variant="ghost" onClick={() => navigate('list')}>
-              ← Volver al listado
-            </Button>
+          <div className="hprops__grid hprops__grid--skeleton" aria-hidden="true">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="hprops__skeleton" />
+            ))}
           </div>
-          <Suspense fallback={
-            <div className="hprops__grid hprops__grid--skeleton" aria-hidden="true">
-              <div className="hprops__skeleton" style={{ gridColumn: '1 / -1', height: '400px' }} />
-            </div>
-          }>
-            <PropertyForm
-              key={view.property?.id ?? NEW_KEY}
-              property={view.property}
-              onCancel={() => navigate('list')}
-              onSaved={() => navigate('list')}
-            />
-          </Suspense>
         </main>
-      )}
+      }>
+        <PropertyList
+          mode={section}
+          saved={saved}
+          visits={visits}
+          onToggleSave={toggleSave}
+          onToggleVisit={toggleVisit}
+          onNavigate={navigate}
+        />
+      </Suspense>
+
+      <Footer />
+
+      <AssistantWidget
+        open={assistantOpen}
+        savedCount={saved.length}
+        visitsCount={visits.length}
+        onToggle={() => setAssistantOpen((open) => !open)}
+        onNavigate={navigate}
+      />
     </>
   )
 }

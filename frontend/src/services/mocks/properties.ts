@@ -1,6 +1,12 @@
 import type { AxiosHeaders, AxiosRequestConfig } from 'axios'
 import fixtures from './data/properties'
-import { PROPERTY_TYPES, type Property, type PropertyInput } from '../types'
+import {
+  CURRENCIES,
+  OPERATION_TYPES,
+  PROPERTY_TYPES,
+  type Property,
+  type PropertyInput,
+} from '../types'
 
 // Persistencia simulada en memoria (vive durante toda la sesión del navegador)
 let store: Property[] = fixtures.map((p) => ({ ...p }))
@@ -18,6 +24,15 @@ const replyError = (
   errors?: string[],
 ): Reply => [status, { message, errors }]
 
+const NUMERIC_FIELDS = [
+  'area_total',
+  'area_construida',
+  'dormitorios',
+  'banos',
+  'estacionamientos',
+  'mantenimiento',
+] as const
+
 const validate = (input: PropertyInput): string[] => {
   const errors: string[] = []
   if (!input.title?.trim()) errors.push('El campo "title" es obligatorio.')
@@ -27,6 +42,18 @@ const validate = (input: PropertyInput): string[] => {
   if (!input.address?.trim()) errors.push('El campo "address" es obligatorio.')
   if (!PROPERTY_TYPES.includes(input.property_type)) {
     errors.push(`El campo "property_type" debe ser uno de: ${PROPERTY_TYPES.join(', ')}.`)
+  }
+  if (input.operacion_type != null && !(OPERATION_TYPES as readonly unknown[]).includes(input.operacion_type)) {
+    errors.push(`El campo "operacion_type" debe ser uno de: ${OPERATION_TYPES.join(', ')}.`)
+  }
+  if (input.moneda != null && !(CURRENCIES as readonly unknown[]).includes(input.moneda)) {
+    errors.push(`El campo "moneda" debe ser uno de: ${CURRENCIES.join(', ')}.`)
+  }
+  for (const field of NUMERIC_FIELDS) {
+    const value = input[field]
+    if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value < 0)) {
+      errors.push(`El campo "${field}" debe ser un número mayor o igual a 0.`)
+    }
   }
   return errors
 }
@@ -69,10 +96,9 @@ export const createProperty = (config: Config): Reply => {
   if (errors.length > 0) return replyError(400, 'Datos de entrada inválidos.', errors)
   const property: Property = {
     id: crypto.randomUUID(),
+    ...body,
     title: body.title.trim(),
-    price: body.price,
     address: body.address.trim(),
-    property_type: body.property_type,
     is_active: true,
     created_at: new Date().toISOString(),
   }
@@ -89,10 +115,9 @@ export const updateProperty = (config: Config, id: string): Reply => {
   if (errors.length > 0) return replyError(400, 'Datos de actualización inválidos.', errors)
   const updated: Property = {
     ...store[index],
+    ...body,
     title: body.title.trim(),
-    price: body.price,
     address: body.address.trim(),
-    property_type: body.property_type,
   }
   store = store.map((p) => (p.id === id ? updated : p))
   return [200, updated]

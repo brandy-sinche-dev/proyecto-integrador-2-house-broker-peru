@@ -1,20 +1,21 @@
 .htoggle {
   display: inline-flex;
   background: var(--field);
-  border-radius: var(--radius-sm);
-  padding: 3px;
-  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px;
+  gap: 4px;
 }
 
 .htoggle__item {
   border: none;
   background: transparent;
-  padding: 6px 16px;
-  border-radius: var(--radius-sm);
+  padding: 9px 22px;
+  border-radius: 999px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--muted);
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .htoggle__item:hover {
@@ -22,7 +23,7 @@
 }
 
 .htoggle__item--active {
-  background: var(--white);
-  color: var(--ink);
-  box-shadow: var(--shadow-soft);
+  background: var(--ink);
+  color: var(--white);
+  box-shadow: 0 8px 18px -10px rgba(23, 19, 14, 0.8);
 }

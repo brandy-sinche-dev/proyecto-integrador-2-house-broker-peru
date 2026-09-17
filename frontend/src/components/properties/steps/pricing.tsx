@@ -14,9 +14,10 @@ interface FormStepPricingProps {
   data: PricingData
   onChange: (data: PricingData) => void
   isEdit: boolean
+  error?: string
 }
 
-export function FormStepPricing({ data, onChange, isEdit }: FormStepPricingProps) {
+export function FormStepPricing({ data, onChange, isEdit, error }: FormStepPricingProps) {
   return (
     <FormSection
       step={4}
@@ -24,12 +25,13 @@ export function FormStepPricing({ data, onChange, isEdit }: FormStepPricingProps
       subtitle="Define el valor y las condiciones de publicación"
     >
       <div className="hform-grid">
-        <Field label="Precio" required hint={isEdit ? 'Edita el valor de venta o renta.' : 'Precio en la moneda seleccionada.'}>
+        <Field label="Precio" required hint={isEdit ? 'Edita el valor de venta o renta.' : 'Precio en la moneda seleccionada.'} error={error}>
           <TextInput
             type="number"
             min={0}
             placeholder="Ej. 850000"
             value={data.price}
+            invalid={Boolean(error)}
             onChange={(e) => onChange({ ...data, price: e.target.value })}
           />
         </Field>

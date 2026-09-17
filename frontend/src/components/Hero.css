@@ -1,62 +1,168 @@
 .hhero {
-  background:
-    radial-gradient(900px 420px at 12% -10%, rgba(176, 141, 82, 0.55), transparent 60%),
-    radial-gradient(700px 380px at 88% 110%, rgba(58, 44, 20, 0.9), transparent 65%),
-    linear-gradient(180deg, #2c2112 0%, #3a2c14 55%, #2c2112 100%);
-  color: #fff;
-  padding: 72px 0 84px;
   position: relative;
   overflow: hidden;
+  color: #fff;
+  padding: 68px 0 84px;
+  background:
+    radial-gradient(760px 420px at 8% -20%, rgba(194, 161, 95, 0.42), transparent 62%),
+    radial-gradient(680px 380px at 96% 120%, rgba(138, 106, 52, 0.5), transparent 60%),
+    linear-gradient(160deg, #241c11 0%, #17130e 48%, #211a11 100%);
+  border-bottom: 1px solid rgba(194, 161, 95, 0.25);
 }
 
-.hhero::after {
-  content: '';
+.hhero__grain {
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.14) 1px, transparent 1px);
-  background-size: 26px 26px;
-  opacity: 0.25;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.22;
   pointer-events: none;
 }
 
 .hhero__inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 24px;
   position: relative;
   z-index: 1;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 54px;
+  align-items: center;
 }
 
 .hhero__eyebrow {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.24em;
+  letter-spacing: 0.34em;
   text-transform: uppercase;
   color: var(--brand-gold);
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .hhero__title {
-  font-size: 42px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
-  max-width: 720px;
+  font-family: var(--font-display);
+  font-size: clamp(34px, 4.6vw, 56px);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.06;
+  white-space: pre-line;
+  max-width: 640px;
 }
 
 .hhero__subtitle {
   font-size: 17px;
-  color: rgba(255, 255, 255, 0.78);
-  max-width: 620px;
-  margin-top: 14px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.74);
+  max-width: 520px;
+  margin-top: 18px;
+}
+
+.hhero__stats {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 40px;
+  margin: 38px 0 0;
+  padding: 26px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.hhero__stats strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--brand-gold);
+  line-height: 1;
+}
+
+.hhero__stats span {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.hhero__figure {
+  position: relative;
+  margin: 0;
+}
+
+.hhero__frame {
+  position: relative;
+  padding: 12px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(194, 161, 95, 0.4);
+  box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.85);
+}
+
+.hhero__frame::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  border: 1px solid rgba(194, 161, 95, 0.22);
+  border-radius: 30px;
+  pointer-events: none;
+}
+
+.hhero__frame img {
+  display: block;
+  width: 100%;
+  border-radius: 16px;
+  filter: saturate(1.05) contrast(1.03);
+}
+
+.hhero__badge {
+  position: absolute;
+  left: 26px;
+  bottom: -16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 10px 16px;
+  border-radius: 999px;
+  box-shadow: 0 16px 30px -16px rgba(0, 0, 0, 0.7);
+}
+
+.hhero__badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand-gold);
+  box-shadow: 0 0 0 4px rgba(194, 161, 95, 0.22);
+}
+
+@media (max-width: 940px) {
+  .hhero {
+    padding: 48px 0 64px;
+  }
+
+  .hhero__inner {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .hhero__figure {
+    max-width: 460px;
+  }
 }
 
 @media (max-width: 640px) {
-  .hhero {
-    padding: 48px 0 56px;
+  .hhero__stats {
+    gap: 26px;
   }
 
-  .hhero__title {
-    font-size: 30px;
+  .hhero__stats strong {
+    font-size: 22px;
   }
 }

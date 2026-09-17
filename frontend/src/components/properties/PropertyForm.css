@@ -1,39 +1,60 @@
 .hform {
-  max-width: 880px;
+  max-width: 900px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 26px;
   padding-bottom: 40px;
 }
 
 .hform__card {
+  position: relative;
+  overflow: hidden;
   background: var(--white);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: 22px;
   box-shadow: var(--shadow-card);
-  padding: 26px;
+  padding: 32px;
+  animation: hfade-up 0.4s ease both;
+}
+
+.hform__card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: var(--gradient-gold);
 }
 
 .hform__error {
   font-size: 13px;
+  font-weight: 600;
   color: var(--danger);
   background: rgba(179, 38, 30, 0.08);
   border: 1px solid rgba(179, 38, 30, 0.2);
   border-radius: var(--radius-sm);
-  padding: 10px 14px;
+  padding: 12px 16px;
 }
 
 .hform__footer {
+  position: sticky;
+  bottom: 16px;
+  z-index: 10;
   display: flex;
   justify-content: space-between;
   gap: 10px;
+  padding: 14px;
+  background: rgba(253, 251, 247, 0.9);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: var(--shadow-card);
 }
 
 .hform-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 18px;
+  gap: 20px;
 }
 
 .hform-grid__full {
@@ -41,26 +62,35 @@
 }
 
 .hform-dropzone {
-  border: 2px dashed var(--line);
-  border-radius: var(--radius-md);
-  padding: 28px 16px;
+  position: relative;
+  border: 2px dashed var(--line-strong);
+  border-radius: 16px;
+  padding: 32px 18px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   text-align: center;
-  background: var(--field);
+  background:
+    radial-gradient(320px 120px at 50% 0%, rgba(194, 161, 95, 0.12), transparent 70%),
+    var(--surface);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.hform-dropzone:hover {
+  border-color: var(--brand-gold);
 }
 
 .hform-dropzone__icon {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   color: var(--brand-bronze);
 }
 
 .hform-dropzone__title {
-  font-size: 14px;
+  font-family: var(--font-display);
+  font-size: 17px;
   font-weight: 700;
   color: var(--ink);
 }
@@ -73,47 +103,58 @@
 .hform-check {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .hform-check__item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
   font-size: 14px;
   font-weight: 600;
   color: var(--ink);
   cursor: pointer;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.hform-check__item:hover {
+  border-color: var(--line-strong);
+  background: var(--white);
 }
 
 .hform-check__item input {
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
   accent-color: var(--brand-bronze);
 }
 
 .hsection {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 24px;
 }
 
 .hsection__head {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding-bottom: 18px;
+  gap: 16px;
+  padding-bottom: 20px;
   border-bottom: 1px solid var(--line);
 }
 
 .hsection__step {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: var(--brand-bronze);
-  color: #fff;
-  font-size: 17px;
-  font-weight: 800;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--gradient-gold);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -122,15 +163,16 @@
 }
 
 .hsection__title {
-  font-size: 20px;
-  font-weight: 800;
+  font-family: var(--font-display);
+  font-size: 23px;
+  font-weight: 700;
   color: var(--ink);
 }
 
 .hsection__subtitle {
   font-size: 13px;
   color: var(--muted);
-  margin-top: 2px;
+  margin-top: 3px;
 }
 
 .hsection__body {
@@ -140,7 +182,12 @@
 
 @media (max-width: 640px) {
   .hform__card {
-    padding: 18px;
+    padding: 20px;
+  }
+
+  .hform__footer {
+    position: static;
+    border-radius: 18px;
   }
 
   .hform-grid {
