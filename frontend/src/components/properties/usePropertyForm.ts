@@ -2,11 +2,11 @@ import { useState } from 'react'
 import { createProperty, updateProperty } from '../../services/properties'
 import { getErrorMessage } from '../../services/errors'
 import type {
-  Currency,
-  OperationType,
+  Moneda,
   Property,
   PropertyInput,
   PropertyType,
+  TransactionMode,
 } from '../../services/types'
 import type { BasicData } from './steps/basic'
 import type { FeaturesData } from './steps/features'
@@ -19,8 +19,6 @@ export const FORM_STEPS = [
   { id: 'media', label: 'Multimedia y planos' },
   { id: 'pricing', label: 'Precio y cierre' },
 ]
-
-type Mode = OperationType
 
 type ErrorKey =
   | keyof BasicData
@@ -48,7 +46,7 @@ function isBlank(value: string): boolean {
 
 export function usePropertyForm({ property, onSaved }: UsePropertyFormOptions) {
   const [step, setStep] = useState(0)
-  const [mode, setMode] = useState<Mode>(property?.operacion_type ?? 'VENTA')
+  const [mode, setMode] = useState<TransactionMode>(property?.mode ?? 'VENTA')
   const [basic, setBasic] = useState<BasicData>({
     title: property?.title ?? '',
     address: property?.address ?? '',
@@ -138,8 +136,9 @@ export function usePropertyForm({ property, onSaved }: UsePropertyFormOptions) {
       title: basic.title.trim(),
       address: basic.address.trim(),
       price: Number(pricing.price),
+      moneda: pricing.moneda as Moneda,
+      mode,
       property_type: basic.property_type as PropertyType,
-      operacion_type: mode,
       area_total: toOptionalNumber(features.area_total),
       area_construida: toOptionalNumber(features.area_construida),
       dormitorios: toOptionalNumber(features.dormitorios),
@@ -147,7 +146,6 @@ export function usePropertyForm({ property, onSaved }: UsePropertyFormOptions) {
       estacionamientos: toOptionalNumber(features.estacionamientos),
       link_planos: media.link_planos.trim() === '' ? undefined : media.link_planos.trim(),
       link_galeria: media.link_galeria.trim() === '' ? undefined : media.link_galeria.trim(),
-      moneda: pricing.moneda as Currency,
       negociable: pricing.negociable,
       destacado: pricing.destacado,
     }

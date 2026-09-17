@@ -1,7 +1,7 @@
-import type { OperationType } from '../../services/types'
+import type { TransactionMode } from '../../services/types'
 
 export interface Filters {
-  operacion: OperationType | ''
+  operacion: TransactionMode | ''
   priceMin: number
   priceMax: number
   metraje: '' | 'small' | 'mid' | 'large'

@@ -1,4 +1,4 @@
-import type { Property } from '../../services/types'
+import type { Property, TransactionMode } from '../../services/types'
 import { formatMoney } from './money'
 import './PropertyCard.css'
 
@@ -17,7 +17,7 @@ const TYPE_LABEL: Record<string, string> = {
   OFICINA: 'Oficina',
 }
 
-const OP_LABEL: Record<string, string> = {
+const OP_LABEL: Record<TransactionMode, string> = {
   VENTA: 'En venta',
   ALQUILER: 'En alquiler',
 }
@@ -71,13 +71,10 @@ export function PropertyCard({ property, saved, visit, onToggleSave, onToggleVis
 
   const typeLabel = TYPE_LABEL[property.property_type] ?? property.property_type
 
-  let primaryBadge: { text: string; variant: string }
-  if (property.operacion_type) {
-    primaryBadge = {
-      text: OP_LABEL[property.operacion_type] ?? property.operacion_type,
-      variant: property.destacado ? 'gold' : 'bronze',
-    }
-  } else primaryBadge = { text: typeLabel, variant: 'muted' }
+  const primaryBadge = {
+    text: OP_LABEL[property.mode] ?? property.mode,
+    variant: property.destacado ? 'gold' : 'bronze',
+  }
 
   const glassBadge = property.destacado ? 'DESTACADO' : property.negociable ? 'NEGOCIABLE' : null
 

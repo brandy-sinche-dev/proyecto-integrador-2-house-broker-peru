@@ -3,7 +3,7 @@ import { FormSection } from './FormSection'
 import { Select } from '../../../components/Select'
 import { TextInput } from '../../../components/TextInput'
 import { ToggleGroup } from '../../../components/ToggleGroup'
-import { PROPERTY_TYPES } from '../../../services/types'
+import { PROPERTY_TYPE_LABELS, PROPERTY_TYPES } from '../../../services/types'
 
 export interface BasicData {
   title: string
@@ -40,7 +40,7 @@ export function FormStepBasic({ mode, onModeChange, data, onChange, errors }: Fo
 
         <Field label="Tipo de propiedad" required error={errors.property_type} className="hform-grid__full">
           <Select
-            options={PROPERTY_TYPES.map((t) => ({ value: t, label: t.charAt(0) + t.slice(1).toLowerCase() }))}
+            options={PROPERTY_TYPES.map((t) => ({ value: t, label: PROPERTY_TYPE_LABELS[t] }))}
             placeholder="Selecciona un tipo"
             value={data.property_type}
             invalid={Boolean(errors.property_type)}

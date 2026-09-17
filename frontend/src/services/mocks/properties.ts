@@ -1,12 +1,6 @@
 import type { AxiosHeaders, AxiosRequestConfig } from 'axios'
 import fixtures from './data/properties'
-import {
-  CURRENCIES,
-  OPERATION_TYPES,
-  PROPERTY_TYPES,
-  type Property,
-  type PropertyInput,
-} from '../types'
+import { PROPERTY_TYPES, TRANSACTION_MODES, type Property, type PropertyInput } from '../types'
 
 // Persistencia simulada en memoria (vive durante toda la sesión del navegador)
 let store: Property[] = fixtures.map((p) => ({ ...p }))
@@ -43,11 +37,8 @@ const validate = (input: PropertyInput): string[] => {
   if (!PROPERTY_TYPES.includes(input.property_type)) {
     errors.push(`El campo "property_type" debe ser uno de: ${PROPERTY_TYPES.join(', ')}.`)
   }
-  if (input.operacion_type != null && !(OPERATION_TYPES as readonly unknown[]).includes(input.operacion_type)) {
-    errors.push(`El campo "operacion_type" debe ser uno de: ${OPERATION_TYPES.join(', ')}.`)
-  }
-  if (input.moneda != null && !(CURRENCIES as readonly unknown[]).includes(input.moneda)) {
-    errors.push(`El campo "moneda" debe ser uno de: ${CURRENCIES.join(', ')}.`)
+  if (!TRANSACTION_MODES.includes(input.mode)) {
+    errors.push(`El campo "mode" debe ser uno de: ${TRANSACTION_MODES.join(', ')}.`)
   }
   for (const field of NUMERIC_FIELDS) {
     const value = input[field]
@@ -98,6 +89,9 @@ export const createProperty = (config: Config): Reply => {
     id: crypto.randomUUID(),
     ...body,
     title: body.title.trim(),
+    price: body.price,
+    moneda: body.moneda ?? 'PEN',
+    mode: body.mode,
     address: body.address.trim(),
     is_active: true,
     created_at: new Date().toISOString(),
@@ -117,6 +111,9 @@ export const updateProperty = (config: Config, id: string): Reply => {
     ...store[index],
     ...body,
     title: body.title.trim(),
+    price: body.price,
+    moneda: body.moneda ?? store[index].moneda,
+    mode: body.mode,
     address: body.address.trim(),
   }
   store = store.map((p) => (p.id === id ? updated : p))

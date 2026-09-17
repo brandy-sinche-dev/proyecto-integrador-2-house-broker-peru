@@ -2,23 +2,34 @@ export const PROPERTY_TYPES = ['DEPARTAMENTO', 'CASA', 'TERRENO', 'OFICINA'] as 
 
 export type PropertyType = (typeof PROPERTY_TYPES)[number]
 
-export const OPERATION_TYPES = ['VENTA', 'ALQUILER'] as const
+export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
+  DEPARTAMENTO: 'Departamento',
+  CASA: 'Casa',
+  TERRENO: 'Terreno',
+  OFICINA: 'Oficina',
+}
 
-export type OperationType = (typeof OPERATION_TYPES)[number]
+export type Moneda = 'PEN' | 'USD'
 
-export const CURRENCIES = ['PEN', 'USD'] as const
+export const TRANSACTION_MODES = ['VENTA', 'ALQUILER'] as const
 
-export type Currency = (typeof CURRENCIES)[number]
+export type TransactionMode = (typeof TRANSACTION_MODES)[number]
+
+export const TRANSACTION_MODE_LABELS: Record<TransactionMode, string> = {
+  VENTA: 'Venta',
+  ALQUILER: 'Alquiler',
+}
 
 export interface Property {
   id: string
   title: string
   price: number
+  moneda: Moneda
+  mode: TransactionMode
   address: string
   property_type: PropertyType
   is_active: boolean
   created_at: string
-  operacion_type?: OperationType
   area_total?: number
   area_construida?: number
   dormitorios?: number
@@ -26,7 +37,6 @@ export interface Property {
   estacionamientos?: number
   link_galeria?: string
   link_planos?: string
-  moneda?: Currency
   negociable?: boolean
   destacado?: boolean
   mantenimiento?: number
@@ -35,9 +45,10 @@ export interface Property {
 export interface PropertyInput {
   title: string
   price: number
+  moneda?: Moneda
+  mode: TransactionMode
   address: string
   property_type: PropertyType
-  operacion_type?: OperationType
   area_total?: number
   area_construida?: number
   dormitorios?: number
@@ -45,7 +56,6 @@ export interface PropertyInput {
   estacionamientos?: number
   link_galeria?: string
   link_planos?: string
-  moneda?: Currency
   negociable?: boolean
   destacado?: boolean
   mantenimiento?: number

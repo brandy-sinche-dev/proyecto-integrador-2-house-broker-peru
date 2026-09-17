@@ -133,7 +133,7 @@ export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit,
     const list = properties.filter((p) => {
       if (mode === 'guardados' && !saved.includes(p.id)) return false
       if (mode === 'visitas' && !visits.includes(p.id)) return false
-      if (filters.operacion && p.operacion_type !== filters.operacion) return false
+      if (filters.operacion && p.mode !== filters.operacion) return false
       if (p.price < filters.priceMin || p.price > filters.priceMax) return false
       if (filters.metraje) {
         const a = areaOf(p)
