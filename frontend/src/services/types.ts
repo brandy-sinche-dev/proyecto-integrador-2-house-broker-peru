@@ -30,6 +30,16 @@ export interface Property {
   property_type: PropertyType
   is_active: boolean
   created_at: string
+  area_total?: number
+  area_construida?: number
+  dormitorios?: number
+  banos?: number
+  estacionamientos?: number
+  link_galeria?: string
+  link_planos?: string
+  negociable?: boolean
+  destacado?: boolean
+  mantenimiento?: number
 }
 
 export interface PropertyInput {
@@ -39,4 +49,14 @@ export interface PropertyInput {
   mode: TransactionMode
   address: string
   property_type: PropertyType
+  area_total?: number
+  area_construida?: number
+  dormitorios?: number
+  banos?: number
+  estacionamientos?: number
+  link_galeria?: string
+  link_planos?: string
+  negociable?: boolean
+  destacado?: boolean
+  mantenimiento?: number
 }

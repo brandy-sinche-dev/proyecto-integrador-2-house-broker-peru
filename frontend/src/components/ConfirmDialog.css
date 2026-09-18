@@ -1,0 +1,58 @@
+.hdialog {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: hfade-in 0.18s ease both;
+}
+
+.hdialog__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(18, 14, 9, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.hdialog__panel {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  overflow: hidden;
+  background: var(--white);
+  border-radius: 22px;
+  box-shadow: 0 40px 70px -26px rgba(0, 0, 0, 0.6);
+  padding: 30px;
+  animation: hfade-up 0.22s ease both;
+}
+
+.hdialog__panel::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: var(--gradient-gold);
+}
+
+.hdialog__title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.hdialog__message {
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.hdialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 26px;
+}

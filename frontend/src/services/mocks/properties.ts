@@ -18,6 +18,15 @@ const replyError = (
   errors?: string[],
 ): Reply => [status, { message, errors }]
 
+const NUMERIC_FIELDS = [
+  'area_total',
+  'area_construida',
+  'dormitorios',
+  'banos',
+  'estacionamientos',
+  'mantenimiento',
+] as const
+
 const validate = (input: PropertyInput): string[] => {
   const errors: string[] = []
   if (!input.title?.trim()) errors.push('El campo "title" es obligatorio.')
@@ -30,6 +39,12 @@ const validate = (input: PropertyInput): string[] => {
   }
   if (!TRANSACTION_MODES.includes(input.mode)) {
     errors.push(`El campo "mode" debe ser uno de: ${TRANSACTION_MODES.join(', ')}.`)
+  }
+  for (const field of NUMERIC_FIELDS) {
+    const value = input[field]
+    if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value < 0)) {
+      errors.push(`El campo "${field}" debe ser un número mayor o igual a 0.`)
+    }
   }
   return errors
 }
@@ -72,12 +87,12 @@ export const createProperty = (config: Config): Reply => {
   if (errors.length > 0) return replyError(400, 'Datos de entrada inválidos.', errors)
   const property: Property = {
     id: crypto.randomUUID(),
+    ...body,
     title: body.title.trim(),
     price: body.price,
     moneda: body.moneda ?? 'PEN',
     mode: body.mode,
     address: body.address.trim(),
-    property_type: body.property_type,
     is_active: true,
     created_at: new Date().toISOString(),
   }
@@ -94,12 +109,12 @@ export const updateProperty = (config: Config, id: string): Reply => {
   if (errors.length > 0) return replyError(400, 'Datos de actualización inválidos.', errors)
   const updated: Property = {
     ...store[index],
+    ...body,
     title: body.title.trim(),
     price: body.price,
     moneda: body.moneda ?? store[index].moneda,
     mode: body.mode,
     address: body.address.trim(),
-    property_type: body.property_type,
   }
   store = store.map((p) => (p.id === id ? updated : p))
   return [200, updated]

@@ -1,9 +1,14 @@
 .hstepper {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 12px 18px;
   display: flex;
   align-items: center;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: var(--shadow-soft);
 }
 
 .hstepper__item {
@@ -14,8 +19,8 @@
 }
 
 .hstepper__dot {
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -23,33 +28,37 @@
   font-size: 13px;
   font-weight: 800;
   flex-shrink: 0;
-  border: 2px solid var(--line);
+  border: 2px solid var(--line-strong);
   background: var(--white);
   color: var(--muted-light);
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .hstepper__label {
   font-size: 13px;
   font-weight: 700;
-  margin-left: 9px;
+  margin-left: 10px;
   white-space: nowrap;
   color: var(--muted);
+  transition: color 0.2s ease;
 }
 
 .hstepper__line {
   flex: 1 1 100%;
-  height: 2px;
-  min-width: 22px;
-  margin: 0 12px;
+  height: 3px;
+  min-width: 26px;
+  margin: 0 14px;
   background: var(--line);
-  border-radius: 2px;
+  border-radius: 3px;
+  transition: background 0.25s ease;
 }
 
 .hstepper__item--active .hstepper__dot {
-  border-color: var(--brand-bronze);
-  background: var(--brand-bronze);
-  color: #fff;
+  border-color: transparent;
+  background: var(--gradient-gold);
+  color: var(--ink);
   box-shadow: var(--shadow-btn);
+  transform: scale(1.06);
 }
 
 .hstepper__item--active .hstepper__label {
@@ -57,27 +66,31 @@
 }
 
 .hstepper__item--done .hstepper__dot {
-  border-color: var(--brand-bronze);
-  background: var(--brand-bronze);
-  color: #fff;
+  border-color: transparent;
+  background: var(--ink);
+  color: var(--brand-gold);
 }
 
 .hstepper__item--done .hstepper__label {
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
-.hstepper__item--done ~ .hstepper__item .hstepper__line,
-.hstepper__item--done .hstepper__line {
-  background: var(--brand-bronze);
+.hstepper__item--done .hstepper__line,
+.hstepper__item--done ~ .hstepper__item .hstepper__line {
+  background: linear-gradient(90deg, var(--brand-gold) 0%, var(--line-strong) 100%);
 }
 
-@media (max-width: 700px) {
+@media (max-width: 760px) {
+  .hstepper {
+    padding: 10px 14px;
+  }
+
   .hstepper__label {
     display: none;
   }
 
   .hstepper__line {
-    min-width: 12px;
+    min-width: 14px;
     margin: 0 8px;
   }
 }

@@ -37,10 +37,35 @@ export function PropertyForm({ property, onCancel, onSaved }: PropertyFormProps)
             errors={form.errors}
           />
         )}
-        {form.step === 1 && <FormStepFeatures data={form.features} onChange={form.setFeatures} />}
+        {form.step === 1 && (
+          <FormStepFeatures
+            data={form.features}
+            errors={form.errors}
+            onChange={(next) => {
+              form.setFeatures(next)
+              const rest = { ...form.errors }
+              for (const key of ['area_total', 'area_construida', 'dormitorios', 'banos', 'estacionamientos']) {
+                delete rest[key as keyof typeof rest]
+              }
+              form.setErrors(rest)
+            }}
+          />
+        )}
         {form.step === 2 && <FormStepMedia data={form.media} onChange={form.setMedia} />}
         {form.step === 3 && (
-          <FormStepPricing data={form.pricing} onChange={form.setPricing} isEdit={form.isEdit} />
+          <FormStepPricing
+            data={form.pricing}
+            onChange={(next) => {
+              form.setPricing(next)
+              if (form.errors.price) {
+                const rest = { ...form.errors }
+                delete rest.price
+                form.setErrors(rest)
+              }
+            }}
+            isEdit={form.isEdit}
+            error={form.errors.price}
+          />
         )}
       </div>
 

@@ -1,28 +1,32 @@
 .hfield {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
 }
 
 .hfield__label {
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--muted-light);
 }
 
 .hfield__req {
   color: var(--brand-bronze);
-  margin-left: 2px;
+  margin-left: 3px;
 }
 
 .hfield__hint {
   font-size: 12px;
-  color: var(--muted);
+  color: var(--muted-light);
 }
 
 .hfield__error {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
-  color: #b3261e;
+  font-weight: 600;
+  color: var(--danger);
 }
