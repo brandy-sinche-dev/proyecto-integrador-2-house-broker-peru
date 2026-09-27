@@ -26,17 +26,19 @@ export function Pagination({ page, totalPages, total, pageSize, onChange }: Pagi
   const end = Math.min(page * pageSize, total)
 
   return (
-    <nav className="hpg" aria-label="Paginación">
-      <p className="hpg__summary">
+    <nav className="hpg" aria-label="Paginación de resultados">
+      {/* Region dinámica para anunciar cambios a lectores de pantalla */}
+      <p className="hpg__summary" aria-live="polite" aria-atomic="true">
         Mostrando {start}–{end} de {total} {total === 1 ? 'propiedad' : 'propiedades'}
       </p>
-      <div className="hpg__controls">
+      
+      <div className="hpg__controls" role="group" aria-label="Controles de navegación de página">
         <button
           type="button"
           className="hpg__btn hpg__btn--nav"
           onClick={() => onChange(page - 1)}
           disabled={page === 1}
-          aria-label="Página anterior"
+          aria-label="Ir a la página anterior"
         >
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <path d="M10 3.5 5.5 8 10 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -45,7 +47,7 @@ export function Pagination({ page, totalPages, total, pageSize, onChange }: Pagi
 
         {buildPages(page, totalPages).map((item, i) =>
           item === '…' ? (
-            <span key={`gap-${i}`} className="hpg__gap" aria-hidden="true">
+            <span key={`gap-${i}`} className="hpg__gap" role="separator" aria-label="Páginas omitidas">
               …
             </span>
           ) : (
@@ -54,6 +56,7 @@ export function Pagination({ page, totalPages, total, pageSize, onChange }: Pagi
               type="button"
               className={`hpg__btn ${item === page ? 'is-active' : ''}`}
               aria-current={item === page ? 'page' : undefined}
+              aria-label={item === page ? `Página actual, página ${item}` : `Ir a la página ${item}`}
               onClick={() => onChange(item)}
             >
               {item}
@@ -66,7 +69,7 @@ export function Pagination({ page, totalPages, total, pageSize, onChange }: Pagi
           className="hpg__btn hpg__btn--nav"
           onClick={() => onChange(page + 1)}
           disabled={page === totalPages}
-          aria-label="Página siguiente"
+          aria-label="Ir a la página siguiente"
         >
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />

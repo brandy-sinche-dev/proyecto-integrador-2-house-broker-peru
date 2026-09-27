@@ -137,8 +137,8 @@
 .hfs__range {
   position: absolute;
   left: 0;
-  width: 100%;
-  height: 16px;
+  width: 28%;
+  height: 28px;
   margin: 0;
   background: none;
   appearance: none;
@@ -208,6 +208,8 @@
 }
 
 .hfs__room {
+  min-height: 44px;
+  padding: 8px 16px;
   width: 40px;
   height: 40px;
   border: none;
@@ -307,4 +309,13 @@
 .hfs__apply svg {
   width: 12px;
   height: 12px;
+}
+
+.hpg__btn {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 2px; 
 }

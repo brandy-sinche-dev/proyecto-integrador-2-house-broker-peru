@@ -10,6 +10,8 @@ import { formatMoney } from './money'
 import type { Property } from '../../services/types'
 import type { NavTarget, Section } from '../../components/Header'
 import './PropertyList.css'
+import { useFilterParams } from './useFilterParams'
+
 
 interface PropertyListProps {
   mode: Section
@@ -87,17 +89,23 @@ export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit,
   const [sort, setSort] = useState<Sort>('recent')
   const [view, setView] = useState<ViewMode>('grid3')
   const [page, setPage] = useState(1)
-  const [filters, setFilters] = useState<Filters>(() => emptyFilters(0, 0))
+
+  // 1. Calculamos los bounds (mínimo y máximo de precio de las propiedades)
+  const bounds = useMemo(() => {
+    const prices = properties.map((p) => p.price)
+    const min = prices.length ? Math.min(...prices) : 0
+    const max = prices.length ? Math.max(...prices) : 0
+    return { min, max: max || 1 }
+  }, [properties])
+
+  // 2. Reemplazamos el useState tradicional por el hook de URL
+  const { filters, applyFilters, clearFilters: clearUrlFilters } = useFilterParams(bounds)
 
   const fetchData = useCallback(() => {
     getProperties()
       .then((data) => {
         const active = data.filter((p) => p.is_active)
         setProperties(active)
-        const prices = active.map((p) => p.price)
-        const min = prices.length ? Math.min(...prices) : 0
-        const max = prices.length ? Math.max(...prices) : 0
-        setFilters(emptyFilters(min, max || 1))
         setStatus('ready')
       })
       .catch((err) => {
@@ -110,12 +118,7 @@ export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit,
     fetchData()
   }, [fetchData])
 
-  const bounds = useMemo(() => {
-    const prices = properties.map((p) => p.price)
-    const min = prices.length ? Math.min(...prices) : 0
-    const max = prices.length ? Math.max(...prices) : 0
-    return { min, max: max || 1 }
-  }, [properties])
+
 
   const reload = () => {
     setStatus('loading')
@@ -123,9 +126,9 @@ export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit,
     fetchData()
   }
 
-  const clearFilters = () => {
+ const clearFilters = () => {
     setQuery('')
-    setFilters(emptyFilters(bounds.min, bounds.max))
+    clearUrlFilters()
   }
 
   const filtered = useMemo(() => {
@@ -167,7 +170,7 @@ export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit,
   const currentPage = Math.min(page, totalPages)
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
-  const chips: { key: string; label: string; onRemove: () => void }[] = []
+const chips: { key: string; label: string; onRemove: () => void }[] = []
   if (mode !== 'inicio')
     chips.push({ key: 'mode', label: mode === 'guardados' ? 'Solo guardados' : 'Solo mis visitas', onRemove: () => onNavigate('inicio') })
   if (query.trim()) chips.push({ key: 'q', label: `“${query.trim()}”`, onRemove: () => setQuery('') })
@@ -175,25 +178,25 @@ export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit,
     chips.push({
       key: 'op',
       label: filters.operacion === 'VENTA' ? 'Venta' : 'Alquiler',
-      onRemove: () => setFilters((f) => ({ ...f, operacion: '' })),
+      onRemove: () => applyFilters({ ...filters, operacion: '' }),
     })
   if (filters.priceMin !== bounds.min || filters.priceMax !== bounds.max)
     chips.push({
       key: 'price',
       label: `${formatMoney(filters.priceMin)} – ${formatMoney(filters.priceMax)}`,
-      onRemove: () => setFilters((f) => ({ ...f, priceMin: bounds.min, priceMax: bounds.max })),
+      onRemove: () => applyFilters({ ...filters, priceMin: bounds.min, priceMax: bounds.max }),
     })
   if (filters.metraje)
-    chips.push({ key: 'm2', label: METRAJE_LABEL[filters.metraje], onRemove: () => setFilters((f) => ({ ...f, metraje: '' })) })
+    chips.push({ key: 'm2', label: METRAJE_LABEL[filters.metraje], onRemove: () => applyFilters({ ...filters, metraje: '' }) })
   if (filters.habitaciones != null)
     chips.push({
       key: 'rooms',
       label: `${filters.habitaciones}+ habitaciones`,
-      onRemove: () => setFilters((f) => ({ ...f, habitaciones: null })),
+      onRemove: () => applyFilters({ ...filters, habitaciones: null }),
     })
-  if (filters.negociable) chips.push({ key: 'neg', label: 'Negociable', onRemove: () => setFilters((f) => ({ ...f, negociable: false })) })
-  if (filters.destacado) chips.push({ key: 'dest', label: 'Destacado', onRemove: () => setFilters((f) => ({ ...f, destacado: false })) })
-  if (filters.cochera) chips.push({ key: 'coch', label: 'Con cochera', onRemove: () => setFilters((f) => ({ ...f, cochera: false })) })
+  if (filters.negociable) chips.push({ key: 'neg', label: 'Negociable', onRemove: () => applyFilters({ ...filters, negociable: false }) })
+  if (filters.destacado) chips.push({ key: 'dest', label: 'Destacado', onRemove: () => applyFilters({ ...filters, destacado: false }) })
+  if (filters.cochera) chips.push({ key: 'coch', label: 'Con cochera', onRemove: () => applyFilters({ ...filters, cochera: false }) })
 
   const hasFilters = chips.length > 0
 
@@ -341,12 +344,12 @@ export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit,
 
             <div className="hprops__layout">
               <FilterSidebar
-                filters={filters}
-                bounds={bounds}
-                currency="S/."
-                onApply={setFilters}
-                onClear={() => setFilters(emptyFilters(bounds.min, bounds.max))}
-              />
+                  filters={filters}
+                  bounds={bounds}
+                  currency="S/."
+                  onApply={applyFilters}
+                  onClear={clearUrlFilters}
+                />
 
               <div className="hprops__results">
                 {filtered.length === 0 ? (
