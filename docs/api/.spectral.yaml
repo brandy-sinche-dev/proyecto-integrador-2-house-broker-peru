@@ -1,0 +1,17 @@
+extends:
+  - spectral:oas
+
+rules:
+  # La documentación del contrato es obligatoria para cada operación.
+  operation-description: error
+  operation-tags: error
+  info-contact: warn
+  info-license: warn
+  oas3-api-servers: error
+
+  # Descripción de cada tag es obligatoria.
+  tag-description: error
+
+  # El proyecto documenta los errores con application/problem+json (RFC 7807).
+  oas3-valid-media-example: error
+  oas3-valid-schema-example: error
