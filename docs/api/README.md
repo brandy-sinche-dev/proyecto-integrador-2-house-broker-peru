@@ -2,17 +2,20 @@
 
 Contratos REST del backend (Django REST Framework) bajo especificación **OpenAPI 3.0**.
 
+> **Tarea actual:** [TASK-ARC-PROP-02] Especificación OpenAPI 3.0 para catálogo
+> paginado — [issue #34](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/34) (HU-PROP-02).
+
 ## Archivo único de contrato
 
 **`openapi_spec.yaml`** es el contrato acumulado de todo el proyecto. Cada sprint
 añade aquí los endpoints que entrega, en lugar de crear un archivo por tarea, para
 que al cierre (Sprint 7) exista un solo `.yml` con la API completa.
 
-| Versión | Sprint | Tarea | Alcance incorporado |
-|---|---|---|---|
-| 1.0.0 | Sprint 1 | `TASK-ARC-PROP-01` | CRUD de propiedades (HU-PROP-01) |
-| 1.1.0 | Sprint 2 | `TASK-ARC-PROP-02` | Catálogo paginado + errores RFC 7807 (HU-PROP-02) |
-| 1.1.0 | Sprint 2 | — | Sincronizado con `Property` de `types.ts`: `moneda`, `mode` y atributos |
+| Versión | Sprint | Tarea | Issue | Alcance incorporado |
+|---|---|---|---|---|
+| 1.0.0 | Sprint 1 | `TASK-ARC-PROP-01` | — | CRUD de propiedades (HU-PROP-01) |
+| 1.1.0 | Sprint 2 | `TASK-ARC-PROP-02` | [#34](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/34) | Catálogo paginado + errores RFC 7807 (HU-PROP-02) |
+| 1.1.0 | Sprint 2 | — | — | Sincronizado con `Property` de `types.ts`: `moneda`, `mode` y atributos |
 
 Al crecer el documento, extrae las secciones a `components/schemas` y referencia
 con `$ref`. No dupliques esquemas entre operaciones.
