@@ -1,8 +1,40 @@
 openapi: 3.0.3
+
 info:
-  title: HouseBroker Perú - API de Propiedades
-  description: Contrato de API REST para la gestión de propiedades (Sprint 1 - APF1).
-  version: 1.0.0
+  title: HouseBroker Perú - API
+  description: |
+    Contrato de API REST de HouseBroker Perú (Django REST Framework).
+
+    Este documento es **el contrato acumulado del proyecto**: cada sprint
+    incorpora aquí los endpoints que entrega, de modo que al cierre de la
+    carrera (Sprint 7) contenga la API completa sin fragmentarse en varios
+    archivos.
+
+    ### Contratos incorporados
+    | Sprint | Tarea | Alcance |
+    |---|---|---|
+    | Sprint 1 | `TASK-ARC-PROP-01` | CRUD de propiedades (HU-PROP-01) |
+    | Sprint 2 | `TASK-ARC-PROP-02` | Catálogo paginado `GET /api/v1/properties` (HU-PROP-02) |
+
+    ### Convenciones
+    - Todos los endpoints están bajo el prefijo `/api/v1`.
+    - Los parámetros de paginación son opcionales; el servidor aplica
+      `DEFAULT_PAGE` y `DEFAULT_LIMIT` cuando se omiten.
+    - Los errores se serializan como `application/problem+json` conforme a
+      **RFC 7807 (Problem Details for HTTP APIs)**.
+  version: 1.1.0
+  contact:
+    name: Equipo HouseBroker Perú
+    url: https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru
+  license:
+    name: Uso académico
+    url: https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/blob/main/README.md
+
+servers:
+  - url: http://localhost:8000
+    description: Entorno de desarrollo local (Django + DRF)
+  - url: https://staging.housebroker.pe
+    description: Entorno de staging (verificado contra el SLA de 300 ms)
 
 tags:
   - name: Propiedades
@@ -13,23 +45,192 @@ paths:
     get:
       tags:
         - Propiedades
-      summary: Obtener listado de propiedades
+      operationId: listProperties
+      summary: Obtener listado paginado de propiedades
+      description: |
+        Devuelve el catálogo de propiedades en formato paginado.
+
+        Solo se incluyen propiedades activas (`is_active = true`). El orden por
+        defecto es `created_at` descendente (más recientes primero).
+
+        Si la página solicitada queda fuera de rango, la respuesta es `200` con
+        `results` vacío y `next` en `null`; no es un error.
+      parameters:
+        - name: page
+          in: query
+          required: false
+          description: Número de página solicitada, empezando en 1.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            default: 1
+            example: 1
+        - name: limit
+          in: query
+          required: false
+          description: |
+            Cantidad máxima de elementos por página. Si se solicita un valor
+            mayor a 100, el servidor lo ajusta a 100 en lugar de devolver un error.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 12
+            example: 12
+        - name: X-Request-Id
+          in: header
+          required: false
+          description: Identificador de correlación para trazar la petición en los logs.
+          schema:
+            type: string
+            format: uuid
       responses:
         '200':
-          description: Lista de propiedades obtenida exitosamente
+          description: Catálogo paginado obtenido exitosamente
+          headers:
+            X-Total-Count:
+              description: Total de registros que cumplen el filtro, sin paginar.
+              schema:
+                type: integer
+                format: int32
+                example: 25
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Property'
+                $ref: '#/components/schemas/PaginatedProperties'
+              examples:
+                primeraPagina:
+                  summary: 'Primera página: 3 de 25 propiedades'
+                  value:
+                    count: 25
+                    next: http://localhost:8000/api/v1/properties?limit=3&page=2
+                    previous: null
+                    results:
+                      - id: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+                        title: Departamento amoblado en Miraflores
+                        price: 150000.0
+                        moneda: PEN
+                        mode: VENTA
+                        address: Av. Larco 456, Miraflores
+                        property_type: DEPARTAMENTO
+                        is_active: true
+                        created_at: '2026-09-07T10:00:00Z'
+                        area_total: 85.5
+                        area_construida: 78.0
+                        dormitorios: 3
+                        banos: 2
+                        estacionamientos: 1
+                        link_galeria: https://galeria.housebroker.pe/departamento-miraflores-01
+                        link_planos: https://planos.housebroker.pe/departamento-miraflores-01.pdf
+                        negociable: true
+                        destacado: false
+                        mantenimiento: 850.0
+                      - id: c3d2a6b1-2b3c-5d4e-0f11-123456789001
+                        title: Casa en San Isidro
+                        price: 850000.0
+                        moneda: USD
+                        mode: VENTA
+                        address: Av. El Golf 120, San Isidro
+                        property_type: CASA
+                        is_active: true
+                        created_at: '2026-09-06T09:30:00Z'
+                        area_total: 320.0
+                        dormitorios: 5
+                        banos: 4
+                        estacionamientos: 2
+                        link_galeria: https://galeria.housebroker.pe/casa-san-isidro-02
+                        negociable: false
+                        destacado: true
+                        mantenimiento: 0.0
+                      - id: b2c1f5a0-1a2b-4c3d-9e0f-222222222222
+                        title: Oficina en San Borja
+                        price: 4200.0
+                        moneda: PEN
+                        mode: ALQUILER
+                        address: Av. Elmer Faucett 900, San Borja
+                        property_type: OFICINA
+                        is_active: true
+                        created_at: '2026-09-05T15:45:00Z'
+                        area_total: 120.0
+                        dormitorios: 0
+                        banos: 2
+                        negociable: true
+                        destacado: false
+                        mantenimiento: 1200.0
+                paginaVacia:
+                  summary: Página sin resultados (búsqueda sin coincidencias)
+                  value:
+                    count: 0
+                    next: null
+                    previous: null
+                    results: []
+                ultimaPagina:
+                  summary: 'Última página: `previous` con enlace y `next` en null'
+                  value:
+                    count: 25
+                    next: null
+                    previous: http://localhost:8000/api/v1/properties?limit=3&page=8
+                    results:
+                      - id: b2c1f5a0-1a2b-4c3d-9e0f-333333333333
+                        title: Terreno en Cienfuegos
+                        price: 310000.0
+                        moneda: PEN
+                        mode: VENTA
+                        address: Av. Loscebadas 1200, Cienfuegos
+                        property_type: TERRENO
+                        is_active: true
+                        created_at: '2026-09-01T08:00:00Z'
+                        area_total: 450.0
+                        negociable: true
+                        destacado: false
+                        mantenimiento: 0.0
+        '400':
+          description: Parámetros de consulta inválidos
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemBadRequest'
+              example:
+                type: https://housebroker.pe/errors/invalid-query-parameter
+                title: Parámetro de consulta inválido
+                status: 400
+                detail: El parámetro 'page' debe ser un entero mayor o igual a 1.
+                instance: /api/v1/properties?page=0
+                code: invalid_query_parameter
+                errors:
+                  - parameter: page
+                    message: El valor '0' es menor que el mínimo permitido (1).
         '500':
           description: Error interno del servidor
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemInternalServerError'
+              example:
+                type: https://housebroker.pe/errors/internal-server-error
+                title: Error interno del servidor
+                status: 500
+                detail: No fue posible completar la consulta del catálogo de propiedades.
+                instance: /api/v1/properties?page=1&limit=12
+                code: internal_server_error
+                request_id: 8b1a0f5c-2d3e-4a5b-9c7d-0e1f2a3b4c5d
 
     post:
       tags:
         - Propiedades
+      operationId: createProperty
       summary: Registrar una nueva propiedad
+      description: Crea un inmueble en el catálogo. El servidor asigna `id` y `created_at`.
       requestBody:
         required: true
         content:
@@ -45,12 +246,23 @@ paths:
                 $ref: '#/components/schemas/Property'
         '400':
           description: Datos de entrada inválidos o faltantes
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemBadRequest'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemInternalServerError'
 
   /api/v1/properties/{id}:
     parameters:
       - name: id
         in: path
         required: true
+        description: Identificador único del inmueble.
         schema:
           type: string
           format: uuid
@@ -58,7 +270,9 @@ paths:
     get:
       tags:
         - Propiedades
+      operationId: getProperty
       summary: Obtener detalle de una propiedad
+      description: Devuelve un inmueble por su identificador único.
       responses:
         '200':
           description: Detalle de la propiedad
@@ -68,11 +282,25 @@ paths:
                 $ref: '#/components/schemas/Property'
         '404':
           description: Propiedad no encontrada
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemNotFound'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemInternalServerError'
 
     put:
       tags:
         - Propiedades
+      operationId: updateProperty
       summary: Actualizar una propiedad existente
+      description: |
+        Reemplaza los campos commercializables del inmueble. `id`, `is_active` y
+        `created_at` se conservan.
       requestBody:
         required: true
         content:
@@ -82,66 +310,425 @@ paths:
       responses:
         '200':
           description: Propiedad actualizada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
         '400':
           description: Datos de actualización inválidos
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemBadRequest'
         '404':
           description: Propiedad no encontrada
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemNotFound'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemInternalServerError'
 
     delete:
       tags:
         - Propiedades
+      operationId: deleteProperty
       summary: Eliminación lógica de una propiedad
+      description: |
+        Marca el inmueble como inactivo (`is_active = false`) sin eliminarlo del
+        catálogo, de modo que el registro siga siendo auditable.
       responses:
         '200':
           description: Propiedad desactivada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
         '404':
           description: Propiedad no encontrada
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemNotFound'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemInternalServerError'
 
 components:
+  headers:
+    XRequestId:
+      description: Identificador de correlación devuelto para trazar la petición.
+      schema:
+        type: string
+        format: uuid
+
   schemas:
     Property:
       type: object
+      description: Representación de un inmueble del catálogo.
+      required:
+        - id
+        - title
+        - price
+        - moneda
+        - mode
+        - address
+        - property_type
+        - is_active
+        - created_at
       properties:
         id:
           type: string
           format: uuid
-          example: "123e4567-e89b-12d3-a456-426614174000"
+          description: Identificador único del inmueble.
+          example: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
         title:
           type: string
-          example: "Departamento amoblado en Miraflores"
+          minLength: 1
+          description: Título comercial del anuncio.
+          example: Departamento amoblado en Miraflores
         price:
           type: number
-          format: float
-          example: 150000.00
+          format: double
+          minimum: 0.0001
+          description: Monto del precio en la moneda indicada por `moneda`. Siempre mayor que 0.
+          example: 150000.0
+        moneda:
+          $ref: '#/components/schemas/Moneda'
+        mode:
+          $ref: '#/components/schemas/TransactionMode'
         address:
           type: string
-          example: "Av. Larco 456, Miraflores"
+          minLength: 1
+          description: Dirección completa dentro de Lima Metropolitana.
+          example: Av. Larco 456, Miraflores
         property_type:
-          type: string
-          enum: [DEPARTAMENTO, CASA, TERRENO, OFICINA]
-          example: "DEPARTAMENTO"
+          $ref: '#/components/schemas/PropertyType'
         is_active:
           type: boolean
+          description: |
+            Indica si el inmueble está visible en el catálogo. Se desactiva
+            mediante eliminación lógica (`DELETE`).
           example: true
         created_at:
           type: string
           format: date-time
-          example: "2026-09-07T10:00:00Z"
+          description: Fecha y hora de registro del inmueble en formato ISO 8601.
+          example: '2026-09-07T10:00:00Z'
+        area_total:
+          type: number
+          format: double
+          minimum: 0
+          description: Área total del inmueble en metros cuadrados.
+          example: 85.5
+        area_construida:
+          type: number
+          format: double
+          minimum: 0
+          description: Área construida en metros cuadrados.
+          example: 78.0
+        dormitorios:
+          type: integer
+          minimum: 0
+          description: Cantidad de dormitorios.
+          example: 3
+        banos:
+          type: integer
+          minimum: 0
+          description: Cantidad de baños.
+          example: 2
+        estacionamientos:
+          type: integer
+          minimum: 0
+          description: Cantidad de estacionamientos.
+          example: 1
+        link_galeria:
+          type: string
+          format: uri
+          description: Enlace externo a la galería de fotografías.
+          example: https://galeria.housebroker.pe/departamento-miraflores-01
+        link_planos:
+          type: string
+          format: uri
+          description: Enlace externo a los planos del inmueble.
+          example: https://planos.housebroker.pe/departamento-miraflores-01.pdf
+        negociable:
+          type: boolean
+          description: Indica si el precio admite negociación.
+          example: true
+        destacado:
+          type: boolean
+          description: Indica si el anuncio se destaca en el catálogo.
+          example: false
+        mantenimiento:
+          type: number
+          format: double
+          minimum: 0
+          description: Costo mensual de mantenimiento, en la moneda de `moneda`.
+          example: 850.0
 
     PropertyInput:
       type: object
+      description: Cuerpo de entrada para crear o actualizar una propiedad.
       required:
         - title
         - price
+        - mode
         - address
         - property_type
       properties:
         title:
           type: string
+          minLength: 1
+          description: Título comercial del anuncio.
+          example: Departamento amoblado en Miraflores
         price:
           type: number
+          format: double
+          minimum: 0.0001
+          description: Monto del precio en la moneda indicada por `moneda`. Siempre mayor que 0.
+          example: 150000.0
+        moneda:
+          allOf:
+            - $ref: '#/components/schemas/Moneda'
+          description: |
+            Moneda del precio. Si se omite, el servidor assume `PEN`.
+          default: PEN
+        mode:
+          $ref: '#/components/schemas/TransactionMode'
         address:
           type: string
+          minLength: 1
+          description: Dirección completa dentro de Lima Metropolitana.
+          example: Av. Larco 456, Miraflores
         property_type:
+          $ref: '#/components/schemas/PropertyType'
+        area_total:
+          type: number
+          format: double
+          minimum: 0
+          description: Área total del inmueble en metros cuadrados.
+          example: 85.5
+        area_construida:
+          type: number
+          format: double
+          minimum: 0
+          description: Área construida en metros cuadrados.
+          example: 78.0
+        dormitorios:
+          type: integer
+          minimum: 0
+          description: Cantidad de dormitorios.
+          example: 3
+        banos:
+          type: integer
+          minimum: 0
+          description: Cantidad de baños.
+          example: 2
+        estacionamientos:
+          type: integer
+          minimum: 0
+          description: Cantidad de estacionamientos.
+          example: 1
+        link_galeria:
           type: string
-          enum: [DEPARTAMENTO, CASA, TERRENO, OFICINA]
+          format: uri
+          description: Enlace externo a la galería de fotografías.
+          example: https://galeria.housebroker.pe/departamento-miraflores-01
+        link_planos:
+          type: string
+          format: uri
+          description: Enlace externo a los planos del inmueble.
+          example: https://planos.housebroker.pe/departamento-miraflores-01.pdf
+        negociable:
+          type: boolean
+          description: Indica si el precio admite negociación.
+          example: true
+        destacado:
+          type: boolean
+          description: Indica si el anuncio se destaca en el catálogo.
+          example: false
+        mantenimiento:
+          type: number
+          format: double
+          minimum: 0
+          description: Costo mensual de mantenimiento, en la moneda de `moneda`.
+          example: 850.0
+
+    PropertyType:
+      type: string
+      description: Categoría del inmueble.
+      enum:
+        - DEPARTAMENTO
+        - CASA
+        - TERRENO
+        - OFICINA
+      example: DEPARTAMENTO
+
+    Moneda:
+      type: string
+      description: Moneda en la que se exprima el precio y el mantenimiento.
+      enum:
+        - PEN
+        - USD
+      example: PEN
+
+    TransactionMode:
+      type: string
+      description: Modalidad de la operación del inmueble.
+      enum:
+        - VENTA
+        - ALQUILER
+      example: VENTA
+
+    PaginatedProperties:
+      type: object
+      description: Envoltorio paginado del catálogo de propiedades.
+      required:
+        - count
+        - next
+        - previous
+        - results
+      additionalProperties: false
+      properties:
+        count:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Total de registros que cumplen el filtro, sin paginar.
+          example: 25
+        next:
+          type: string
+          format: uri
+          nullable: true
+          description: |
+            URL absoluta de la siguiente página, o `null` si la página
+            solicitada es la última.
+          example: http://localhost:8000/api/v1/properties?limit=3&page=2
+        previous:
+          type: string
+          format: uri
+          nullable: true
+          description: |
+            URL absoluta de la página anterior, o `null` si la página
+            solicitada es la primera.
+          example: null
+        results:
+          type: array
+          description: Propiedades correspondientes a la página solicitada.
+          items:
+            $ref: '#/components/schemas/Property'
+
+    Problem:
+      type: object
+      description: |
+        Objeto base de error conforme a **RFC 7807** (Problem Details for
+        HTTP APIs). Los campos `type`, `title`, `status` y `detail` son los
+        member names definidos por el estándar; `code`, `errors` y `request_id`
+        son extensiones propias de la API.
+      required:
+        - type
+        - title
+        - status
+        - detail
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI que identifica el tipo de problema.
+          example: https://housebroker.pe/errors/invalid-query-parameter
+        title:
+          type: string
+          description: Resumen corto y estable del tipo de problema.
+          example: Parámetro de consulta inválido
+        status:
+          type: integer
+          format: int32
+          description: Código de estado HTTP, replicado por comodidad del cliente.
+          example: 400
+        detail:
+          type: string
+          description: Explicación del problema en español, legible por una persona.
+          example: El parámetro 'page' debe ser un entero mayor o igual a 1.
+        instance:
+          type: string
+          format: uri-reference
+          description: Ruta de la petición que originó el problema.
+          example: /api/v1/properties?page=0
+        code:
+          type: string
+          description: Código de error estable y programático.
+          example: invalid_query_parameter
+        request_id:
+          type: string
+          format: uuid
+          description: Identificador de correlación para soporte y trazabilidad.
+
+    ProblemBadRequest:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required:
+            - code
+            - errors
+          properties:
+            code:
+              type: string
+              description: Código de error estable.
+              example: invalid_query_parameter
+            errors:
+              type: array
+              description: Detalle del error por cada parámetro o campo rechazado.
+              items:
+                type: object
+                required:
+                  - parameter
+                  - message
+                properties:
+                  parameter:
+                    type: string
+                    description: Nombre del parámetro o campo rechazado.
+                    example: page
+                  message:
+                    type: string
+                    description: Motivo del rechazo, en español.
+                    example: El valor '0' es menor que el mínimo permitido (1).
+
+    ProblemNotFound:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required:
+            - code
+          properties:
+            code:
+              type: string
+              description: Código de error estable.
+              example: resource_not_found
+
+    ProblemInternalServerError:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required:
+            - code
+            - request_id
+          properties:
+            code:
+              type: string
+              description: Código de error estable.
+              example: internal_server_error
+            request_id:
+              type: string
+              format: uuid
+              description: |
+                Identificador de correlación. El cliente debe reportarlo para
+                que el equipo pueda rastrear la petición en los logs. No se
+                expone detalle interno de la excepción.
