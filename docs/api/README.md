@@ -2,9 +2,9 @@
 
 Contratos REST del backend (Django REST Framework) bajo especificación **OpenAPI 3.0**.
 
-> **Tarea actual:** [TASK-ARC-SEC-02] Especificación OpenAPI 3.0 para recuperación
-> de contraseña —
-> [issue #76](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/76) (HU-SEC-02).
+> **Tarea actual:** [TASK-ARC-PROP-05] Especificación OpenAPI 3.0 para la
+> gestión de propiedades favoritas —
+> [issue #104](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/104) (HU-PROP-05).
 
 ## Archivo único de contrato
 
@@ -23,6 +23,7 @@ que al cierre (Sprint 7) exista un solo `.yml` con la API completa.
 | 1.5.0 | Sprint 4 | `TASK-ARC-CRM-01` | [#90](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/90) | Disponibilidad por fecha (`GET .../available-slots`) y alta de citas (`POST /api/v1/appointments`) (HU-CRM-01) |
 | 1.6.0 | Sprint 3 | `TASK-ARC-SEC-01` | [#69](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/69) | `bearerAuth` + `refreshCookie`, y `register` / `login` / `refresh` (HU-SEC-01) |
 | 1.7.0 | Sprint 3 | `TASK-ARC-SEC-02` | [#76](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/76) | Recuperación de contraseña: `password-reset` y `password-reset-confirm` (HU-SEC-02) |
+| 1.8.0 | Sprint 4 | `TASK-ARC-PROP-05` | [#104](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/104) | Favoritos por usuario: `GET`/`POST /favorites/` y `DELETE /favorites/{property_id}/` (HU-PROP-05) |
 
 Al crecer el documento, extrae las secciones a `components/schemas` y referencia
 con `$ref`. No dupliques esquemas entre operaciones.
@@ -36,6 +37,9 @@ el schema en el mismo commit.
 
 | Método | Ruta | Operación | Sprint |
 |---|---|---|---|
+| GET | `/api/v1/favorites/` | `listFavorites` — paginado, por `added_at` desc | 4 |
+| POST | `/api/v1/favorites/` | `addFavorite` — idempotente | 4 |
+| DELETE | `/api/v1/favorites/{property_id}/` | `removeFavorite` — idempotente | 4 |
 | POST | `/api/v1/auth/register` | `registerUser` | 3 |
 | POST | `/api/v1/auth/login` | `loginUser` | 3 |
 | POST | `/api/v1/auth/refresh` | `refreshAccessToken` | 3 |
@@ -695,16 +699,146 @@ curl -i -X POST http://localhost:8000/api/v1/auth/password-reset-confirm/ \
 # -> 204, sin cuerpo, con Set-Cookie hb_refresh_token=; Max-Age=0
 ```
 
+## Propiedades favoritas (HU-PROP-05)
+
+`TASK-ARC-PROP-05` especifica la lista de inmuebles guardados por el usuario y
+las operaciones para agregar y quitar. Los tres endpoints usan el `bearerAuth`
+global: **no hay favoritos sin sesión**.
+
+| Método | Ruta | Operación | Acceso |
+|---|---|---|---|
+| GET | `/api/v1/favorites/` | `listFavorites` | Autenticado |
+| POST | `/api/v1/favorites/` | `addFavorite` | Autenticado |
+| DELETE | `/api/v1/favorites/{property_id}/` | `removeFavorite` | Autenticado |
+
+A diferencia de los endpoints de autenticación, estos **no** declaran
+`security: []`: heredan el `bearerAuth` global, así que un `401` es lo primero
+que devuelve cualquiera de los tres sin token válido.
+
+### La lista es privada y no admite parámetro de usuario
+
+El backend filtra por el `sub` del access token. El contrato no expone ningún
+`?user_id=` ni `?user=`, y **no debe añadirse**: bastaría cambiar ese parámetro
+para leer los favoritos de otra persona.
+
+El orden es `added_at` descendente, lo que espera la vista "Mis Favoritos": lo
+guardado después aparece primero. Es un orden estable porque cada favorito tiene
+su propia fecha, a diferencia del `created_at` del inmueble, que puede empatar
+entre varios anuncios.
+
+Cada elemento es un `Favorite`, que envuelve el `Property` y le añade `added_at`:
+
+```json
+{
+  "count": 2,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "property": { "id": "b2c1f5a0-...", "title": "Departamento amoblado en Miraflores" },
+      "added_at": "2026-10-05T09:12:44Z"
+    }
+  ]
+}
+```
+
+No se aplana el inmueble dentro de `Property` a propósito: los metadatos de la
+relación (`added_at`) no son del inmueble, y mezclarlos haría que el mismo
+anuncio apareciera con campos distintos según desde dónde se leyera.
+
+### Agregar y quitar son idempotentes
+
+Esta es la decisión que más afecta al frontend, y viene de
+`TASK-WPO-PROP-05`, que implementa el botón con debounce.
+
+| Operación | Situación | Respuesta |
+|---|---|---|
+| POST | No estaba en favoritos | `200` con el favorito y su `added_at` |
+| POST | Ya estaba en favoritos | `200` con **el mismo** `added_at` |
+| DELETE | Estaba en favoritos | `204` sin cuerpo |
+| DELETE | No estaba en favoritos | `204` sin cuerpo |
+
+No hay `201` ni `409`, y el `DELETE` nunca devuelve `404` por "no era favorito".
+La razón es que un doble clic en el corazón o un reintento por red llega al
+servidor dos veces: si la segunda devolviera un error, el frontend tendría que
+distinguir entre "ya estaba" y "falló de verdad", y en el caso del `DELETE`
+tendría que traducir ese `404` a "listo" para no enseñarle un error al usuario
+que ya completó la operación.
+
+El `POST` devuelve además el `added_at` original, no la fecha de la petición
+repetida, para que un reintento no reordene la lista.
+
+### El `404` es del inmueble, no de la relación
+
+| Situación | Respuesta |
+|---|---|
+| `property_id` no corresponde a ningún inmueble | `404 resource_not_found` |
+| El inmueble existe pero está desactivado (`is_active: false`) | `404 resource_not_found` |
+| Ya era favorito | `200` |
+| No era favorito | `204` |
+
+Guardar un inmueble desactivado no tiene sentido: la eliminación del catálogo es
+lógica (`is_active: false`), así que el inmueble sigue existiendo en la base de
+datos pero no se puede guardar.
+
+### `Property.is_favorite`: el corazón del catálogo
+
+La v1.8.0 **añade `is_favorite` a `Property`**, y es el único cambio que esta
+versión hace fuera del módulo de favoritos.
+
+```yaml
+is_favorite:
+  type: boolean
+```
+
+Es lo que `TASK-A11Y-PROP-05` necesita: el botón de corazón de `PropertyCard`
+tiene que alternar `aria-pressed="true|false"`, y para saber en qué estado
+pintarse sin una llamada por inmueble.
+
+El campo depende del access token, así que **el mismo catálogo devuelve valores
+distintos según quién pregunte**. Es coherente con el resto del contrato porque
+todas las lecturas ya exigen `bearerAuth` por el `security` global. Si algún día
+el catálogo se publica sin token, el backend tendrá que omitir el campo o
+mandarlo `false` en lugar de romper el esquema.
+
+### Matriz de errores
+
+| Situación | `code` | Respuesta |
+|---|---|---|
+| Token ausente, vencido o con firma inválida | `unauthorized` | `401` |
+| `property_id` con formato inválido (solo en POST) | `invalid_query_parameter` | `400` |
+| El inmueble no existe o está desactivado | `resource_not_found` | `404` |
+
+El `DELETE` no declara `400`: su `property_id` va en la ruta, y un UUID mal
+formado en un path no se distingue del que no existe, así que responde `404`
+como cualquier otro identificador desconocido.
+
+```bash
+# listar
+curl -H "Authorization: Bearer $ACCESS" \
+  "http://localhost:8000/api/v1/favorites/?limit=12&page=1"
+
+# guardar (idempotente: repetirlo devuelve 200 con el mismo added_at)
+curl -X POST http://localhost:8000/api/v1/favorites/ \
+  -H "Authorization: Bearer $ACCESS" -H "Content-Type: application/json" \
+  -d '{"property_id":"b2c1f5a0-1a2b-4c3d-9e0f-111111111111"}'
+
+# quitar (idempotente: repetirlo devuelve 204)
+curl -X DELETE http://localhost:8000/api/v1/favorites/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/ \
+  -H "Authorization: Bearer $ACCESS"
+```
+
 ### Desviación conocida de Spectral
 
-`password-reset` y `password-reset-confirm` llevan **barra final**, y solo
-ellos. Spectral lo marca con `path-keys-no-trailing-slash` y el contrato queda
-con 2 warnings, a diferencia del resto de versiones que están en 0.
+`password-reset`, `password-reset-confirm`, `favorites` y
+`favorites/{property_id}` llevan **barra final**, y solo ellos. Spectral lo marca
+con `path-keys-no-trailing-slash` y el contrato queda con 4 warnings, a
+diferencia de las versiones anteriores, que estaban en 0.
 
-Es deliberado: el enunciado de la tarea especifica las rutas con barra, y es la
-convención de Django REST Framework, que es donde `TASK-BACK-SEC-02` las va a
-implementar. Quitar la barra dejaría el contrato en 0 warnings, pero obligaría
-a registrar en Django unas rutas que DRF no genera por defecto.
+Es deliberado: el enunciado de cada tarea especifica las rutas con barra, y es la
+convención de Django REST Framework, que es donde se implementarán. Quitar la
+barra dejaría el contrato en 0 warnings, pero obligaría a registrar en Django
+unas rutas que DRF no genera por defecto.
 
 ## Disponibilidad y reserva de visitas (HU-CRM-01)
 
@@ -845,10 +979,11 @@ Validación estructural complementaria:
 npx @apidevtools/swagger-cli validate docs/api/openapi_spec.yaml
 ```
 
-Estado actual (v1.7.0): `swagger-cli` reports *"is valid"* y Spectral
-`* 2 problems (0 errors, 2 warnings, 0 infos, 0 hints)*`. Los dos warnings son
-`path-keys-no-trailing-slash` de las rutas de recuperación, y están justificados
-en [Desviación conocida de Spectral](#desviación-conocida-de-spectral).
+Estado actual (v1.8.0): `swagger-cli` reports *"is valid"* y Spectral
+`* 4 problems (0 errors, 4 warnings, 0 infos, 0 hints)*`. Los cuatro warnings
+son `path-keys-no-trailing-slash` de las rutas de recuperación y de favoritos, y
+están justificados en
+[Desviación conocida de Spectral](#desviación-conocida-de-spectral).
 
 ## Notas para la implementación
 
@@ -951,6 +1086,21 @@ en [Desviación conocida de Spectral](#desviación-conocida-de-spectral).
 - El `uid` no lleva `writeOnly`, a diferencia de las contraseñas: es un
   identificador, no un secreto, y el frontend necesita mandarlo. Aun así, los
   tokens de recuperación **sí** deben quedar fuera de los logs de acceso.
+- `POST /favorites/` devuelve `200` y no `201`. Es deliberado, para que un
+  reintento del debounce de `TASK-WPO-PROP-05` no produzca un error; si
+  `TASK-BACK-PROP-05` implementa `201`, el frontend tendrá que tratar el `409`
+  como éxito.
+- `Favorite` envuelve `Property` y añade `added_at`. `TASK-BACK-PROP-05` necesita
+  el modelo `User <-> FavoriteProperty` **con** marca de tiempo propia; sin ella
+  no hay orden de "guardados recientemente" ni se puede distinguir un reintento
+  de una segunda marca real.
+- Los favoritos de un inmueble que luego se desactiva (`is_active: false`) siguen
+  en la lista y se devuelven con `is_active: false`. Si el negocio decide
+  ocultarlos, es un filtro del backend y no un cambio de contrato.
+- La v1.8.0 **sí toca un esquema compartido**: `Property` gana `is_favorite`,
+  que depende del access token. Los clientes generados a partir del contrato
+  tienen que regenerarse, porque `Property` aparece en el catálogo, en el
+  detalle y en cada favorito.
 - `duration_minutes` no lo elige el cliente: deriva del `ScheduleSlot` reservado
   y define la ventana `[scheduled_at, scheduled_at + duration_minutes)` con la
   que el backend detecta solapamientos entre citas del mismo agente. Si se

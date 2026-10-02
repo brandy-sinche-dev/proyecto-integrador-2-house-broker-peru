@@ -21,6 +21,7 @@ info:
     | Sprint 3 | `TASK-ARC-SEC-02` | Recuperación de contraseña con token temporal (HU-SEC-02) |
     | Sprint 4 | `TASK-ARC-CRM-01` | Disponibilidad por fecha y creación de citas (HU-CRM-01) |
     | Sprint 4 | `TASK-ARC-CRM-02` | Agenda de citas filtrada por rol y estados de cita (HU-CRM-02) |
+    | Sprint 4 | `TASK-ARC-PROP-05` | Gestión de propiedades favoritas por usuario (HU-PROP-05) |
 
     ### Convenciones
     - Todos los endpoints están bajo el prefijo `/api/v1`.
@@ -41,7 +42,11 @@ info:
       uso, entregados por correo. La solicitud responde `202` con un mensaje
       genérico exista o no la cuenta, para no revelar qué correos están
       registrados, y está limitada por `PASSWORD_RESET_THROTTLE`.
-  version: 1.7.0
+    - Los favoritos son una lista privada por usuario: el backend la filtra por
+      el `sub` del access token y los endpoints no aceptan ningún parámetro de
+      usuario. Agregar y quitar son idempotentes, para que un doble clic o un
+      reintento no se traduzcan en un error.
+  version: 1.8.0
   contact:
     name: Equipo HouseBroker Perú
     url: https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru
@@ -71,6 +76,12 @@ tags:
       recuperación usa tokens temporales firmados y de un solo uso, y su
       solicitud está limitada por IP y por correo para frenar el envío masivo
       de correos.
+  - name: Favoritos
+    description: |
+      Propiedades guardadas por el usuario autenticado, para la vista "Mis
+      Favoritos" y el botón de corazón del catálogo. La lista es privada y el
+      backend la filtra por el usuario del access token; agregar y quitar son
+      idempotentes.
   - name: Citas
     description: |
       Disponibilidad de visitas y agenda de citas: consulta de horarios libres
@@ -778,6 +789,282 @@ paths:
                 detail: El enlace ya no es válido. Solicita un correo nuevo para restablecer tu clave.
                 instance: /api/v1/auth/password-reset-confirm/
                 code: invalid_reset_token
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/favorites/:
+    parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
+
+    get:
+      tags:
+        - Favoritos
+      operationId: listFavorites
+      summary: Listar las propiedades guardadas
+      description: |
+        Devuelve los inmuebles que el usuario autenticado ha guardado, del más
+        reciente al más antiguo.
+
+        Es una lista **por usuario**: el backend la filtra por el `sub` del access
+        token, así que dos personas nunca ven los favoritos de la otra. El
+        endpoint no acepta ningún parámetro de usuario, y no debe añadirse uno:
+        si lo admitiera, bastaría cambiar `?user_id=` para leer los favoritos
+        ajenos.
+
+        ### Orden y paginación
+
+        Se ordena por `added_at` descendente, que es lo que espera la vista "Mis
+        Favoritos": lo guardado después aparece primero. Es un orden estable
+        porque cada favorito tiene su propia fecha, a diferencia del
+        `created_at` de un inmueble, que puede empatar entre varios.
+
+        Los parámetros `page` y `limit` se comportan como en el catálogo, con
+        `DEFAULT_PAGE` y `DEFAULT_LIMIT` cuando se omiten.
+      responses:
+        '200':
+          description: Página de propiedades guardadas
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFavorites'
+              example:
+                count: 2
+                next: null
+                previous: null
+                results:
+                  - property:
+                      id: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+                      title: Departamento amoblado en Miraflores
+                      price: 150000.0
+                      moneda: PEN
+                      mode: VENTA
+                      address: Av. Larco 456, Miraflores
+                      property_type: DEPARTAMENTO
+                      is_active: true
+                      is_favorite: true
+                      created_at: '2026-09-07T10:00:00Z'
+                    added_at: '2026-10-05T09:12:44Z'
+                  - property:
+                      id: c3d4e5f6-2b3c-4d5e-9f70-333333333333
+                      title: Casa con patio en Surco
+                      price: 385000.0
+                      moneda: PEN
+                      mode: VENTA
+                      address: Calle Los Olivos 128, Surco
+                      property_type: CASA
+                      is_active: true
+                      is_favorite: true
+                      created_at: '2026-08-21T16:40:00Z'
+                    added_at: '2026-10-04T18:03:11Z'
+        '401':
+          description: |
+            Token ausente, vencido o con firma inválida. Se aplica el
+            `bearerAuth` global, igual que en el resto del contrato.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemUnauthorized'
+              example:
+                type: https://housebroker.pe/errors/unauthorized
+                title: No autenticado
+                status: 401
+                detail: El token de acceso es inválido o ha expirado.
+                instance: /api/v1/favorites/
+                code: unauthorized
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Favoritos
+      operationId: addFavorite
+      summary: Guardar una propiedad en favoritos
+      description: |
+        Añade un inmueble a la lista del usuario autenticado.
+
+        ### Idempotente a propósito
+
+        Devuelve `200` con el favorito tanto si lo acaba de añadir como si ya
+        estaba, y en ambos casos devuelve el mismo `added_at` original. No hay
+        `201` ni un `409` por duplicado, a propósito.
+
+        El motivo es `TASK-WPO-PROP-05`, que implementa el botón con debounce:
+        un doble clic o un reintento por red llega al servidor dos veces, y si la
+        segunda devolviera un error el frontend tendría que distinguir entre
+        "ya estaba" y "falló de verdad". Con `200` siempre, el cliente solo
+        tiene un camino único y el `added_at` original evita que el orden de la
+        lista cambie por un reintento.
+
+        ### El `404` es del inmueble, no de la lista
+
+        El `404 resource_not_found` aparece cuando el `property_id` no
+        corresponde a ningún inmueble existente, o cuando existe pero está
+        desactivado (`is_active: false`), que es la eliminación lógica del
+        proyecto. Guardar un inmueble que ya no está en el catálogo no tiene
+        sentido.
+
+        No devuelve tokens ni datos de sesión: los favorites no cambian la
+        autenticación.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FavoriteInput'
+            example:
+              property_id: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+      responses:
+        '200':
+          description: |
+            Inmueble guardado. La misma respuesta si ya estaba en la lista, con
+            el `added_at` de la primera vez.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Favorite'
+              example:
+                property:
+                  id: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+                  title: Departamento amoblado en Miraflores
+                  price: 150000.0
+                  moneda: PEN
+                  mode: VENTA
+                  address: Av. Larco 456, Miraflores
+                  property_type: DEPARTAMENTO
+                  is_active: true
+                  is_favorite: true
+                  created_at: '2026-09-07T10:00:00Z'
+                added_at: '2026-10-05T09:12:44Z'
+        '400':
+          description: El `property_id` no tiene el formato de un UUID
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemBadRequest'
+              example:
+                type: https://housebroker.pe/errors/invalid-query-parameter
+                title: Parámetro de consulta inválido
+                status: 400
+                detail: El cuerpo debe incluir un 'property_id' válido.
+                instance: /api/v1/favorites/
+                code: invalid_query_parameter
+                errors:
+                  - parameter: property_id
+                    message: El identificador de propiedad no tiene un formato válido.
+        '401':
+          description: Token ausente, vencido o con firma inválida
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemUnauthorized'
+              example:
+                type: https://housebroker.pe/errors/unauthorized
+                title: No autenticado
+                status: 401
+                detail: El token de acceso es inválido o ha expirado.
+                instance: /api/v1/favorites/
+                code: unauthorized
+        '404':
+          description: |
+            El inmueble no existe o está desactivado. No se confunde con "ya
+            estaba en favoritos": eso devuelve `200`.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemNotFound'
+              example:
+                type: https://housebroker.pe/errors/resource-not-found
+                title: Recurso no encontrado
+                status: 404
+                detail: No existe una propiedad con el identificador indicado.
+                instance: /api/v1/favorites/
+                code: resource_not_found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/favorites/{property_id}/:
+    parameters:
+      - $ref: '#/components/parameters/FavoritePropertyId'
+
+    delete:
+      tags:
+        - Favoritos
+      operationId: removeFavorite
+      summary: Quitar una propiedad de favoritos
+      description: |
+        Elimina el inmueble de la lista del usuario autenticado.
+
+        ### Idempotente
+
+        Devuelve `204` tanto si lo quitaba como si no estaba en la lista. Un
+        `DELETE` debe poder repetirse sin efectos, y con el botón de corazón de
+        `PropertyCard` un doble clic es el caso normal, no la excepción: si
+        devolviera `404`, el frontend tendría que traducir ese `404` a "listo"
+        para no enseñar un error al usuario que ya completó la operación.
+
+        Por eso el `404` de este endpoint es **solo** del inmueble: si el
+        `property_id` no corresponde a nada existente, ahí sí hay `404`. Si
+        el inmueble existe y no estaba en la lista, la operación se considera
+        cumplida.
+
+        No devuelve cuerpo. El `204` no lleva `Set-Cookie` ni toca la sesión.
+      responses:
+        '204':
+          description: |
+            Inmueble quitado de favoritos, o no estaba en la lista. Sin cuerpo.
+        '401':
+          description: Token ausente, vencido o con firma inválida
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemUnauthorized'
+              example:
+                type: https://housebroker.pe/errors/unauthorized
+                title: No autenticado
+                status: 401
+                detail: El token de acceso es inválido o ha expirado.
+                instance: /api/v1/favorites/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/
+                code: unauthorized
+        '404':
+          description: |
+            El inmueble no existe. No se devuelve cuando simplemente no era
+            favorito.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemNotFound'
+              example:
+                type: https://housebroker.pe/errors/resource-not-found
+                title: Recurso no encontrado
+                status: 404
+                detail: No existe una propiedad con el identificador indicado.
+                instance: /api/v1/favorites/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/
+                code: resource_not_found
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -2494,6 +2781,19 @@ components:
         type: string
         format: uuid
 
+    FavoritePropertyId:
+      name: property_id
+      in: path
+      required: true
+      description: |
+        Identificador del inmueble. Se llama así, y no `id` como en
+        `/properties/{id}`, porque en esta ruta queda claro a quién pertenece
+        el recurso: el favorito del usuario.
+      schema:
+        type: string
+        format: uuid
+      example: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+
     MinPrice:
       name: minPrice
       in: query
@@ -2761,6 +3061,19 @@ components:
           description: |
             Indica si el inmueble está visible en el catálogo. Se desactiva
             mediante eliminación lógica (`DELETE`).
+          example: true
+        is_favorite:
+          type: boolean
+          description: |
+            Indica si **el usuario de la petición** guardó este inmueble en
+            favoritos. Es lo que permite pintar el corazón de `PropertyCard` sin
+            una llamada por inmueble.
+
+            Depende del access token, así que el mismo catálogo devuelve
+            valores distintos según quién pregunte. Todas las lecturas de este
+            contrato exigen `bearerAuth` por el `security` global, así que el
+            campo siempre se puede calcular; si algún día publica el
+            catálogo sin token, tendría que omitirlo o mandarlo `false`.
           example: true
         created_at:
           type: string
@@ -3222,6 +3535,106 @@ components:
           description: Los siete días de la semana, en orden de lunes a domingo.
           items:
             $ref: '#/components/schemas/WeekdaySchedule'
+
+    FavoriteInput:
+      type: object
+      additionalProperties: false
+      required:
+        - property_id
+      description: |
+        Cuerpo de `POST /api/v1/favorites/`. Solo necesita el inmueble: la fecha
+        de guardado la asigna el backend, porque es un dato del servidor y no
+        tiene sentido que el cliente pueda elegirlo.
+      properties:
+        property_id:
+          type: string
+          format: uuid
+          description: |
+            Identificador del inmueble a guardar, tomado de `Property.id`. Si no
+            corresponde a un inmueble activo produce `404`.
+          example: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+      example:
+        property_id: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+
+    Favorite:
+      type: object
+      additionalProperties: false
+      required:
+        - property
+        - added_at
+      description: |
+        Un inmueble guardado, con la fecha en que el usuario lo guardó.
+
+        No es un `Property` pelado: el contrato envuelve el inmueble y le añade
+        `added_at`, que es dato de la relación y no del inmueble. Aplanar los
+        campos dentro de `Property` haría que el mismo inmueble apareciera con
+        metadatos distintos según desde dónde se leyera.
+      properties:
+        property:
+          $ref: '#/components/schemas/Property'
+        added_at:
+          type: string
+          format: date-time
+          description: |
+            Momento en que el usuario guardó el inmueble, en UTC. Es lo que
+            ordena la lista de forma descendente y no cambia cuando el endpoint
+            recibe un `POST` repetido.
+          example: '2026-10-05T09:12:44Z'
+      example:
+        property:
+          id: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+          title: Departamento amoblado en Miraflores
+          price: 150000.0
+          moneda: PEN
+          mode: VENTA
+          address: Av. Larco 456, Miraflores
+          property_type: DEPARTAMENTO
+          is_active: true
+          is_favorite: true
+          created_at: '2026-09-07T10:00:00Z'
+        added_at: '2026-10-05T09:12:44Z'
+
+    PaginatedFavorites:
+      type: object
+      description: Envoltorio paginado de la lista de favoritos del usuario.
+      required:
+        - count
+        - next
+        - previous
+        - results
+      additionalProperties: false
+      properties:
+        count:
+          type: integer
+          format: int32
+          minimum: 0
+          description: |
+            Total de inmuebles guardados por este usuario, sin paginar. Es el
+            número que necesita la vista "Mis Favoritos" para el contador.
+          example: 2
+        next:
+          type: string
+          format: uri
+          nullable: true
+          description: |
+            URL absoluta de la siguiente página, o `null` si la página
+            solicitada es la última.
+          example: null
+        previous:
+          type: string
+          format: uri
+          nullable: true
+          description: |
+            URL absoluta de la página anterior, o `null` si la página
+            solicitada es la primera.
+          example: null
+        results:
+          type: array
+          description: |
+            Favoritos de la página solicitada, del más reciente al más
+            antiguo.
+          items:
+            $ref: '#/components/schemas/Favorite'
 
     PaginatedProperties:
       type: object
