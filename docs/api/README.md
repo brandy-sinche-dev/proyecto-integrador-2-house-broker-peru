@@ -2,9 +2,9 @@
 
 Contratos REST del backend (Django REST Framework) bajo especificación **OpenAPI 3.0**.
 
-> **Tarea actual:** [TASK-ARC-CRM-01] Especificación OpenAPI 3.0 para agendamiento
-> de visitas y reservas —
-> [issue #90](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/90) (HU-CRM-01).
+> **Tarea actual:** [TASK-ARC-SEC-01] Especificación OpenAPI 3.0 para
+> autenticación JWT y roles —
+> [issue #69](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/69) (HU-SEC-01).
 
 ## Archivo único de contrato
 
@@ -21,6 +21,7 @@ que al cierre (Sprint 7) exista un solo `.yml` con la API completa.
 | 1.3.0 | Sprint 3 | `TASK-ARC-PROP-04` | [#83](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/83) | Estado operativo (`PATCH .../status`) y horarios (`GET`/`PUT .../schedules`), con `401`/`403`/`409` (HU-PROP-04) |
 | 1.4.0 | Sprint 4 | `TASK-ARC-CRM-02` | [#97](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/97) | Agenda de citas filtrada por rol (`GET /api/v1/appointments`) y estados de cita (`PATCH .../status`) (HU-CRM-02) |
 | 1.5.0 | Sprint 4 | `TASK-ARC-CRM-01` | [#90](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/90) | Disponibilidad por fecha (`GET .../available-slots`) y alta de citas (`POST /api/v1/appointments`) (HU-CRM-01) |
+| 1.6.0 | Sprint 3 | `TASK-ARC-SEC-01` | [#69](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/69) | `bearerAuth` + `refreshCookie`, y `register` / `login` / `refresh` (HU-SEC-01) |
 
 Al crecer el documento, extrae las secciones a `components/schemas` y referencia
 con `$ref`. No dupliques esquemas entre operaciones.
@@ -34,6 +35,9 @@ el schema en el mismo commit.
 
 | Método | Ruta | Operación | Sprint |
 |---|---|---|---|
+| POST | `/api/v1/auth/register` | `registerUser` | 3 |
+| POST | `/api/v1/auth/login` | `loginUser` | 3 |
+| POST | `/api/v1/auth/refresh` | `refreshAccessToken` | 3 |
 | GET | `/api/v1/properties` | `listProperties` — catálogo paginado | 2 |
 | POST | `/api/v1/properties` | `createProperty` | 1 |
 | GET | `/api/v1/properties/{id}` | `getProperty` | 1 |
@@ -406,6 +410,152 @@ accionable. El backend no debe revelar la existencia de una cita ajena al
 agente que la consulta: la ausencia de permiso se responde con `403` solo
 cuando el recurso es visible para el usuario.
 
+## Autenticación, tokens y roles (HU-SEC-01)
+
+`TASK-ARC-SEC-01` especifica el registro, el inicio de sesión y el refresco del
+access token, y define los dos esquemas de seguridad del contrato.
+
+| Método | Ruta | Operación | Acceso |
+|---|---|---|---|
+| POST | `/api/v1/auth/register` | `registerUser` | Público |
+| POST | `/api/v1/auth/login` | `loginUser` | Público |
+| POST | `/api/v1/auth/refresh` | `refreshAccessToken` | `refreshCookie` |
+
+### Dónde vive cada token
+
+| Token | Transporte | Persistencia en el cliente |
+|---|---|---|
+| `access` | cuerpo de la respuesta → cabecera `Authorization: Bearer` | **Solo en memoria** |
+| `refresh` | cookie `HttpOnly` `hb_refresh_token` | Gestionada por el navegador |
+
+Es un modelo **híbrido**, el patrón habitual de OAuth 2.0, y resuelve una
+contradicción que ya existía en el repositorio:
+
+- `docs/02_Arquitectura.md:47,659` pide *"JWT en cookies HttpOnly"* y avisa de
+  aplicar *"protección CSRF cuando se utilicen cookies"*.
+- El criterio del Sprint 3 (`planning.md:82`) exige *"JWT gestionado sin
+  exposición en localStorage"*.
+- Pero `docs/api/README.md` documentaba que el cliente leía el token desde
+  `localStorage.hb_token`, que es justo lo que los dos anteriores prohíben.
+
+Con este modelo, el `access` sigue yendo en la cabecera `Bearer` —así que
+`bearerAuth` y las 10 operaciones ya especificadas **no cambian**— y lo único
+que se persiste es el refresh, dentro de una cookie que JavaScript no puede leer.
+
+`TokenPair` **no** incluye el refresh token en el cuerpo: si se entregara ahí,
+cualquier XSS podría leerlo y robar la sesión completa, que es justo lo que la
+cookie evita.
+
+#### Política de la cookie
+
+| Atributo | Valor | Motivo |
+|---|---|---|
+| `HttpOnly` | presente | `document.cookie` no puede leerla |
+| `Secure` | presente | Solo viaja por HTTPS |
+| `SameSite` | `Strict` | Corta el envío en navegaciones externas |
+| `Path` | `/api/v1/auth` | Limita el envío a los endpoints que lo necesitan |
+| `Max-Age` | `REFRESH_LIFETIME` | La sesión expira sola |
+
+**Sobre CSRF:** al ser `HttpOnly` y `SameSite=Strict`, la cookie no habilita CSRF
+en el resto de la API: los endpoints que solo aceptan `Authorization: Bearer`
+siguen siendo inmunes porque el navegador no adjunta cabeceras personalizadas
+en un envío automático. Aun así, **`POST /api/v1/auth/login` sí debe validar un
+token CSRF de doble envío**, porque es el único punto donde se establece la
+sesión y el atacante solo necesita que la víctima.visitase su sitio.
+
+### Registro: por qué `role` solo admite `CLIENTE`
+
+El enunciado pide que el cuerpo del registro incluya `email`, `password` y
+`role`. El campo está ahí, pero su enumerado tiene **un único valor**:
+
+```yaml
+role:
+  enum: [CLIENTE]
+  default: CLIENTE
+```
+
+Un registro público que aceptara `ADMINISTRADOR` dejaría que cualquiera se
+autopromoviera a administrador con un `curl`. Las cuentas de `AGENTE` y
+`ADMINISTRADOR` las crea un administrador desde el panel. Enviar esos roles
+produce `400` con `role_not_assignable`, que es un rechazo explícito y no un
+campo ignorado en silencio.
+
+El registro **no** devuelve tokens (`201` con el usuario creado): el cliente
+debe llamar a `login` a continuación, para no duplicar la lógica de sesión en
+dos endpoints.
+
+### Matriz de errores
+
+| Situación | `code` | Respuesta |
+|---|---|---|
+| `email` con formato inválido | `invalid_query_parameter` | `400` |
+| Contraseña por debajo del mínimo | `weak_password` | `400` |
+| `role` distinto de `CLIENTE` | `role_not_assignable` | `400` |
+| Correo ya registrado | `email_already_registered` | `409` |
+| Credenciales incorrectas | `invalid_credentials` | `401` |
+| Cuenta desactivada | `account_disabled` | `403` |
+| Refresh expirado, revocado o ausente | `invalid_refresh_token` | `401` |
+| Refresh ya rotado (reuso) | `refresh_token_reused` | `401` |
+
+Tres detalles que importan para el frontend:
+
+- **Correo inexistente y contraseña incorrecta son indistinguibles.** Ambos
+  devuelven `401` con `invalid_credentials` y el mismo `detail`; separarlos
+  confirmaría qué correos están registrados.
+- **Cuenta desactivada es `403`, no `401`.** Un `401` haría que el cliente
+  creyera que su contraseña falla y la volviera a enviar.
+- **`email_already_registered` es `409`, no `400`.** El correo tiene formato
+  válido; lo que falla es que el recurso ya existe. Un `400` haría que el
+  formulario marcara el campo sin explicar el motivo.
+
+### Rotación del refresh token
+
+Cada refresco emite un access **y un refresh nuevos**, e invalida el anterior.
+
+| Situación | Resultado |
+|---|---|
+| Refresco con el token vigente | `200`, access nuevo y refresh rotado |
+| Refresco con un token ya rotado | `401` `refresh_token_reused` |
+| Refresco con token expirado o revocado | `401` `invalid_refresh_token` |
+
+Detectar la reutilización es lo que hace útil la rotación: si un token robado se
+usa desde otro equipo, el uso legítimo posterior falla y queda registrado, en
+lugar de que ambos sigan funcionando en paralelo. Tras detectar un reuso se
+invalida **toda la familia** de tokens del usuario.
+
+El `401` del refresco devuelve `Set-Cookie` con `Max-Age=0`, para borrar la
+cookie en el navegador y no dejar una sesión zombi.
+
+```bash
+# login: el refresh llega en la cookie, no en el cuerpo
+curl -i -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"maria.quispe@correo.com","password":"ClaveSegura2026"}' -c cookies.txt
+# -> {"access":"eyJ0...","token_type":"Bearer","expires_in":1800,"user":{...}}
+# -> Set-Cookie: hb_refresh_token=...; HttpOnly; Secure; SameSite=Strict
+
+# refresh: el navegador adjunta la cookie
+curl -X POST http://localhost:8000/api/v1/auth/refresh -b cookies.txt
+```
+
+### Claims del access token
+
+El backend toma el rol del token para autorizar, sin consultar la base de datos
+en cada petición:
+
+| Claim | Contenido | Uso |
+|---|---|---|
+| `sub` | UUID del usuario | Identidad del titular |
+| `email` | Correo normalizado a minúsculas | Trazabilidad |
+| `role` | `CLIENTE`, `AGENTE`, `ADMINISTRADOR` | **Autorización (RBAC)** |
+| `token_type` | `access` | Rechazar un refresh enviado por error |
+| `jti` | Identificador único del token | Revocación individual |
+| `iat` / `exp` | Emisión y expiración (Unix epoch) | Validación de vigencia |
+
+La contrapartida: **un cambio de rol no surte efecto hasta que el access
+expira**, salvo que se revoque por `jti`. `TASK-BACK-SEC-01` debe tener esto en
+cuenta al implementar el middleware de permisos.
+
 ## Disponibilidad y reserva de visitas (HU-CRM-01)
 
 `TASK-ARC-CRM-01` especifica los dos endpoints del flujo de agendar una visita:
@@ -616,6 +766,25 @@ npx @apidevtools/swagger-cli validate docs/api/openapi_spec.yaml
   global. Es la única operación del contrato que lo hace, y a propósito: expone
   horarios del inmueble, no citas. Si `TASK-BACK-SEC-01` decide que la ficha de
   la propiedad pasa a exigir sesión, hay que quitar ese `security: []`.
+- La v1.6.0 **sí toca las convenciones de seguridad del contrato**: corrige la
+  contradicción entre `docs/02_Arquitectura.md` (cookies `HttpOnly`) y el
+  `localStorage.hb_token` que documentaba este README. El `bearerAuth` se
+  mantiene para el access token, así que **ninguna operación previa cambia de
+  forma**; lo que cambia es que el refresh deja de ser accesible a JavaScript.
+- `docs/api/README.md` decía que el cliente leía el token de
+  `localStorage.hb_token` (`frontend/src/services/axios.ts`). Con la v1.6.0 esa
+  nota queda desactualizada a propósito: `TASK-FRONT-SEC-01` debe migrar el
+  access token a un contexto de React **en memoria** y dejar de persistirlo.
+  Mientras esa migración no ocurra, el frontend y el contrato discrepan.
+- **No hay `logout` en el contrato.** La sesión termina cuando expira el refresh
+  token, lo que deja sesiones vivas hasta `REFRESH_LIFETIME` después de que el
+  usuario Cerró sesión. `TASK-ARC-SEC-02` (recuperación de contraseña) es el
+  sitio natural para añadir `POST /api/v1/auth/logout` con revocación de la
+  familia de tokens.
+- La rotación de refresh exige una tabla de tokens revocados en el backend. Sin
+  ella, `refresh_token_reused` no puede distinguir un reuso real de una carrera
+  legítima de dos pestañas, y `TASK-BACK-SEC-01` necesita definir esa
+  persistencia antes de implementar el endpoint.
 - `duration_minutes` no lo elige el cliente: deriva del `ScheduleSlot` reservado
   y define la ventana `[scheduled_at, scheduled_at + duration_minutes)` con la
   que el backend detecta solapamientos entre citas del mismo agente. Si se
