@@ -17,6 +17,7 @@ info:
     | Sprint 2 | `TASK-ARC-PROP-02` | Catálogo paginado `GET /api/v1/properties` (HU-PROP-02) |
     | Sprint 2 | `TASK-ARC-PROP-03` | Filtros de búsqueda en `GET /api/v1/properties` (HU-PROP-03) |
     | Sprint 3 | `TASK-ARC-PROP-04` | Estado operativo y horarios de visita (HU-PROP-04) |
+    | Sprint 4 | `TASK-ARC-CRM-01` | Disponibilidad por fecha y creación de citas (HU-CRM-01) |
     | Sprint 4 | `TASK-ARC-CRM-02` | Agenda de citas filtrada por rol y estados de cita (HU-CRM-02) |
 
     ### Convenciones
@@ -30,7 +31,7 @@ info:
     - Los endpoints mutables exigen `Authorization: Bearer <jwt>` y rol `AGENTE`
       o `ADMINISTRADOR`. Un `401` significa token ausente o inválido; un `403`
       significa token válido sin permiso sobre el recurso.
-  version: 1.4.0
+  version: 1.5.0
   contact:
     name: Equipo HouseBroker Perú
     url: https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru
@@ -53,10 +54,11 @@ tags:
       visitas. Solo accesible para Agentes asignados y Administradores.
   - name: Citas
     description: |
-      Agenda de visitas: consulta de la cita según el rol del usuario y gestión
-      de su estado (confirmar, reprogramar, cancelar, completar o registrar la
-      inasistencia). Solo los Agentes asignados y Administradores modifican el
-      estado de una cita.
+      Disponibilidad de visitas y agenda de citas: consulta de horarios libres
+      por fecha, reserva de una visita y gestión de su estado (confirmar,
+      reprogramar, cancelar, completar o registrar la inasistencia). La reserva
+      y el cambio de estado exigen sesión; solo el Agente asignado o un
+      Administrador modifican el estado de una cita.
 
 security:
   - bearerAuth: []
@@ -868,6 +870,165 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/properties/{id}/available-slots:
+    parameters:
+      - $ref: '#/components/parameters/PropertyId'
+
+    get:
+      tags:
+        - Disponibilidad
+      security: []
+      operationId: getPropertyAvailableSlots
+      summary: Consultar los horarios disponibles de una propiedad en una fecha
+      description: |
+        Devuelve los horarios concretos que quedan libres para visitar un
+        inmueble en una fecha determinada (RF-CRM-01). Es el paso previo a
+        `POST /api/v1/appointments`: el cliente elige un `start_at` de esta
+        respuesta y lo envía como `scheduled_at` al reservar.
+
+        ### Cómo se calcula la disponibilidad
+
+        Los horarios no se almacenan por fecha: se **derivan** en cada petición
+        de la agenda semanal del Sprint 3
+        (`GET /api/v1/properties/{id}/schedules`). Para la fecha pedida:
+
+        1. Se toma el `WeekdaySchedule` que corresponde al día de la semana y
+           se materializan sus franjas `is_active = true` en esa fecha concreta.
+        2. Se descarta cada franja que ya tiene una cita en estado `PENDING`,
+           `CONFIRMED` o `RESCHEDULED`, comparando el intervalo
+           `[start_at, end_at)` completo, no solo el instante de inicio.
+        3. Se devuelve el resultado en orden ascendente de `start_at`.
+
+        Por construcción, un horario que otro agente acaba de tomar puede dejar
+        de estar disponible entre esta consulta y el `POST`: la respuesta **no
+        reserva** nada. El bloqueo real ocurre en el `POST`, que responde `409`
+        con `appointment_slot_conflict`.
+
+        ### Días sin atención
+
+        Si la fecha no tiene franjas configuradas, tiene todas desactivadas o
+        ya se agotaron, la respuesta es `200` con `slots: []`. Es el mismo
+        criterio que usa `GET .../schedules` para los días sin atención: una
+        lista vacía significa "no hay horario ese día", no "no se pudo cargar".
+
+        ### Alcance de acceso
+
+        Se declara `security: []` porque devuelve información del **inmueble**
+        y no datos de citas: no expone quién agendó ni con qué agente, solo
+        horas libres. Es la misma decisión que deja el catálogo público, y
+        permite pintar el calendario en la ficha del inmueble sin exigir
+        sesión previa. Crear la cita sí la exige.
+
+        ### Rango de fechas admitido
+
+        La fecha va de **hoy a 60 días vista adelante** en `America/Lima`. El
+        horizonte acota el costo de materializar la agenda y evita que el
+        cliente ofrezca fechas que la agencia todavía no tiene publicados sus
+        horarios. Una fecha fuera del rango produce `400`; una fecha de hoy con
+        horas ya vencidas devuelve `200` con `slots: []`, porque el filtro de
+        horas pasadas es parte del cálculo y no un error.
+      parameters:
+        - $ref: '#/components/parameters/AvailabilityDate'
+      responses:
+        '200':
+          description: Horarios disponibles obtenidos exitosamente
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailableSlots'
+              examples:
+                conHorarios:
+                  summary: Día con franjas libres
+                  value:
+                    property_id: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+                    date: '2026-10-08'
+                    timezone: America/Lima
+                    total_slots: 2
+                    slots:
+                      - start_at: '2026-10-08T14:00:00Z'
+                        end_at: '2026-10-08T15:00:00Z'
+                        duration_minutes: 60
+                      - start_at: '2026-10-08T16:00:00Z'
+                        end_at: '2026-10-08T17:00:00Z'
+                        duration_minutes: 60
+                sinHorarios:
+                  summary: Día sin franjas configuradas
+                  value:
+                    property_id: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+                    date: '2026-10-11'
+                    timezone: America/Lima
+                    total_slots: 0
+                    slots: []
+        '400':
+          description: |
+            Parámetro `date` inválido: formato distinto de `YYYY-MM-DD`, fecha
+            anterior a hoy, o fecha más de 60 días vista adelante.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemBadRequest'
+              examples:
+                formatoInvalido:
+                  summary: Formato de fecha incorrecto
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Parámetro de consulta inválido
+                    status: 400
+                    detail: El parámetro 'date' debe tener formato ISO 8601 (YYYY-MM-DD).
+                    instance: /api/v1/properties/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/available-slots?date=08-10-2026
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: date
+                        message: El valor '08-10-2026' no cumple el formato YYYY-MM-DD.
+                fechaPasada:
+                  summary: Fecha anterior a hoy
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Parámetro de consulta inválido
+                    status: 400
+                    detail: No se puede consultar disponibilidad de una fecha pasada.
+                    instance: /api/v1/properties/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/available-slots?date=2026-09-01
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: date
+                        message: El valor '2026-09-01' es anterior a la fecha de hoy (2026-10-02).
+                fueraDeHorizonte:
+                  summary: Fecha más allá del horizonte de 60 días
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Parámetro de consulta inválido
+                    status: 400
+                    detail: La fecha pedida supera el horizonte de 60 dias para agendar visitas.
+                    instance: /api/v1/properties/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/available-slots?date=2027-06-01
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: date
+                        message: La fecha maxima admitida es 2026-11-30.
+        '404':
+          description: El inmueble no existe
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemNotFound'
+              example:
+                type: https://housebroker.pe/errors/resource-not-found
+                title: Recurso no encontrado
+                status: 404
+                detail: No existe una propiedad con el identificador indicado.
+                instance: /api/v1/properties/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/available-slots?date=2026-10-08
+                code: resource_not_found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/appointments:
     get:
       tags:
@@ -1030,6 +1191,207 @@ paths:
                 code: forbidden
                 required_roles:
                   - ADMINISTRADOR
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Citas
+      operationId: createAppointment
+      summary: Solicitar la reserva de una visita
+      description: |
+        Crea una solicitud de visita a un inmueble (RF-CRM-01). La cita nace
+        siempre en estado `PENDING`: reservarla no la confirma. La confirmación
+        es una acción posterior del agente, en
+        `PATCH /api/v1/appointments/{id}/status`.
+
+        ### De dónde sale el horario
+
+        `scheduled_at` debe coincidir **exactamente** con un `start_at` devuelto
+        por `GET /api/v1/properties/{id}/available-slots?date=...`. El servidor
+        no ajusta ni redondea la hora: si no hay coincidencia exacta devuelve
+        `400`, porque las franjas que no atienden la visita no se agendan.
+
+        La comprobación se repite dentro de la misma transacción que inserta la
+        cita, de modo que dos reservas simultáneas por el mismo horario no
+        puedan aceptarse ambas. Si el horario se tomó entre la consulta de
+        disponibilidad y este `POST`, la respuesta es `409` con
+        `appointment_slot_conflict` y **no** se crea ninguna cita.
+
+        ### Quién agenda y para quién
+
+        Un `CLIENTE` agenda para sí mismo: su identificador se toma del token y
+        **no se acepta en el cuerpo**, para que nadie pueda registrar una cita
+        en nombre de otro. Un `AGENTE` o un `ADMINISTRADOR` puede registrar una
+        visita en nombre de un cliente mediante `client_id`.
+
+        ### Efectos derivados
+
+        El backend envía el correo de confirmación al cliente y la notificación
+        al agente asignado (RF-SEC-05). Ese envío es posterior a la respuesta
+        `201` y su fallo no revoca la cita.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppointmentCreateInput'
+            examples:
+              clienteAgenda:
+                summary: Un cliente reserva para sí mismo
+                value:
+                  property_id: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+                  scheduled_at: '2026-10-08T16:00:00Z'
+              agenteRegistra:
+                summary: Un agente registra la visita de un cliente que llega a oficina
+                value:
+                  property_id: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+                  scheduled_at: '2026-10-08T16:00:00Z'
+                  client_id: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+      responses:
+        '201':
+          description: Visita solicitada exitosamente
+          headers:
+            Location:
+              description: URL del recurso creado.
+              schema:
+                type: string
+                format: uri
+              example: http://localhost:8000/api/v1/appointments/a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Appointment'
+              example:
+                id: a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e
+                status: PENDING
+                scheduled_at: '2026-10-08T16:00:00Z'
+                duration_minutes: 60
+                reason: null
+                property:
+                  id: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+                  title: Departamento amoblado en Miraflores
+                  district: Miraflores
+                  address: Av. Larco 456, Miraflores
+                client:
+                  id: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+                  full_name: Maria Fernanda Quispe
+                  email: maria.quispe@correo.com
+                  phone: '+51 987 654 321'
+                agent:
+                  id: 7c4a9d21-3b6e-4f80-9a2d-5e7c1b3f8d40
+                  full_name: Brandy Sinche
+                  email: brandy.sinche@housebrokerperu.com
+                created_at: '2026-10-05T09:12:44Z'
+                updated_at: '2026-10-05T09:12:44Z'
+        '400':
+          description: |
+            El cuerpo o el horario no son válidos. Casos cubiertos:
+            - `scheduled_at` con formato distinto de ISO 8601, o ausente.
+            - `scheduled_at` en una fecha pasada o más de 60 días vista adelante.
+            - El horario no coincide con ninguna franja habilitada de la
+              propiedad.
+            - La propiedad existe pero no admite agendamiento porque su
+              `PropertyStatus` es `RESERVADO`, `ALQUILADO`, `VENDIDO` o
+              `SUSPENDIDO`.
+            - Falta `client_id` en una reserva registrada por un agente.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemBadRequest'
+              examples:
+                horarioInvalido:
+                  summary: La hora no cae en ninguna franja de atención
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Parámetro de consulta inválido
+                    status: 400
+                    detail: El horario '2026-10-08T16:00:00Z' no coincide con ninguna franja habilitada de la propiedad.
+                    instance: /api/v1/appointments
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: scheduled_at
+                        message: Los horarios disponibles para el 2026-10-08 son 14:00 y 16:00.
+                propiedadNoAgendable:
+                  summary: El inmueble no admite visitas
+                  value:
+                    type: https://housebroker.pe/errors/property-not-bookable
+                    title: Propiedad no agendable
+                    status: 400
+                    detail: La propiedad esta en estado 'RESERVADO' y no admite nuevas visitas.
+                    instance: /api/v1/appointments
+                    code: property_not_bookable
+                    errors:
+                      - parameter: property_id
+                        message: Solo se pueden agendar visitas sobre propiedades en estado DISPONIBLE.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: |
+            El token es válido pero el usuario no puede registrar la visita.
+            Ocurre cuando la cuenta está desactivada (`is_active = false`) o
+            cuando un `CLIENTE` intenta enviar `client_id` para agendar en
+            nombre de otro.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemForbidden'
+              example:
+                type: https://housebroker.pe/errors/forbidden
+                title: Sin permisos sobre el recurso
+                status: 403
+                detail: Un cliente no puede registrar citas en nombre de otro usuario.
+                instance: /api/v1/appointments
+                code: forbidden
+        '404':
+          description: |
+            La propiedad indicada no existe, o el `client_id` enviado no
+            corresponde a un usuario registrado.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemNotFound'
+              example:
+                type: https://housebroker.pe/errors/resource-not-found
+                title: Recurso no encontrado
+                status: 404
+                detail: No existe una propiedad con el identificador indicado.
+                instance: /api/v1/appointments
+                code: resource_not_found
+        '409':
+          description: |
+            El horario ya está ocupado por otra cita en estado `PENDING`,
+            `CONFIRMED` o `RESCHEDULED`. No se crea ninguna cita: la reserva es
+            atómica, no parcial.
+
+            Usa el mismo código que la reprogramación de
+            `PATCH /api/v1/appointments/{id}/status`, porque es la misma
+            condición de negocio: un horario tomado.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemConflict'
+              example:
+                type: https://housebroker.pe/errors/appointment-slot-conflict
+                title: Conflicto de horario de cita
+                status: 409
+                detail: El horario '2026-10-08T16:00:00Z' ya esta ocupado por la cita f1e2d3c4-5a6b-4c7d-8e9f-0a1b2c3d4e5f.
+                instance: /api/v1/appointments
+                code: appointment_slot_conflict
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -1511,6 +1873,25 @@ components:
         type: string
         format: uuid
       example: 8b1a0f5c-2d3e-4a5b-9c7d-0e1f2a3b4c5d
+    AvailabilityDate:
+      name: date
+      in: query
+      required: true
+      description: |
+        Fecha concreta de la que se quiere la disponibilidad, en formato ISO
+        8601 (`YYYY-MM-DD`) y timezone `America/Lima`.
+
+        El valor se interpreta como **día local de Lima**, no como instante
+        UTC: `2026-10-08` son las visitas del jueves 8 en el horario peruano,
+        aunque el servidor construya los instantes en UTC.
+
+        La fecha va de hoy a 60 días vista adelante. Formato incorrecto, fecha
+        pasada o fecha fuera del horizonte producen `400`.
+      schema:
+        type: string
+        format: date
+      example: '2026-10-08'
+
     AppointmentId:
       name: id
       in: path
@@ -2137,6 +2518,133 @@ components:
           items:
             $ref: '#/components/schemas/Property'
 
+    AvailableSlot:
+      type: object
+      description: |
+        Instante concreto disponible para agendar, ya materializado sobre una
+        fecha. A diferencia de `ScheduleSlot`, que es una franja semanal
+        recurrente en `HH:MM`, aquí las horas son fechas completas en UTC,
+        porque una disponibilidad solo tiene sentido en un día determinado.
+      required:
+        - start_at
+        - end_at
+        - duration_minutes
+      properties:
+        start_at:
+          type: string
+          format: date-time
+          description: |
+            Inicio de la visita en UTC. Es el valor que el cliente envía como
+            `scheduled_at` al reservar; debe coincidir exactamente.
+          example: '2026-10-08T14:00:00Z'
+        end_at:
+          type: string
+          format: date-time
+          description: |
+            Fin de la visita en UTC. Intervalo semiabierto `[start_at,
+            end_at)`, igual que `ScheduleSlot`, para que dos visitas contiguas
+            no se consideren solapadas.
+          example: '2026-10-08T15:00:00Z'
+        duration_minutes:
+          type: integer
+          format: int32
+          minimum: 15
+          maximum: 480
+          description: |
+            Duración en minutos. Se deriva de `end_time - start_time` de la
+            franja configurada; el cliente no puede elegirla.
+          example: 60
+
+    AvailableSlots:
+      type: object
+      description: |
+        Disponibilidad de un inmueble en una fecha concreta. Es un recurso
+        **calculado**: no se persiste y puede quedar obsoleto entre la consulta
+        y la reserva, que es lo que el `409` del `POST` reflecta.
+      required:
+        - property_id
+        - date
+        - timezone
+        - total_slots
+        - slots
+      properties:
+        property_id:
+          type: string
+          format: uuid
+          description: Inmueble consultado.
+          example: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+        date:
+          type: string
+          format: date
+          description: Día consultado, tal como se recibió en `date`.
+          example: '2026-10-08'
+        timezone:
+          type: string
+          description: |
+            Zona horaria en la que se interpretó `date` y en la que se
+            configuraron las franjas del inmueble. Coincide con el `timezone` de
+            `GET /api/v1/properties/{id}/schedules`.
+          example: America/Lima
+        total_slots:
+          type: integer
+          format: int32
+          minimum: 0
+          description: |
+            Número de horarios devueltos. Es redundante con `slots.length` a
+            propósito: el frontend lo usa para pintar un contador ("3 horarios")
+            sin recorrer el arreglo, y la aserción sirve para detectar que la
+            respuesta llegó truncada.
+          example: 2
+        slots:
+          type: array
+          description: |
+            Horarios libres de la fecha, en orden ascendente de `start_at`. Es
+            `[]` cuando el día no tiene franjas, tiene todas desactivadas o ya
+            se agotaron.
+          items:
+            $ref: '#/components/schemas/AvailableSlot'
+          example:
+            - start_at: '2026-10-08T14:00:00Z'
+              end_at: '2026-10-08T15:00:00Z'
+              duration_minutes: 60
+
+    AppointmentCreateInput:
+      type: object
+      description: |
+        Cuerpo del alta de cita. `scheduled_at` debe ser un `start_at` devuelto
+        por `GET /api/v1/properties/{id}/available-slots` para la misma
+        propiedad; el servidor no ajusta la hora ni reserva un hueco
+        aproximado.
+      required:
+        - property_id
+        - scheduled_at
+      additionalProperties: false
+      properties:
+        property_id:
+          type: string
+          format: uuid
+          description: Inmueble que se quiere visitar.
+          example: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+        scheduled_at:
+          type: string
+          format: date-time
+          description: |
+            Instante de la visita en UTC. Debe coincidir exactamente con un
+            horario disponible; cualquier otro valor produce `400`.
+          example: '2026-10-08T16:00:00Z'
+        client_id:
+          type: string
+          format: uuid
+          description: |
+            Cliente para el que se registra la visita. **Solo lo envía un
+            `AGENTE` o un `ADMINISTRADOR`**, para agendar en nombre de alguien
+            que se presenta en oficina. Un `CLIENTE` que incluya este campo
+            recibe `403`: su identificador se toma siempre del token.
+          example: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+      example:
+        property_id: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+        scheduled_at: '2026-10-08T16:00:00Z'
+
     AppointmentStatus:
       type: string
       description: |
@@ -2501,9 +3009,11 @@ components:
                 rechazada en conjunto.
 
                 En el módulo CRM se suman `invalid_filter_range` para un rango
-                de fechas invertido (`dateFrom` > `dateTo`) y
+                de fechas invertido (`dateFrom` > `dateTo`),
                 `invalid_appointment_transition` cuando el `status` de destino no
-                es alcanzable desde el estado actual de la cita.
+                es alcanzable desde el estado actual de la cita, y
+                `property_not_bookable` cuando se intenta agendar una visita
+                sobre una propiedad cuyo `PropertyStatus` no admite reservas.
               example: invalid_query_parameter
             errors:
               type: array

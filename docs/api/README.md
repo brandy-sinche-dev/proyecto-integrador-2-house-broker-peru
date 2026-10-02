@@ -2,9 +2,9 @@
 
 Contratos REST del backend (Django REST Framework) bajo especificación **OpenAPI 3.0**.
 
-> **Tarea actual:** [TASK-ARC-CRM-02] Especificación OpenAPI 3.0 para la gestión de
-> estados y reprogramación de citas —
-> [issue #97](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/97) (HU-CRM-02).
+> **Tarea actual:** [TASK-ARC-CRM-01] Especificación OpenAPI 3.0 para agendamiento
+> de visitas y reservas —
+> [issue #90](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/90) (HU-CRM-01).
 
 ## Archivo único de contrato
 
@@ -20,6 +20,7 @@ que al cierre (Sprint 7) exista un solo `.yml` con la API completa.
 | 1.2.0 | Sprint 2 | `TASK-ARC-PROP-03` | [#43](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/43) | Query params de filtros: `minPrice`, `maxPrice`, `propertyType`, `ubigeo`, `search` (HU-PROP-03) |
 | 1.3.0 | Sprint 3 | `TASK-ARC-PROP-04` | [#83](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/83) | Estado operativo (`PATCH .../status`) y horarios (`GET`/`PUT .../schedules`), con `401`/`403`/`409` (HU-PROP-04) |
 | 1.4.0 | Sprint 4 | `TASK-ARC-CRM-02` | [#97](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/97) | Agenda de citas filtrada por rol (`GET /api/v1/appointments`) y estados de cita (`PATCH .../status`) (HU-CRM-02) |
+| 1.5.0 | Sprint 4 | `TASK-ARC-CRM-01` | [#90](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/90) | Disponibilidad por fecha (`GET .../available-slots`) y alta de citas (`POST /api/v1/appointments`) (HU-CRM-01) |
 
 Al crecer el documento, extrae las secciones a `components/schemas` y referencia
 con `$ref`. No dupliques esquemas entre operaciones.
@@ -41,7 +42,9 @@ el schema en el mismo commit.
 | PATCH | `/api/v1/properties/{id}/status` | `updatePropertyStatus` — estado operativo | 3 |
 | GET | `/api/v1/properties/{id}/schedules` | `getPropertySchedules` | 3 |
 | PUT | `/api/v1/properties/{id}/schedules` | `replacePropertySchedules` | 3 |
+| GET | `/api/v1/properties/{id}/available-slots` | `getPropertyAvailableSlots` — horarios libres por fecha | 4 |
 | GET | `/api/v1/appointments` | `listAppointments` — agenda paginada y filtrada | 4 |
+| POST | `/api/v1/appointments` | `createAppointment` — solicitud de visita | 4 |
 | PATCH | `/api/v1/appointments/{id}/status` | `updateAppointmentStatus` — estado de cita | 4 |
 
 ## Catálogo paginado (HU-PROP-02)
@@ -403,6 +406,128 @@ accionable. El backend no debe revelar la existencia de una cita ajena al
 agente que la consulta: la ausencia de permiso se responde con `403` solo
 cuando el recurso es visible para el usuario.
 
+## Disponibilidad y reserva de visitas (HU-CRM-01)
+
+`TASK-ARC-CRM-01` especifica los dos endpoints del flujo de agendar una visita:
+consultar los horarios libres de un inmueble y registrar la reserva.
+
+| Método | Ruta | Operación |
+|---|---|---|
+| GET | `/api/v1/properties/{id}/available-slots` | `getPropertyAvailableSlots` |
+| POST | `/api/v1/appointments` | `createAppointment` |
+
+A diferencia del resto de la sección de CRM, `available-slots` es **público**
+(`security: []`): devuelve información del inmueble, no datos de citas, y
+permite pintar el calendario en la ficha de la propiedad sin exigir sesión
+previa. Crear la cita sí la exige.
+
+> **Nota sobre la barra final.** El enunciado escribe
+> `POST /api/v1/appointments/`, con barra. El contrato usa
+> `/api/v1/appointments` sin barra, igual que el resto de rutas del spec: en
+> OpenAPI `/api/v1/appointments` y `/api/v1/appointments/` son **recursos
+> distintos**, y registrar ambos crearía una operación duplicada. El backend
+> debe usar `APPEND_SLASH` y responder `301` si recibe la variante con barra.
+
+### Cómo se calcula la disponibilidad
+
+`GET /api/v1/properties/{id}/available-slots?date=2026-10-08` **no lee una tabla
+de horarios por fecha**: deriva el resultado de la agenda semanal del Sprint 3.
+
+1. Se toma el `WeekdaySchedule` del día de la semana y se materializan sus
+   franjas `is_active = true` sobre esa fecha concreta.
+2. Se descarta cada franja que ya tiene una cita en `PENDING`, `CONFIRMED` o
+   `RESCHEDULED`, comparando el intervalo `[start_at, end_at)` completo y no
+   solo el instante de inicio.
+3. Se devuelve el resultado en orden ascendente de `start_at`.
+
+Por eso los horarios devueltos son **instancias en UTC**, mientras que
+`ScheduleSlot` sigue siendo una franja `HH:MM` recurrente: una disponibilidad
+solo tiene sentido en un día determinado.
+
+| Aspecto | `ScheduleSlot` (Sprint 3) | `AvailableSlot` (esta tarea) |
+|---|---|---|
+| Forma | Franja semanal recurrente | Instante de una fecha concreta |
+| Horas | `HH:MM` | `date-time` en UTC |
+| Almacenamiento | Persistido | **Calculado** en cada petición |
+
+La respuesta es un recurso calculado: **no reserva nada**. El bloqueo real ocurre
+en el `POST`.
+
+#### Reglas de la consulta
+
+| Regla | Resultado |
+|---|---|
+| `date` ausente o con formato distinto de `YYYY-MM-DD` | `400` `invalid_query_parameter` |
+| `date` anterior a hoy | `400` `invalid_query_parameter` |
+| `date` más de 60 días vista adelante | `400` `invalid_query_parameter` |
+| Día sin franjas, todas inactivas o agotadas | `200` con `slots: []` |
+| Hoy con horas ya vencidas | `200` con `slots: []` (es cálculo, no error) |
+
+`date` es obligatorio y se interpreta como **día local de Lima**: `2026-10-08`
+son las visitas del jueves 8 en horario peruano, aunque los `start_at` se
+devuelvan en UTC.
+
+El horizonte de 60 días acota el costo de materializar la agenda e impide que el
+cliente ofrezca fechas cuyos horarios la agencia aún no publicó.
+
+### La reserva
+
+El cuerpo es `AppointmentCreateInput`: `property_id` y `scheduled_at`
+obligatorios, más `client_id` opcional.
+
+| Regla | Código | Respuesta |
+|---|---|---|
+| `scheduled_at` no coincide con ninguna franja habilitada | `invalid_query_parameter` | `400` |
+| La propiedad existe pero no admite visitas (`PropertyStatus` distinto de `DISPONIBLE`) | `property_not_bookable` | `400` |
+| El horario ya está ocupado | `appointment_slot_conflict` | `409` |
+| Un `CLIENTE` envía `client_id` | `forbidden` | `403` |
+| Token ausente, vencido o con firma inválida | `unauthorized` | `401` |
+| La propiedad o el `client_id` no existen | `resource_not_found` | `404` |
+
+- **La cita nace siempre en `PENDING`.** Reservar no es confirmar: la
+  confirmación es una acción posterior del agente, en
+  `PATCH /api/v1/appointments/{id}/status`.
+- **`scheduled_at` debe coincidir exactamente** con un `start_at` devuelto por
+  `available-slots`. El servidor no ajusta ni redondea la hora, y una franja que
+  no atiende la visita no se agenda.
+- **La comprobación va dentro de la misma transacción que inserta la cita**, de
+  modo que dos reservas simultáneas por el mismo horario no puedan aceptarse
+  ambas. Si el horario se tomó entre la consulta y el `POST`, el resultado es
+  `409` y **no se crea ninguna cita**: la reserva es atómica, no parcial.
+- **Un `CLIENTE` agenda para sí mismo**: su identificador se toma del token y no
+  se acepta en el cuerpo, para que nadie pueda registrar una cita en nombre de
+  otro. `AGENTE` y `ADMINISTRADOR` sí pueden enviar `client_id` para agendar en
+  nombre de alguien que llega a oficina.
+- El backend envía el correo de confirmación al cliente y la notificación al
+  agente (RF-SEC-05). Ese envío es posterior al `201` y su fallo no revoca la
+  cita.
+
+```bash
+# 1. Ver los horarios libres del jueves 8
+curl "http://localhost:8000/api/v1/properties/b2c1f5a0-.../available-slots?date=2026-10-08"
+# -> { "slots": [{ "start_at": "2026-10-08T14:00:00Z", ... }], "total_slots": 2 }
+
+# 2. Reservar el segundo
+curl -X POST http://localhost:8000/api/v1/appointments \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"property_id":"b2c1f5a0-...","scheduled_at":"2026-10-08T16:00:00Z"}'
+```
+
+### `409` por horario ocupado, no `400`
+
+El enunciado de la tarea pide `400` para el horario ocupado. El contrato usa
+`409` con `appointment_slot_conflict`, por dos razones:
+
+1. **Coherencia interna:** es la misma condición de negocio que la
+   reprogramación de `TASK-ARC-CRM-02`, que ya devuelve `409` con ese mismo
+   código. Con `400` en el alta y `409` en el parche, el frontend tendría dos
+   tratamientos para un único error.
+2. **RFC 9110:** un horario tomado no es una entrada malformada, es un conflicto
+   con el estado actual del recurso, que es exactamente lo que describe `409`.
+
+El `400` sigue cubriendo lo que sí es entrada inválida: formato de fecha,
+horario fuera de franja, propiedad no agendable.
+
 ## Validación con Spectral
 
 El ruleset `.spectral.yaml` (en esta carpeta) extiende `spectral:oas` y sube a
@@ -473,9 +598,24 @@ npx @apidevtools/swagger-cli validate docs/api/openapi_spec.yaml
   ficha de CRM (HU-CRM-03). Incluir el inmueble entero inflaría el listado sin
   que el frontend lo use.
 - `Appointment` es la representación de lectura que consume `TASK-FRONT-CRM-02`;
-  el modelo se crea en `TASK-ARC-CRM-01`, que añadirá `AppointmentInput` y el
-  `POST` sobre la misma ruta. Esta tarea no especifica el alta porque queda
-  fuera de su checklist.
+  el modelo se crea en `TASK-ARC-CRM-01` (v1.5.0), que añade `AppointmentCreateInput`
+  y el `POST` sobre la misma ruta.
+- La v1.5.0 no declara `POST /api/v1/appointments/` con barra final. En OpenAPI
+  esa ruta es un recurso distinto al de `POST /api/v1/appointments` y
+  documentar ambas crearía una operación duplicada que el backend no debe
+  implementar por separado.
+- **Falta protección contra doble envío en el `POST`.** Un `POST` repetido con
+  el mismo cuerpo crea dos citas en `PENDING`, porque cada solicitud es una
+  reserva nueva. `TASK-BACK-CRM-01` debería resolverlo con una restricción de
+  unicidad en base de datos sobre `(agent, scheduled_at)` para estados no
+  terminales, o con una cabecera `Idempotency-Key` que el contrato aún no define.
+- `AvailableSlots.total_slots` es redundante con `slots.length` a propósito: el
+  frontend lo usa para pintar un contador sin recorrer el arreglo, y la
+  aserción detecta una respuesta truncada.
+- `getPropertyAvailableSlots` declara `security: []` para apagar el `bearerAuth`
+  global. Es la única operación del contrato que lo hace, y a propósito: expone
+  horarios del inmueble, no citas. Si `TASK-BACK-SEC-01` decide que la ficha de
+  la propiedad pasa a exigir sesión, hay que quitar ese `security: []`.
 - `duration_minutes` no lo elige el cliente: deriva del `ScheduleSlot` reservado
   y define la ventana `[scheduled_at, scheduled_at + duration_minutes)` con la
   que el backend detecta solapamientos entre citas del mismo agente. Si se
