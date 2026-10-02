@@ -18,6 +18,7 @@ info:
     | Sprint 2 | `TASK-ARC-PROP-03` | Filtros de búsqueda en `GET /api/v1/properties` (HU-PROP-03) |
     | Sprint 3 | `TASK-ARC-PROP-04` | Estado operativo y horarios de visita (HU-PROP-04) |
     | Sprint 3 | `TASK-ARC-SEC-01` | Registro, inicio de sesión y refresco de token (HU-SEC-01) |
+    | Sprint 3 | `TASK-ARC-SEC-02` | Recuperación de contraseña con token temporal (HU-SEC-02) |
     | Sprint 4 | `TASK-ARC-CRM-01` | Disponibilidad por fecha y creación de citas (HU-CRM-01) |
     | Sprint 4 | `TASK-ARC-CRM-02` | Agenda de citas filtrada por rol y estados de cita (HU-CRM-02) |
 
@@ -36,7 +37,11 @@ info:
       cliente lo mantiene solo en memoria. El **refresh token** viaja en la
       cookie `HttpOnly` `hb_refresh_token` y nunca en el cuerpo de la respuesta,
       para que no quede expuesto a JavaScript (RF-SEC-01).
-  version: 1.6.0
+    - La recuperación de contraseña usa tokens temporales firmados y de un solo
+      uso, entregados por correo. La solicitud responde `202` con un mensaje
+      genérico exista o no la cuenta, para no revelar qué correos están
+      registrados, y está limitada por `PASSWORD_RESET_THROTTLE`.
+  version: 1.7.0
   contact:
     name: Equipo HouseBroker Perú
     url: https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru
@@ -59,10 +64,13 @@ tags:
       visitas. Solo accesible para Agentes asignados y Administradores.
   - name: Autenticación
     description: |
-      Registro de usuarios, inicio de sesión y refresco del access token.
-      El access token se entrega en el cuerpo de la respuesta y se envía en la
-      cabecera `Authorization: Bearer`; el refresh token se entrega en una
-      cookie `HttpOnly` y no se expone a JavaScript.
+      Registro de usuarios, inicio de sesión, refresco del access token y
+      recuperación de contraseña. El access token se entrega en el cuerpo de la
+      respuesta y se envía en la cabecera `Authorization: Bearer`; el refresh
+      token se entrega en una cookie `HttpOnly` y no se expone a JavaScript. La
+      recuperación usa tokens temporales firmados y de un solo uso, y su
+      solicitud está limitada por IP y por correo para frenar el envío masivo
+      de correos.
   - name: Citas
     description: |
       Disponibilidad de visitas y agenda de citas: consulta de horarios libres
@@ -485,6 +493,291 @@ paths:
                 detail: La cuenta esta desactivada. Contacta al administrador para reactivarla.
                 instance: /api/v1/auth/refresh
                 code: account_disabled
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/auth/password-reset/:
+    post:
+      tags:
+        - Autenticación
+      security: []
+      operationId: requestPasswordReset
+      summary: Solicitar el restablecimiento de la clave
+      description: |
+        Pide el envío de un correo con un enlace de restablecimiento (RF-SEC-02).
+
+        ### Una única respuesta, exista o no la cuenta
+
+        El endpoint responde `202` **siempre**, con el mismo cuerpo, esté el
+        correo registrado o no. Un `404` o un `email_sent: false` confirmarían
+        al atacante qué correos están dados de alta, que es información
+        reutilizable para fuerza bruta o spam. Es el mismo criterio que ya aplica
+        a `login`, donde un correo inexistente y una clave incorrecta comparten
+        `invalid_credentials`.
+
+        El envío ocurre en segundo plano, por eso `202 Accepted` y no `200`: la
+        petición queda encolada y el usuario no debe esperar al servidor SMTP.
+
+        ### El token del enlace
+
+        El enlace del correo lleva `uid` y `token` en la URL
+        (`/recuperar-clave?uid=...&token=...`), que el frontend reenvía en el
+        cuerpo de `password-reset-confirm`. El token es **firmado y de un solo
+        uso**, y caduca a los `PASSWORD_RESET_TOKEN_LIFETIME` minutos.
+
+        ### Límite de solicitudes
+
+        Es el endpoint más expuesto a abuso del sistema, porque cada petición
+        aceptada dispara un correo. Se aplican dos límites, por IP y por correo,
+        y ambos devuelven `429` con la cabecera `Retry-After`. El límite por
+        correo es además el que frena el spam dirigido a una víctima
+        concreta. La implementación corresponde a `TASK-WPO-SEC-02`.
+
+        ### Cuentas inactivas
+
+        Una cuenta desactivada recibe el mismo `202` que una activa. Informar por
+        correo que la cuenta está desactivada se lo diría al remitente de la
+        solicitud, que puede no ser el titular.
+
+        ```bash
+        curl -i -X POST http://localhost:8000/api/v1/auth/password-reset/ \
+          -H "Content-Type: application/json" \
+          -d '{"email":"maria.quispe@correo.com"}'
+        # -> 202 {"detail":"Si el correo corresponde a una cuenta activa, ...","email_sent":true}
+        ```
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+            example:
+              email: maria.quispe@correo.com
+      responses:
+        '202':
+          description: |
+            Solicitud aceptada. El cuerpo es idéntico exista o no la cuenta.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasswordResetRequested'
+              example:
+                detail: >-
+                  Si el correo corresponde a una cuenta activa, recibirás un
+                  mensaje con el enlace para restablecer tu clave.
+                email_sent: true
+        '400':
+          description: El correo no supera la validación de formato
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemBadRequest'
+              example:
+                type: https://housebroker.pe/errors/invalid-query-parameter
+                title: Parámetro de consulta inválido
+                status: 400
+                detail: El cuerpo debe incluir un 'email' válido.
+                instance: /api/v1/auth/password-reset/
+                code: invalid_query_parameter
+                errors:
+                  - parameter: email
+                    message: Introduce un correo electrónico válido.
+        '429':
+          description: |
+            Se superó el límite de solicitudes, por IP o por correo. La
+            cabecera `Retry-After` indica los segundos que deben pasar antes de
+            reintentar.
+          headers:
+            Retry-After:
+              description: |
+                Segundos que faltan para que el límite se restablezca. El
+                cliente no debe reintentar antes de ese plazo.
+              schema:
+                type: integer
+                format: int32
+                minimum: 1
+              example: 900
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemTooManyRequests'
+              examples:
+                limitePorIp:
+                  summary: Se superó el límite por dirección IP
+                  value:
+                    type: https://housebroker.pe/errors/too-many-requests
+                    title: Demasiadas solicitudes
+                    status: 429
+                    detail: Superaste el límite de solicitudes desde esta IP. Reintenta en 15 minutos.
+                    instance: /api/v1/auth/password-reset/
+                    code: too_many_requests
+                    retry_after: 900
+                limitePorCorreo:
+                  summary: Se superó el límite para ese correo
+                  value:
+                    type: https://housebroker.pe/errors/too-many-requests
+                    title: Demasiadas solicitudes
+                    status: 429
+                    detail: Ya se enviaron varios correos a esta dirección. Reintenta en 15 minutos.
+                    instance: /api/v1/auth/password-reset/
+                    code: too_many_requests
+                    retry_after: 900
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/auth/password-reset-confirm/:
+    post:
+      tags:
+        - Autenticación
+      security: []
+      operationId: confirmPasswordReset
+      summary: Confirmar el restablecimiento con una nueva clave
+      description: |
+        Valida el token temporal recibido por correo y guarda la nueva clave
+        (RF-SEC-02). Cierra el flujo abierto por `password-reset`.
+
+        ### ¿Por qué `uid` y `token` van en el cuerpo
+
+        El enlace del correo los trae en la URL, pero el frontend los reenvía en
+        el cuerpo del `POST`, que es lo que espera el endpoint de Django. La
+        alternativa sería un token único que ya incluyera el `uid`, y es más
+        limpia, pero obliga a apartarse de `PasswordResetTokenGenerator`, que es
+        lo que fija `TASK-BACK-SEC-02`.
+
+        ### La respuesta es `204`
+
+        No devuelve tokens ni datos del usuario: **el reset no inicia sesión**.
+        Tras restablecer la clave el cliente debe llamar a `login`, así el
+        frontend tiene un solo camino para obtener un access token y no dos
+        rutas que mantener sincronizadas.
+
+        ### Se cierran todas las sesiones
+
+        Al guardar la nueva clave el backend **revoca todas las familias de
+        refresh token** del usuario e invalida los tokens de recuperación
+        pendientes. Es el motivo de ser del flujo: si la clave se cambió porque
+        la anterior estaba comprometida, dejar las sesiones abiertas haría
+        inútil el arreglo, porque un atacante con un refresh token robado
+        seguiría entrando con la nueva clave.
+
+        La respuesta devuelve `Set-Cookie` con `Max-Age=0` para borrar la cookie
+        `hb_refresh_token` del navegador, que ya no corresponde a una sesión
+        válida.
+
+        ### Un token, un uso
+
+        | Token recibido | Resultado |
+        |---|---|
+        | Válido y vigente | `204`, nueva clave guardada |
+        | Ya usado antes | `401` `invalid_reset_token` |
+        | Caducado | `401` `invalid_reset_token` |
+        | Firmado con otra clave | `401` `invalid_reset_token` |
+
+        Los tres casos de `401` comparten el mismo `detail` a propósito:
+        distinguirlos ayudaría a un atacante a medir la antigüedad del
+        enlace. El frontend solo necesita saber que debe pedir un correo nuevo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetConfirm'
+            example:
+              uid: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+              token: nQv7-Tb4m-Xz9p-Lc2h-Rk8d-3Fj6w-Sy1a-Vu5g
+              new_password: ClaveNueva2026
+              re_new_password: ClaveNueva2026
+      responses:
+        '204':
+          description: |
+            Clave restablecida. No hay cuerpo; todas las sesiones del usuario
+            han sido revocadas.
+          headers:
+            Set-Cookie:
+              description: |
+                Cookie `hb_refresh_token` con `Max-Age=0`, que borra la sesión
+                del navegador. El `HttpOnly` y el `Secure` se mantienen.
+              schema:
+                type: string
+              example: hb_refresh_token=; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=0
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+        '400':
+          description: |
+            El cuerpo no supera la validación. Cubre el `uid` con formato
+            inválido, la nueva clave débil y la falta de coincidencia entre las
+            dos claves.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemBadRequest'
+              examples:
+                uidInvalido:
+                  summary: El `uid` no tiene el formato de un UUID
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Parámetro de consulta inválido
+                    status: 400
+                    detail: El cuerpo debe incluir un 'uid' válido.
+                    instance: /api/v1/auth/password-reset-confirm/
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: uid
+                        message: El identificador de usuario no tiene un formato válido.
+                claveDebil:
+                  summary: La nueva clave no cumple la política de seguridad
+                  value:
+                    type: https://housebroker.pe/errors/weak-password
+                    title: Contraseña débil
+                    status: 400
+                    detail: La nueva clave no cumple los requisitos de seguridad.
+                    instance: /api/v1/auth/password-reset-confirm/
+                    code: weak_password
+                    errors:
+                      - parameter: new_password
+                        message: La clave debe tener al menos 10 caracteres, una mayúscula, una minúscula y un dígito.
+                clavesDistintas:
+                  summary: Las dos claves no coinciden
+                  value:
+                    type: https://housebroker.pe/errors/password-mismatch
+                    title: Las claves no coinciden
+                    status: 400
+                    detail: "Los campos 'new_password' y 're_new_password' deben ser iguales."
+                    instance: /api/v1/auth/password-reset-confirm/
+                    code: password_mismatch
+                    errors:
+                      - parameter: re_new_password
+                        message: Las claves no coinciden.
+        '401':
+          description: |
+            El token de recuperación es inválido, ya se usó o ha caducado.
+            Los tres casos comparten `detail` para no filtrar información al
+            atacante.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemUnauthorized'
+              example:
+                type: https://housebroker.pe/errors/invalid-reset-token
+                title: Enlace de recuperación inválido
+                status: 401
+                detail: El enlace ya no es válido. Solicita un correo nuevo para restablecer tu clave.
+                instance: /api/v1/auth/password-reset-confirm/
+                code: invalid_reset_token
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -3663,6 +3956,12 @@ components:
                 es alcanzable desde el estado actual de la cita, y
                 `property_not_bookable` cuando se intenta agendar una visita
                 sobre una propiedad cuyo `PropertyStatus` no admite reservas.
+
+                En el módulo de autenticación se suman `weak_password` cuando
+                una clave no cumple la política de seguridad, tanto en el
+                registro como al restablecer la contraseña, y
+                `password_mismatch` cuando `new_password` y `re_new_password`
+                no coinciden en `password-reset-confirm`.
               example: invalid_query_parameter
             errors:
               type: array
@@ -3691,6 +3990,173 @@ components:
                       sin código ni jargon.
                     example: El valor '0' es menor que el mínimo permitido (1).
 
+    PasswordResetRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+      description: |
+        Cuerpo de `POST /api/v1/auth/password-reset/`. Solo necesita el correo:
+        el token se genera en el servidor y viaja por email, nunca lo elige ni lo
+        recibe el cliente.
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: |
+            Correo al que se intenta enviar el enlace de restablecimiento. El
+            backend lo normaliza a minúsculas antes de buscar la cuenta.
+
+            Aunque no exista ninguna cuenta con ese correo, la respuesta es `202`
+            con el mismo cuerpo: la diferencia se produciría dentro del backend y
+            nunca sale por la API.
+          example: maria.quispe@correo.com
+      example:
+        email: maria.quispe@correo.com
+
+    PasswordResetRequested:
+      type: object
+      additionalProperties: false
+      required:
+        - detail
+        - email_sent
+      description: |
+        Cuerpo de la respuesta `202` de `password-reset`.
+
+        `email_sent` es siempre `true` y existe por una sola razón: dejar el
+        contrato explícito ante el frontend de que **el valor no confirma nada**.
+        Un futuro `false` sería una fuga de enumeración de cuentas, así que
+        tendría que venir acompañado de un cambio de versión del contrato.
+      properties:
+        detail:
+          type: string
+          description: |
+            Mensaje para mostrar al usuario, redactado de forma que sirva tanto
+            si se envió el correo como si no.
+          example: >-
+            Si el correo corresponde a una cuenta activa, recibirás un mensaje
+            con el enlace para restablecer tu clave.
+        email_sent:
+          type: boolean
+          enum:
+            - true
+          description: |
+            Siempre `true`. No refleja si la cuenta existe: es una constante para
+            que el frontend no interprete el `202` como confirmación de envío.
+          example: true
+      example:
+        detail: >-
+          Si el correo corresponde a una cuenta activa, recibirás un mensaje con
+          el enlace para restablecer tu clave.
+        email_sent: true
+
+    PasswordResetConfirm:
+      type: object
+      additionalProperties: false
+      required:
+        - uid
+        - token
+        - new_password
+        - re_new_password
+      description: |
+        Cuerpo de `POST /api/v1/auth/password-reset-confirm/`. Reúne lo que
+        el frontend leyó de la URL del enlace y lo que el usuario escribió.
+      properties:
+        uid:
+          type: string
+          format: uuid
+          description: |
+            Identificador del usuario titular de la cuenta, tomado de los
+            parámetros `uid` de la URL del enlace del correo. En este contrato es
+            el UUID en texto plano, y no el `uidb64` en base64 que usa el
+            endpoint de Django: `TASK-BACK-SEC-02` tiene que elegir si acepta
+            ambos o traduce uno a otro en el serializador.
+
+            Un formato inválido produce `400`, no `401`: el cuerpo está mal, el
+            token no llegó ni a evaluarse.
+          example: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+        token:
+          type: string
+          minLength: 20
+          maxLength: 200
+          description: |
+            Token temporal firmado que llegó en la URL del enlace. El backend
+            comprueba la firma, la vigencia de
+            `PASSWORD_RESET_TOKEN_LIFETIME` y que no se haya usado antes.
+
+            El valor real lo emite `PasswordResetTokenGenerator` en
+            `TASK-BACK-SEC-02`; los límites de longitud de aquí son el orden de
+            magnitud esperado y sirven para descartar entradas evidentemente
+            malformadas antes de tocar la base de datos.
+
+            No debe registrarse en los logs de acceso: un token de recuperación
+            vigente es tan equivalente a la contraseña como la propia clave.
+          example: nQv7-Tb4m-Xz9p-Lc2h-Rk8d-3Fj6w-Sy1a-Vu5g
+        new_password:
+          type: string
+          format: password
+          minLength: 10
+          maxLength: 128
+          writeOnly: true
+          description: |
+            Nueva clave en texto plano, que el backend cifra con Bcrypt antes de
+            almacenarla. Aplica la misma política que en el registro: al menos
+            10 caracteres, una mayúscula, una minúscula y un dígito. El
+            incumplimiento produce `400` con `weak_password`.
+
+            No puede ser igual a la clave anterior. Esa comprobación la hace el
+            backend comparando contra el hash almacenado, y también devuelve
+            `400` con `weak_password`, para no revelar por separado que la clave
+            antigua era la correcta.
+          example: ClaveNueva2026
+        re_new_password:
+          type: string
+          format: password
+          minLength: 10
+          maxLength: 128
+          writeOnly: true
+          description: |
+            Repetición de la nueva clave. El backend exige que coincida con
+            `new_password` y responde `400` con `password_mismatch` si no, en vez
+            de confiar en la comparación del navegador, que el cliente puede
+            evitarse.
+
+            Es el campo que verifica `TASK-TEST-SEC-02` con su caso de
+            *coincidencia de claves*.
+          example: ClaveNueva2026
+      example:
+        uid: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+        token: nQv7-Tb4m-Xz9p-Lc2h-Rk8d-3Fj6w-Sy1a-Vu5g
+        new_password: ClaveNueva2026
+        re_new_password: ClaveNueva2026
+
+    ProblemTooManyRequests:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required:
+            - code
+            - retry_after
+          properties:
+            code:
+              type: string
+              description: |
+                Código de error estable. `too_many_requests` significa que se
+                agotó el límite de solicitudes del endpoint. No distingue el
+                motivo, porque un `429` específico por correo confirmaría que
+                esa cuenta existe.
+              example: too_many_requests
+            retry_after:
+              type: integer
+              description: |
+                Segundos que faltan para que el límite se restablezca, en el
+                mismo valor que la cabecera `Retry-After`. Se incluye en el
+                cuerpo para clientes que no leen cabeceras, como un cliente
+                móvil en modo BACKGROUND.
+              minimum: 1
+              example: 900
+
     ProblemNotFound:
       allOf:
         - $ref: '#/components/schemas/Problem'
@@ -3715,6 +4181,13 @@ components:
               description: |
                 Código de error estable. `unauthorized` cubre el token ausente,
                 vencido o con firma inválida.
+
+                En el módulo de autenticación también se usa para los tokens de
+                recuperación de contraseña: `invalid_refresh_token` cuando el
+                refresh está caducado, revocado o ausente, `refresh_token_reused`
+                cuando se detecta la reutilización de uno ya rotado, e
+                `invalid_reset_token` cuando el token del enlace de
+                restablecimiento es inválido, ya se usó o ha caducado.
               example: unauthorized
 
     ProblemForbidden:
