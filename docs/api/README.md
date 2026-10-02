@@ -2,9 +2,9 @@
 
 Contratos REST del backend (Django REST Framework) bajo especificación **OpenAPI 3.0**.
 
-> **Tarea actual:** [TASK-ARC-SEC-01] Especificación OpenAPI 3.0 para
-> autenticación JWT y roles —
-> [issue #69](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/69) (HU-SEC-01).
+> **Tarea actual:** [TASK-ARC-SEC-02] Especificación OpenAPI 3.0 para recuperación
+> de contraseña —
+> [issue #76](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/76) (HU-SEC-02).
 
 ## Archivo único de contrato
 
@@ -22,6 +22,7 @@ que al cierre (Sprint 7) exista un solo `.yml` con la API completa.
 | 1.4.0 | Sprint 4 | `TASK-ARC-CRM-02` | [#97](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/97) | Agenda de citas filtrada por rol (`GET /api/v1/appointments`) y estados de cita (`PATCH .../status`) (HU-CRM-02) |
 | 1.5.0 | Sprint 4 | `TASK-ARC-CRM-01` | [#90](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/90) | Disponibilidad por fecha (`GET .../available-slots`) y alta de citas (`POST /api/v1/appointments`) (HU-CRM-01) |
 | 1.6.0 | Sprint 3 | `TASK-ARC-SEC-01` | [#69](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/69) | `bearerAuth` + `refreshCookie`, y `register` / `login` / `refresh` (HU-SEC-01) |
+| 1.7.0 | Sprint 3 | `TASK-ARC-SEC-02` | [#76](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/76) | Recuperación de contraseña: `password-reset` y `password-reset-confirm` (HU-SEC-02) |
 
 Al crecer el documento, extrae las secciones a `components/schemas` y referencia
 con `$ref`. No dupliques esquemas entre operaciones.
@@ -38,6 +39,8 @@ el schema en el mismo commit.
 | POST | `/api/v1/auth/register` | `registerUser` | 3 |
 | POST | `/api/v1/auth/login` | `loginUser` | 3 |
 | POST | `/api/v1/auth/refresh` | `refreshAccessToken` | 3 |
+| POST | `/api/v1/auth/password-reset/` | `requestPasswordReset` | 3 |
+| POST | `/api/v1/auth/password-reset-confirm/` | `confirmPasswordReset` | 3 |
 | GET | `/api/v1/properties` | `listProperties` — catálogo paginado | 2 |
 | POST | `/api/v1/properties` | `createProperty` | 1 |
 | GET | `/api/v1/properties/{id}` | `getProperty` | 1 |
@@ -556,6 +559,153 @@ La contrapartida: **un cambio de rol no surte efecto hasta que el access
 expira**, salvo que se revoque por `jti`. `TASK-BACK-SEC-01` debe tener esto en
 cuenta al implementar el middleware de permisos.
 
+## Recuperación de contraseña (HU-SEC-02)
+
+`TASK-ARC-SEC-02` cierra el flujo de credenciales con los dos endpoints que
+consumen el token que llega por correo.
+
+| Método | Ruta | Operación | Acceso | Respuesta |
+|---|---|---|---|---|
+| POST | `/api/v1/auth/password-reset/` | `requestPasswordReset` | Público | `202` genérico |
+| POST | `/api/v1/auth/password-reset-confirm/` | `confirmPasswordReset` | Público | `204` sin cuerpo |
+
+### El flujo completo
+
+```
+1. Usuario: "¿Olvidé mi contraseña?"     -> POST /password-reset/           -> 202
+2. Correo: enlace /recuperar-clave?uid=..&token=..
+3. Usuario: escribe su nueva clave      -> POST /password-reset-confirm/  -> 204
+4. Frontend: redirige a /login          -> POST /login                     -> 200
+```
+
+El paso 4 es obligatorio: **el reset no inicia sesión**. Devolver `204` y no un
+par de tokens mantiene un único camino para obtener un access token, en lugar de
+dos que el frontend tendría que mantener sincronizadas.
+
+### La respuesta es `202` siempre, exista o no la cuenta
+
+| Correo | Respuesta |
+|---|---|
+| Registrado y activo | `202` con `detail` y `email_sent: true` |
+| No registrado | `202` con `detail` y `email_sent: true` |
+| Registrado pero desactivado | `202` con `detail` y `email_sent: true` |
+
+El cuerpo es **idéntico en los tres casos**. Un `404` o un `email_sent: false`
+le dirían al atacante qué correos están dados de alta, información que después
+alimenta la fuerza bruta. Es el mismo criterio que ya aplica a `login` con
+`invalid_credentials`.
+
+Por eso `email_sent` es una constante con `enum: [true]`: existe para dejar
+explícito en el contrato que **el valor no confirma nada**. Si alguna vez
+devolviera `false`, sería una fuga de enumeración y tendría que venir con un
+cambio de versión del contrato.
+
+`202 Accepted` y no `200` porque el correo se envía en segundo plano: la
+petición queda encolada y el usuario no espera al servidor SMTP.
+
+### Límite de solicitudes: `429` con `Retry-After`
+
+Es el endpoint más expuesto a abuso, porque cada petición aceptada dispara un
+correo. Se aplican dos límites y ambos devuelven el mismo `too_many_requests`:
+
+| Límite | Frena |
+|---|---|
+| Por IP | Un atacante que recorre una lista de correos desde una sola máquina |
+| Por correo | El spam dirigido a una víctima concreta, que el límite por IP no frena |
+
+El `429` **no dice cuál de los dos se agotó**, porque un código específico por
+correo confirmaría que esa cuenta existe. `Retry-After` va en cabecera y
+repetido en el cuerpo como `retry_after`, para clientes que no leen cabeceras.
+
+La implementación corresponde a `TASK-WPO-SEC-02`, tal como fija
+`planning.md:50`.
+
+### El cuerpo de la confirmación
+
+| Campo | Obligatorio | Valida |
+|---|---|---|
+| `uid` | sí | UUID del titular |
+| `token` | sí | 20–200 caracteres, firmado, de un solo uso |
+| `new_password` | sí | Política de clave, igual que en el registro |
+| `re_new_password` | sí | Debe coincidir con `new_password` |
+
+`uid` y `token` viajan en la URL del enlace de correo y el frontend los reenvía
+en el cuerpo del `POST`. Es lo que espera el endpoint de Django, y aunque un
+token único que ya incluyera el `uid` sería más limpio, obligaría a apartarse
+de `PasswordResetTokenGenerator`, que es lo que fija `TASK-BACK-SEC-02`.
+
+`re_new_password` es el campo que verifica `TASK-TEST-SEC-02` con su caso de
+*coincidencia de claves* (`planning.md:48`). El backend compara, no el
+navegador, que el cliente puede saltarse.
+
+### Cambiar la clave cierra todas las sesiones
+
+Al guardar la nueva clave el backend **revoca todas las familias de refresh
+token** e invalida los tokens de recuperación pendientes. Sin eso el arreglo no
+serviría de nada: quien entró con la clave robada seguiría entrando con la
+nueva. El `204` devuelve `Set-Cookie` con `Max-Age=0` para borrar la cookie
+`hb_refresh_token` del navegador.
+
+Un token de recuperación, uno solo.
+
+| Token recibido | Respuesta |
+|---|---|
+| Válido y vigente | `204`, nueva clave guardada |
+| Ya usado antes | `401` `invalid_reset_token` |
+| Caducado | `401` `invalid_reset_token` |
+| Firmado con otra clave | `401` `invalid_reset_token` |
+
+Los tres `401` comparten el mismo `detail`: distinguirlos ayudaría a medir la
+antigüedad del enlace.
+
+### Matriz de errores
+
+| Situación | `code` | Respuesta |
+|---|---|---|
+| `email` con formato inválido | `invalid_query_parameter` | `400` |
+| `uid` que no es un UUID | `invalid_query_parameter` | `400` |
+| Nueva clave débil, o igual a la anterior | `weak_password` | `400` |
+| Las dos claves no coinciden | `password_mismatch` | `400` |
+| Token inválido, usado o caducado | `invalid_reset_token` | `401` |
+| Se agotó el límite por IP o por correo | `too_many_requests` | `429` |
+
+Dos distinciones que conviene no perder de vista:
+
+- **`uid` inválido es `400`, no `401`.** El cuerpo está mal y el token no llegó a
+  evaluarse. `invalid_reset_token` es para cuando el token sí se procesó y no
+  sirvió.
+- **Reutilizar la clave anterior devuelve `weak_password`**, no un código
+  aparte. Un código específico confirmaría al atacante que la clave que conoce
+  era la buena.
+
+El token de recuperación no debe registrarse en los logs de acceso: mientras
+esté vigente es tan equivalente a la contraseña como la propia clave.
+
+```bash
+# 1. solicitar el correo
+curl -X POST http://localhost:8000/api/v1/auth/password-reset/ \
+  -H "Content-Type: application/json" \
+  -d '{"email":"maria.quispe@correo.com"}'
+# -> 202 {"detail":"Si el correo corresponde a una cuenta activa, ...","email_sent":true}
+
+# 2. confirmar con lo que venía en el enlace
+curl -i -X POST http://localhost:8000/api/v1/auth/password-reset-confirm/ \
+  -H "Content-Type: application/json" \
+  -d '{"uid":"c3d4e5f6-...","token":"nQv7-Tb4m-...","new_password":"ClaveNueva2026","re_new_password":"ClaveNueva2026"}'
+# -> 204, sin cuerpo, con Set-Cookie hb_refresh_token=; Max-Age=0
+```
+
+### Desviación conocida de Spectral
+
+`password-reset` y `password-reset-confirm` llevan **barra final**, y solo
+ellos. Spectral lo marca con `path-keys-no-trailing-slash` y el contrato queda
+con 2 warnings, a diferencia del resto de versiones que están en 0.
+
+Es deliberado: el enunciado de la tarea especifica las rutas con barra, y es la
+convención de Django REST Framework, que es donde `TASK-BACK-SEC-02` las va a
+implementar. Quitar la barra dejaría el contrato en 0 warnings, pero obligaría
+a registrar en Django unas rutas que DRF no genera por defecto.
+
 ## Disponibilidad y reserva de visitas (HU-CRM-01)
 
 `TASK-ARC-CRM-01` especifica los dos endpoints del flujo de agendar una visita:
@@ -695,6 +845,11 @@ Validación estructural complementaria:
 npx @apidevtools/swagger-cli validate docs/api/openapi_spec.yaml
 ```
 
+Estado actual (v1.7.0): `swagger-cli` reports *"is valid"* y Spectral
+`* 2 problems (0 errors, 2 warnings, 0 infos, 0 hints)*`. Los dos warnings son
+`path-keys-no-trailing-slash` de las rutas de recuperación, y están justificados
+en [Desviación conocida de Spectral](#desviación-conocida-de-spectral).
+
 ## Notas para la implementación
 
 - El cliente React resuelve el prefijo como `VITE_API_URL` + `/v1/properties`
@@ -785,6 +940,17 @@ npx @apidevtools/swagger-cli validate docs/api/openapi_spec.yaml
   ella, `refresh_token_reused` no puede distinguir un reuso real de una carrera
   legítima de dos pestañas, y `TASK-BACK-SEC-01` necesita definir esa
   persistencia antes de implementar el endpoint.
+- El `429` de `password-reset` está declarado en el contrato desde la v1.7.0,
+  pero su implementación es de `TASK-WPO-SEC-02`: hasta que exista, el endpoint
+  acepta solicitudes sin límite y es abusable como vector de spam.
+- **La v1.7.0 no resuelve la contradicción de `uid`.** El contrato usa el UUID en
+  texto plano, pero `PasswordResetTokenGenerator` de Django trabaja con `uidb64`
+  (el pk en base64). `TASK-BACK-SEC-02` tiene que decidir si acepta ambos
+  formatos o traduce uno a otro en el serializador; si elige `uidb64`, hay que
+  corregir `PasswordResetConfirm.uid` y su `example`.
+- El `uid` no lleva `writeOnly`, a diferencia de las contraseñas: es un
+  identificador, no un secreto, y el frontend necesita mandarlo. Aun así, los
+  tokens de recuperación **sí** deben quedar fuera de los logs de acceso.
 - `duration_minutes` no lo elige el cliente: deriva del `ScheduleSlot` reservado
   y define la ventana `[scheduled_at, scheduled_at + duration_minutes)` con la
   que el backend detecta solapamientos entre citas del mismo agente. Si se
