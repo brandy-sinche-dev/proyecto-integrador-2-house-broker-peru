@@ -17,6 +17,7 @@ info:
     | Sprint 2 | `TASK-ARC-PROP-02` | Catálogo paginado `GET /api/v1/properties` (HU-PROP-02) |
     | Sprint 2 | `TASK-ARC-PROP-03` | Filtros de búsqueda en `GET /api/v1/properties` (HU-PROP-03) |
     | Sprint 3 | `TASK-ARC-PROP-04` | Estado operativo y horarios de visita (HU-PROP-04) |
+    | Sprint 3 | `TASK-ARC-SEC-01` | Registro, inicio de sesión y refresco de token (HU-SEC-01) |
     | Sprint 4 | `TASK-ARC-CRM-01` | Disponibilidad por fecha y creación de citas (HU-CRM-01) |
     | Sprint 4 | `TASK-ARC-CRM-02` | Agenda de citas filtrada por rol y estados de cita (HU-CRM-02) |
 
@@ -31,7 +32,11 @@ info:
     - Los endpoints mutables exigen `Authorization: Bearer <jwt>` y rol `AGENTE`
       o `ADMINISTRADOR`. Un `401` significa token ausente o inválido; un `403`
       significa token válido sin permiso sobre el recurso.
-  version: 1.5.0
+    - El **access token** viaja en la cabecera `Authorization: Bearer <jwt>` y el
+      cliente lo mantiene solo en memoria. El **refresh token** viaja en la
+      cookie `HttpOnly` `hb_refresh_token` y nunca en el cuerpo de la respuesta,
+      para que no quede expuesto a JavaScript (RF-SEC-01).
+  version: 1.6.0
   contact:
     name: Equipo HouseBroker Perú
     url: https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru
@@ -52,6 +57,12 @@ tags:
     description: |
       Estado operativo del inmueble y franjas horarias habilitadas para agendar
       visitas. Solo accesible para Agentes asignados y Administradores.
+  - name: Autenticación
+    description: |
+      Registro de usuarios, inicio de sesión y refresco del access token.
+      El access token se entrega en el cuerpo de la respuesta y se envía en la
+      cabecera `Authorization: Bearer`; el refresh token se entrega en una
+      cookie `HttpOnly` y no se expone a JavaScript.
   - name: Citas
     description: |
       Disponibilidad de visitas y agenda de citas: consulta de horarios libres
@@ -64,6 +75,419 @@ security:
   - bearerAuth: []
 
 paths:
+  /api/v1/auth/register:
+    post:
+      tags:
+        - Autenticación
+      security: []
+      operationId: registerUser
+      summary: Registrar un usuario
+      description: |
+        Crea una cuenta de cliente (RF-SEC-01). Es el único endpoint del
+        contrato que **no** requiere sesión, y por eso su cuerpo está acotado
+        para que no permita escaladas de privilegio.
+
+        ### Por qué `role` solo admite `CLIENTE`
+
+        El campo `role` forma parte del cuerpo porque el enunciado de la tarea
+        lo pide, pero su enumerado tiene un único valor:
+
+        - Un registro público que aceptara `ADMINISTRADOR` dejaría que
+          cualquiera se autopromoviera a administrador con un `curl`.
+        - Las cuentas de `AGENTE` y `ADMINISTRADOR` las crea un administrador
+          desde el panel, no el propio usuario.
+
+        Enviar `AGENTE` o `ADMINISTRADOR` produce `400` con
+        `role_not_assignable`, que es un rechazo explícito y no un campo
+        ignorado en silencio.
+
+        ### Contraseña
+
+        `password` viaja en el cuerpo y se almacena con Bcrypt; nunca se
+        devuelve en ninguna respuesta. Los criterios mínimos de longitud se
+        validan en el servidor y su incumplimiento produce `400` con
+        `weak_password`.
+
+        ### Sesión tras el registro
+
+        La respuesta es `201` con el usuario creado y **sin tokens**: el
+        registro no inicia sesión. El cliente debe llamar a
+        `POST /api/v1/auth/login` a continuación. Entregar aquí el par de
+        tokens obligaría al frontend a duplicar la lógica de almacenamiento de
+        sesión que ya existe en el login.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterInput'
+            examples:
+              registro:
+                summary: Alta de un cliente
+                value:
+                  email: maria.quispe@correo.com
+                  password: ClaveSegura2026
+                  full_name: Maria Fernanda Quispe
+                  phone: '+51 987 654 321'
+      responses:
+        '201':
+          description: Usuario registrado exitosamente
+          headers:
+            Location:
+              description: URL del recurso creado.
+              schema:
+                type: string
+                format: uri
+              example: http://localhost:8000/api/v1/auth/users/c3d4e5f6-2b3c-4d5e-9f70-222222222222
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUser'
+              example:
+                id: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+                email: maria.quispe@correo.com
+                full_name: Maria Fernanda Quispe
+                phone: '+51 987 654 321'
+                role: CLIENTE
+                is_active: true
+                created_at: '2026-10-05T09:12:44Z'
+        '400':
+          description: |
+            El cuerpo no supera la validación. Casos cubiertos:
+            - `email` con formato inválido.
+            - `password` más corta que `PASSWORD_MIN_LENGTH` o demasiado común.
+            - `full_name` ausente o de longitud insuficiente.
+            - `role` distinto de `CLIENTE` (`role_not_assignable`).
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemBadRequest'
+              examples:
+                emailInvalido:
+                  summary: Formato de correo incorrecto
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Parámetro de consulta inválido
+                    status: 400
+                    detail: El campo 'email' no tiene un formato de correo válido.
+                    instance: /api/v1/auth/register
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: email
+                        message: El valor 'maria.quispe@correo' no es una dirección de correo válida.
+                rolNoAsignable:
+                  summary: Intento de registro con rol privilegiado
+                  value:
+                    type: https://housebroker.pe/errors/role-not-assignable
+                    title: Rol no asignable en el registro
+                    status: 400
+                    detail: El registro público solo admite el rol 'CLIENTE'.
+                    instance: /api/v1/auth/register
+                    code: role_not_assignable
+                    errors:
+                      - parameter: role
+                        message: El valor 'ADMINISTRADOR' no puede asignarse en el registro. Las cuentas de agente y administrador las crea un administrador.
+                contrasenaDebil:
+                  summary: Contraseña por debajo del mínimo
+                  value:
+                    type: https://housebroker.pe/errors/weak-password
+                    title: Contraseña insegura
+                    status: 400
+                    detail: El campo 'password' no cumple los requisitos de seguridad.
+                    instance: /api/v1/auth/register
+                    code: weak_password
+                    errors:
+                      - parameter: password
+                        message: La contraseña debe tener al menos 10 caracteres, una mayúscula, una minúscula y un dígito.
+        '409':
+          description: |
+            El correo ya está registrado. No es un error de formato: el
+            `email` es válido, lo que falla es que el recurso ya existe.
+            Devolver `400` haría que el formulario mostrara un error de campo
+            sin explicar el motivo real.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemConflict'
+              example:
+                type: https://housebroker.pe/errors/email-already-registered
+                title: Correo ya registrado
+                status: 409
+                detail: Ya existe una cuenta con el correo 'maria.quispe@correo.com'.
+                instance: /api/v1/auth/register
+                code: email_already_registered
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/auth/login:
+    post:
+      tags:
+        - Autenticación
+      security: []
+      operationId: loginUser
+      summary: Iniciar sesión
+      description: |
+        Valida las credenciales y devuelve un par de tokens (RF-SEC-01).
+
+        ### Dónde acaba cada token
+
+        | Token | Transporte | Por qué |
+        |---|---|---|
+        | `access` | cuerpo de la respuesta | El cliente lo mantiene en memoria y lo envía en `Authorization: Bearer` |
+        | `refresh` | cookie `HttpOnly` `hb_refresh_token` | Invisible a JavaScript, sobrevive recargas y cierra la sesión al expirar |
+
+        El refresh token **no** se incluye en el cuerpo. Exponerlo en la
+        respuesta lo haría accesible desde JavaScript, que es justo lo que la
+        cookie `HttpOnly` evita, y permitiría que un XSS robara la sesión
+        completa.
+
+        ### Mensajes de error
+
+        Un correo inexistente y una contraseña incorrecta producen el **mismo**
+        `401` con `invalid_credentials` y el mismo `detail`. Distinguirlos
+        confirmaría al atacante qué correos están registrados en la plataforma.
+
+        ### Sesión y CSRF
+
+        El login es el único punto donde se establece la sesión, y por eso es
+        el objetivo natural de un forgery: el endpoint debe exigir un token CSRF
+        de doble envío además de las credenciales. La respuesta incluye la
+        cabecera `Set-Cookie` con la política de la cookie.
+
+        ### Mantenimiento de sesión
+
+        Tras un login exitoso el cliente puede extender la sesión llamando a
+        `POST /api/v1/auth/refresh`. No hay `logout` en esta versión del
+        contrato: la sesión termina cuando expira el refresh token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+            example:
+              email: maria.quispe@correo.com
+              password: ClaveSegura2026
+      responses:
+        '200':
+          description: Credenciales válidas
+          headers:
+            Set-Cookie:
+              description: |
+                Cookie `HttpOnly` con el refresh token y los atributos de
+                `securitySchemes.refreshCookie`.
+              schema:
+                type: string
+              example: hb_refresh_token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=604800
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+              example:
+                access: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjM2Q0ZTVmNiJ9
+                token_type: Bearer
+                expires_in: 1800
+                user:
+                  id: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+                  email: maria.quispe@correo.com
+                  full_name: Maria Fernanda Quispe
+                  phone: '+51 987 654 321'
+                  role: CLIENTE
+                  is_active: true
+                  created_at: '2026-10-05T09:12:44Z'
+        '400':
+          description: El cuerpo no supera la validación
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemBadRequest'
+              example:
+                type: https://housebroker.pe/errors/invalid-query-parameter
+                title: Parámetro de consulta inválido
+                status: 400
+                detail: El cuerpo debe incluir 'email' y 'password'.
+                instance: /api/v1/auth/login
+                code: invalid_query_parameter
+                errors:
+                  - parameter: password
+                    message: Este campo es obligatorio.
+        '401':
+          description: |
+            Credenciales incorrectas. Cubre indistintamente el correo
+            inexistente y la contraseña equivocada.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemUnauthorized'
+              example:
+                type: https://housebroker.pe/errors/invalid-credentials
+                title: Credenciales inválidas
+                status: 401
+                detail: El correo o la contraseña no coinciden con ninguna cuenta activa.
+                instance: /api/v1/auth/login
+                code: invalid_credentials
+        '403':
+          description: |
+            Las credenciales son correctas pero la cuenta no puede iniciar
+            sesión, por estar desactivada (`is_active = false`).
+
+            Se distingue del `401` a propósito: un `401` haría que el cliente
+            creyera que su contraseña falla y la volviera a enviar.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemForbidden'
+              example:
+                type: https://housebroker.pe/errors/account-disabled
+                title: Cuenta desactivada
+                status: 403
+                detail: La cuenta esta desactivada. Contacta al administrador para reactivarla.
+                instance: /api/v1/auth/login
+                code: account_disabled
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/auth/refresh:
+    post:
+      tags:
+        - Autenticación
+      operationId: refreshAccessToken
+      summary: Renovar el access token
+      security:
+        - refreshCookie: []
+      description: |
+        Emite un access token nuevo a partir del refresh token de la cookie
+        `hb_refresh_token`. No lleva cuerpo: la credencial viaja en la cookie que
+        el navegador adjunta solo.
+
+        ### Rotación del refresh token
+
+        Cada refresco **rota** el refresh token: la respuesta emite un `access`
+        nuevo y un `refresh` nuevo, y el anterior queda invalidado.
+
+        | Situación | Resultado |
+        |---|---|
+        | Se refresca con el token vigente | `200`, `access` nuevo y `refresh` rotado |
+        | Se refresca con un token ya rotado | `401` `refresh_token_reused` |
+        | Se refresca con un token expirado o revocado | `401` `invalid_refresh_token` |
+
+        Detectar la reutilización es lo que hace útil la rotación: si un token
+        robado se usa desde otro equipo, el uso legítimo posterior falla y
+        queda registrado, en lugar de que ambos sigan funcionando en paralelo.
+        Tras detectar un reuso se invalida toda la familia de tokens del
+        usuario, de modo que el atacante y el titular pierden la sesión.
+
+        No lleva token CSRF explícito porque la cookie es `SameSite=Strict`: el
+        navegador no la adjunta en un envío originado en otro sitio, que es
+        justamente el escenario de CSRF. Si `SameSite` se relajara, este
+        endpoint pasaría a exigirlo.
+      responses:
+        '200':
+          description: Access token renovado
+          headers:
+            Set-Cookie:
+              description: |
+                Cookie `HttpOnly` con el refresh token rotado, que reemplaza a
+                la anterior.
+              schema:
+                type: string
+              example: hb_refresh_token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=604800
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+              example:
+                access: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjM2Q0ZTVmNiJ9
+                token_type: Bearer
+                expires_in: 1800
+                user:
+                  id: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+                  email: maria.quispe@correo.com
+                  full_name: Maria Fernanda Quispe
+                  phone: '+51 987 654 321'
+                  role: CLIENTE
+                  is_active: true
+                  created_at: '2026-10-05T09:12:44Z'
+        '401':
+          description: |
+            El refresh token no es válido: falta la cookie, está expirado, fue
+            revocado o ya se rotó. La sesión debe rehacerse con
+            `POST /api/v1/auth/login`.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Set-Cookie:
+              description: |
+                Cookie `hb_refresh_token` vacía, que borra la sesión en el
+                navegador cuando el token no es recuperable.
+              schema:
+                type: string
+              example: hb_refresh_token=; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=0
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemUnauthorized'
+              examples:
+                tokenInvalido:
+                  summary: Cookie ausente, expirada o revocada
+                  value:
+                    type: https://housebroker.pe/errors/invalid-refresh-token
+                    title: Refresh token inválido
+                    status: 401
+                    detail: El refresh token no es válido. Vuelve a iniciar sesión.
+                    instance: /api/v1/auth/refresh
+                    code: invalid_refresh_token
+                tokenReutilizado:
+                  summary: Se reutilizó un token ya rotado
+                  value:
+                    type: https://housebroker.pe/errors/refresh-token-reused
+                    title: Refresh token reutilizado
+                    status: 401
+                    detail: El refresh token ya fue rotado. Por seguridad se cerraron todas las sesiones del usuario.
+                    instance: /api/v1/auth/refresh
+                    code: refresh_token_reused
+        '403':
+          description: |
+            El token era válido pero la cuenta fue desactivada después de
+            emitirse. La sesión se cierra igualmente.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemForbidden'
+              example:
+                type: https://housebroker.pe/errors/account-disabled
+                title: Cuenta desactivada
+                status: 403
+                detail: La cuenta esta desactivada. Contacta al administrador para reactivarla.
+                instance: /api/v1/auth/refresh
+                code: account_disabled
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/properties:
     get:
       tags:
@@ -1669,6 +2093,32 @@ components:
         El cliente adjunta el token en `frontend/src/services/axios.ts` leyendo
         `localStorage.hb_token`.
 
+    refreshCookie:
+        type: apiKey
+        in: cookie
+        name: hb_refresh_token
+        description: |
+          Refresh token en cookie `HttpOnly`, que es el único mecanismo con el que
+          `POST /api/v1/auth/refresh` valida la sesión. El navegador la adjunta
+          solo, sin que el código del cliente tenga que leerla.
+
+          Atributos que debe fijar el backend:
+
+          | Atributo | Valor | Motivo |
+          |---|---|---|
+          | `HttpOnly` | presente | Impide que `document.cookie` lo lea, que es el impacto de XSS |
+          | `Secure` | presente | Solo viaja por HTTPS |
+          | `SameSite` | `Strict` | Corta el envío en navegaciones originadas fuera del sitio |
+          | `Path` | `/api/v1/auth` | Limita el envío a los endpoints que lo necesitan |
+          | `Max-Age` | igual a `REFRESH_LIFETIME` | La sesión expira sola |
+
+          Al no ser accesible desde JavaScript, este token **no habilita CSRF por
+          sí solo** en el resto de la API: los endpoints que solo aceptan
+          `Authorization: Bearer` siguen siendo inmunes porque el navegador no
+          adjunta cabeceras personalizadas en un envío automático. Aun así,
+          `POST /api/v1/auth/login` y `POST /api/v1/auth/refresh` sí modifican el
+          estado de la sesión y deben validar un token CSRF de doble envío.
+
   responses:
     Unauthorized:
       description: Token ausente, vencido o con firma inválida
@@ -2644,6 +3094,205 @@ components:
       example:
         property_id: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
         scheduled_at: '2026-10-08T16:00:00Z'
+
+    RegisterInput:
+      type: object
+      description: |
+        Cuerpo del registro público. `additionalProperties: false` hace que un
+        cliente que invente campos reciba `400` en lugar de que se ignoren en
+        silencio.
+      required:
+        - email
+        - password
+        - full_name
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: |
+            Correo de la cuenta. Es el identificador de inicio de sesión, por
+            lo que debe ser único. El backend lo normaliza a minúsculas antes
+            de comparar, de modo que `Maria@correo.com` y `maria@correo.com` son
+            la misma cuenta.
+          example: maria.quispe@correo.com
+        password:
+          type: string
+          format: password
+          minLength: 10
+          maxLength: 128
+          writeOnly: true
+          description: |
+            Contraseña en texto plano, que el backend cifra con Bcrypt antes de
+            almacenarla. `format: password` marca el campo para que las
+            herramientas de documentación lo oculten, y `writeOnly` impide que
+            un generador de clientes lo incluya en las respuestas.
+
+            Cumple al menos 10 caracteres, una mayúscula, una minúscula y un
+            dígito. El incumplimiento produce `400` con `weak_password`.
+          example: ClaveSegura2026
+        full_name:
+          type: string
+          minLength: 2
+          maxLength: 120
+          description: Nombres y apellidos del usuario.
+          example: Maria Fernanda Quispe
+        phone:
+          type: string
+          minLength: 9
+          maxLength: 20
+          description: |
+            Teléfono de contacto, opcional en el registro y editable después.
+            Es el canal de avisos de cita además del correo.
+          example: '+51 987 654 321'
+        role:
+          type: string
+          description: |
+            Rol solicitado. **Solo se admite `CLIENTE`.** Las cuentas de `AGENTE`
+            y `ADMINISTRADOR` las crea un administrador, así que un registro
+            público que aceptara esos valores permitiría escalada de
+            privilegios. Enviar cualquiera de los dos produce `400` con
+            `role_not_assignable`.
+          enum:
+            - CLIENTE
+          default: CLIENTE
+          example: CLIENTE
+      example:
+        email: maria.quispe@correo.com
+        password: ClaveSegura2026
+        full_name: Maria Fernanda Quispe
+        phone: '+51 987 654 321'
+
+    LoginInput:
+      type: object
+      description: Cuerpo del inicio de sesión.
+      required:
+        - email
+        - password
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: |
+            Correo con el que se registró la cuenta. La comparación no distingue
+            mayúsculas ni acentos.
+          example: maria.quispe@correo.com
+        password:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 128
+          writeOnly: true
+          description: Contraseña de la cuenta.
+          example: ClaveSegura2026
+      example:
+        email: maria.quispe@correo.com
+        password: ClaveSegura2026
+
+    AuthUser:
+      type: object
+      description: |
+        Usuario autenticado. Es la representación pública: **no incluye
+        `password` ni `is_staff`**, porque el frontend solo necesita identificar
+        a la persona y conocer su rol para decidir qué interfaz mostrar.
+      required:
+        - id
+        - email
+        - full_name
+        - role
+        - is_active
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador del usuario.
+          example: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+        email:
+          type: string
+          format: email
+          description: Correo de la cuenta.
+          example: maria.quispe@correo.com
+        full_name:
+          type: string
+          description: Nombres y apellidos.
+          example: Maria Fernanda Quispe
+        phone:
+          type: string
+          nullable: true
+          description: Teléfono de contacto, si se registró.
+          example: '+51 987 654 321'
+        role:
+          $ref: '#/components/schemas/UserRole'
+        is_active:
+          type: boolean
+          description: |
+            Cuenta habilitada. Una cuenta desactivada no puede iniciar sesión
+            (`403` `account_disabled`) y sus tokens dejan de aceptarse.
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          description: Momento de alta de la cuenta.
+          example: '2026-10-05T09:12:44Z'
+
+    TokenPair:
+      type: object
+      description: |
+        Credenciales de sesión. Deliberadamente **no** incluye el refresh token:
+        ese viaja en la cookie `HttpOnly` descrita en
+        `securitySchemes.refreshCookie`. Si el refresh estuviera en el cuerpo,
+        cualquier XSS podría leerlo y robar la sesión completa, que es
+        justamente lo que la cookie evita.
+      required:
+        - access
+        - token_type
+        - expires_in
+        - user
+      properties:
+        access:
+          type: string
+          description: |
+            Access token JWT. El cliente lo mantiene **solo en memoria** y lo
+            envía en `Authorization: Bearer <access>` en cada petición.
+
+            Su payload lleva estos claims, y es de ahí de donde el backend toma
+            el rol para autorizar, no de una consulta a la base de datos:
+
+            | Claim | Contenido | Uso |
+            |---|---|---|
+            | `sub` | UUID del usuario | Identidad del titular |
+            | `email` | Correo normalizado a minúsculas | Trazabilidad |
+            | `role` | `CLIENTE`, `AGENTE` o `ADMINISTRADOR` | **Autorización (RBAC)** |
+            | `token_type` | `access` | Distinguirlo del refresh ante una confusión de tokens |
+            | `jti` | Identificador único del token | Revocación individual |
+            | `iat` / `exp` | Emisión y expiración, en Unix epoch | Validación de vigencia |
+
+            La contrapartida de llevar el rol en el token es que un cambio de rol
+            no surte efecto hasta que el access expira, salvo que se revoque por
+            `jti`.
+          example: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjM2Q0ZTVmNiJ9
+        token_type:
+          type: string
+          description: |
+            Tipo de credencial de la cabecera `Authorization`. Siempre `Bearer`,
+            por RFC 6750.
+          enum:
+            - Bearer
+          example: Bearer
+        expires_in:
+          type: integer
+          format: int32
+          minimum: 1
+          description: |
+            Segundos de vigencia del access token. Permite al frontend renovar
+            proactivamente en lugar de esperar un `401`.
+          example: 1800
+        user:
+          $ref: '#/components/schemas/AuthUser'
 
     AppointmentStatus:
       type: string
