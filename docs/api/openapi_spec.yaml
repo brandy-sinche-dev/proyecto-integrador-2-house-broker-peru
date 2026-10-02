@@ -16,6 +16,7 @@ info:
     | Sprint 1 | `TASK-ARC-PROP-01` | CRUD de propiedades (HU-PROP-01) |
     | Sprint 2 | `TASK-ARC-PROP-02` | Catálogo paginado `GET /api/v1/properties` (HU-PROP-02) |
     | Sprint 2 | `TASK-ARC-PROP-03` | Filtros de búsqueda en `GET /api/v1/properties` (HU-PROP-03) |
+    | Sprint 3 | `TASK-ARC-PROP-04` | Estado operativo y horarios de visita (HU-PROP-04) |
 
     ### Convenciones
     - Todos los endpoints están bajo el prefijo `/api/v1`.
@@ -25,7 +26,10 @@ info:
       `search`) son opcionales y se combinan con conjunción (AND).
     - Los errores se serializan como `application/problem+json` conforme a
       **RFC 7807 (Problem Details for HTTP APIs)**.
-  version: 1.2.0
+    - Los endpoints mutables exigen `Authorization: Bearer <jwt>` y rol `AGENTE`
+      o `ADMINISTRADOR`. Un `401` significa token ausente o inválido; un `403`
+      significa token válido sin permiso sobre el recurso.
+  version: 1.3.0
   contact:
     name: Equipo HouseBroker Perú
     url: https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru
@@ -42,6 +46,13 @@ servers:
 tags:
   - name: Propiedades
     description: Endpoints para la gestión administrativa y consulta de inmuebles
+  - name: Disponibilidad
+    description: |
+      Estado operativo del inmueble y franjas horarias habilitadas para agendar
+      visitas. Solo accesible para Agentes asignados y Administradores.
+
+security:
+  - bearerAuth: []
 
 paths:
   /api/v1/properties:
@@ -495,8 +506,484 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemInternalServerError'
 
+  /api/v1/properties/{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/PropertyId'
+
+    patch:
+      tags:
+        - Disponibilidad
+      operationId: updatePropertyStatus
+      summary: Actualizar el estado operativo de una propiedad
+      description: |
+        Cambia el estado operativo del inmueble (RF-PROP-04). Es un `PATCH`
+        semántico: el cuerpo puede contener `status`, `reason` o ambos, y el
+        resto de campos del inmueble queda intacto.
+
+        `status` gobierna la visibilidad en el catálogo, no el borrado físico:
+
+        | Estado | En catálogo | Agendable |
+        |---|---|---|
+        | `DISPONIBLE` | Sí | Sí |
+        | `RESERVADO` | Sí | No |
+        | `ALQUILADO` | Sí | No |
+        | `VENDIDO` | Sí | No |
+        | `SUSPENDIDO` | No (`is_active = false`) | No |
+
+        La transición a `SUSPENDIDO` es la que retira el inmueble del catálogo
+        mediante eliminación lógica. Volver a `DISPONIBLE` lo reactiva. Es
+        intencionalmente distinta de `DELETE /api/v1/properties/{id}`, que
+        también desactiva pero no deja registro de la suspensión.
+
+        No hay transición válida desde `VENDIDO` ni `ALQUILADO`: son estados
+        terminales y un intento de revertirlos produce `409`.
+
+        El estado anterior se devuelve en `previous_status` para que el frontend
+        pueda revertir la UI si observa un fallo de red después de aplicar el
+        cambio.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PropertyStatusInput'
+            examples:
+              cambioDeEstado:
+                summary: Marcar como reservada con motivo
+                value:
+                  status: RESERVADO
+                  reason: El propietario inicio tramite de reserva con seña.
+              soloEstado:
+                summary: Reactivar un inmueble suspendido
+                value:
+                  status: DISPONIBLE
+      responses:
+        '200':
+          description: Estado actualizado exitosamente
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PropertyStatusResult'
+              example:
+                id: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+                status: RESERVADO
+                previous_status: DISPONIBLE
+                is_active: true
+                reason: El propietario inicio tramite de reserva con seña.
+                changed_by: 7c4a9d21-3b6e-4f80-9a2d-5e7c1b3f8d40
+                changed_at: '2026-09-30T14:20:00Z'
+        '400':
+          description: Cuerpo inválido o transición no permitida
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemBadRequest'
+              examples:
+                estadoInvalido:
+                  summary: '`status` fuera del enum'
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Parámetro de consulta inválido
+                    status: 400
+                    detail: El campo 'status' admite los valores DISPONIBLE, RESERVADO, ALQUILADO, VENDIDO, SUSPENDIDO.
+                    instance: /api/v1/properties/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/status
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: status
+                        message: El valor 'ALQUILANDO' no pertenece al conjunto permitido (DISPONIBLE, RESERVADO, ALQUILADO, VENDIDO, SUSPENDIDO).
+                cuerpoVacio:
+                  summary: 'PATCH sin `status`'
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Parámetro de consulta inválido
+                    status: 400
+                    detail: El campo 'status' es obligatorio para actualizar el estado operativo.
+                    instance: /api/v1/properties/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/status
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: status
+                        message: Este campo es obligatorio.
+                transicionInvalida:
+                  summary: Transición desde un estado terminal
+                  value:
+                    type: https://housebroker.pe/errors/invalid-property-transition
+                    title: Transición de estado no permitida
+                    status: 400
+                    detail: No se puede pasar de 'VENDIDO' a 'DISPONIBLE'. Los estados VENDIDO y ALQUILADO son terminales.
+                    instance: /api/v1/properties/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/status
+                    code: invalid_property_transition
+                    errors:
+                      - parameter: status
+                        message: La transición VENDIDO -> DISPONIBLE no está permitida.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Propiedad no encontrada
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemNotFound'
+        '409':
+          description: |
+            El inmueble tiene visitas confirmadas en la franja afectada, o la
+            escritura concurrente que colisiona con otra actualización.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemConflict'
+              example:
+                type: https://housebroker.pe/errors/property-state-conflict
+                title: Conflicto de estado del inmueble
+                status: 409
+                detail: No se puede suspender el inmueble porque tiene 2 visitas confirmadas en las próximas 48 horas.
+                instance: /api/v1/properties/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/status
+                code: property_state_conflict
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/properties/{id}/schedules:
+    parameters:
+      - $ref: '#/components/parameters/PropertyId'
+
+    get:
+      tags:
+        - Disponibilidad
+      operationId: getPropertySchedules
+      summary: Obtener las franjas horarias de una propiedad
+      description: |
+        Devuelve las franjas habilitadas para agendar visitas al inmueble,
+        agrupadas por día de la semana.
+
+        Cada franja es un intervalo `[start_time, end_time)` en formato
+        `HH:MM` (24 h). El extremo derecho es **exclusivo**: una franja
+        `09:00-12:00` y otra `12:00-15:00` son contiguas, no solapadas.
+      responses:
+        '200':
+          description: Franjas obtenidas exitosamente
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PropertySchedules'
+              example:
+                property_id: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+                timezone: America/Lima
+                total_slots: 3
+                days:
+                  - weekday: LUNES
+                    slots:
+                      - id: 9a7b1c2d-3e4f-5a6b-8c7d-9e0f1a2b3c4d
+                        start_time: '09:00'
+                        end_time: '12:00'
+                        is_active: true
+                  - weekday: MARTES
+                    slots: []
+                  - weekday: MIERCOLES
+                    slots: []
+                  - weekday: JUEVES
+                    slots: []
+                  - weekday: VIERNES
+                    slots: []
+                  - weekday: SABADO
+                    slots:
+                      - id: 9a7b1c2d-3e4f-5a6b-8c7d-9e0f1a2b3c4f
+                        start_time: '10:00'
+                        end_time: '13:00'
+                        is_active: true
+                  - weekday: DOMINGO
+                    slots: []
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Propiedad no encontrada
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      tags:
+        - Disponibilidad
+      operationId: replacePropertySchedules
+      summary: Reemplazar las franjas horarias de una propiedad
+      description: |
+        Operación de **reemplazo completo** (idempotente por diseño): el cuerpo
+        es la nueva configuración completa de la semana. Los bloques que no
+        vienen en el cuerpo se desactivan (`is_active = false`) en lugar de
+        borrarse, para conservar el historial de citas ya agendadas.
+
+        Se eligió `PUT` y no `PATCH` porque editar un solo bloque dejaría el resto
+        ambiguo. Un `PUT` con `days: []` deja el inmueble sin franjas, que es un
+        estado válido: bloquea el agendamiento sin desactivar la propiedad.
+
+        #### Reglas de validación
+
+        | Regla | Rechazo |
+        |---|---|
+        | `start_time` anterior a `end_time` | `400` |
+        | Duración mínima de 30 minutos | `400` |
+        | Duración máxima de 8 horas | `400` |
+        | Sin solapamiento entre franjas del mismo día | `400` |
+        | Sin duplicar el mismo día de la semana | `400` |
+        | Máximo 6 franjas por día | `400` |
+        | Máximo 28 franjas por semana | `400` |
+
+        Los horarios se interpretan en la zona horaria `America/Lima` que
+        devuelve el `GET`. No se aceptan sufijos de zona ni offsets UTC en los
+        valores.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PropertySchedulesInput'
+            examples:
+              semanaCompleta:
+                summary: Lunes a viernes, 09:00 a 18:00
+                value:
+                  days:
+                    - weekday: LUNES
+                      slots:
+                        - start_time: '09:00'
+                          end_time: '12:00'
+                        - start_time: '14:00'
+                          end_time: '18:00'
+                    - weekday: MARTES
+                      slots:
+                        - start_time: '09:00'
+                          end_time: '18:00'
+                    - weekday: MIERCOLES
+                      slots:
+                        - start_time: '09:00'
+                          end_time: '18:00'
+                    - weekday: JUEVES
+                      slots:
+                        - start_time: '09:00'
+                          end_time: '18:00'
+                    - weekday: VIERNES
+                      slots:
+                        - start_time: '09:00'
+                          end_time: '13:00'
+              sinFranjas:
+                summary: Sin franjas, sin desactivar el inmueble
+                value:
+                  days: []
+      responses:
+        '200':
+          description: Franjas reemplazadas exitosamente
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PropertySchedules'
+        '400':
+          description: Franjas que incumplen las reglas de rango o solapamiento
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemBadRequest'
+              examples:
+                rangoInvertido:
+                  summary: '`start_time` posterior a `end_time`'
+                  value:
+                    type: https://housebroker.pe/errors/invalid-time-range
+                    title: Rango horario inválido
+                    status: 400
+                    detail: La franja de LUNES tiene 'start_time' 18:00 posterior a 'end_time' 12:00.
+                    instance: /api/v1/properties/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/schedules
+                    code: invalid_time_range
+                    errors:
+                      - parameter: days[0].slots[0]
+                        message: "start_time' (18:00) debe ser anterior a 'end_time' (12:00)."
+                duracionMinima:
+                  summary: 'Franja de 15 minutos'
+                  value:
+                    type: https://housebroker.pe/errors/invalid-time-range
+                    title: Rango horario inválido
+                    status: 400
+                    detail: La franja de LUNES dura 15 minutos y el mínimo es 30.
+                    instance: /api/v1/properties/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/schedules
+                    code: invalid_time_range
+                    errors:
+                      - parameter: days[0].slots[1]
+                        message: La duración de la franja (15 min) es menor que el mínimo (30 min).
+                solapamiento:
+                  summary: Dos franjas que se superponen en el mismo día
+                  value:
+                    type: https://housebroker.pe/errors/schedule-overlap
+                    title: Franjas horarias solapadas
+                    status: 400
+                    detail: Las franjas 09:00-12:00 y 11:00-13:00 de LUNES se solapan.
+                    instance: /api/v1/properties/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/schedules
+                    code: schedule_overlap
+                    errors:
+                      - parameter: days[0].slots[1]
+                        message: Se solapa con la franja 09:00-12:00.
+                formatoDeHora:
+                  summary: '`start_time` fuera del patrón HH:MM'
+                  value:
+                    type: https://housebroker.pe/errors/invalid-time-range
+                    title: Rango horario inválido
+                    status: 400
+                    detail: El campo 'start_time' debe usar el formato HH:MM en 24 horas.
+                    instance: /api/v1/properties/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/schedules
+                    code: invalid_time_range
+                    errors:
+                      - parameter: days[0].slots[0].start_time
+                        message: El valor '9:00 am' no cumple el formato HH:MM (patrón ^([01]\d|2[0-3]):[0-5]\d$).
+                diaDuplicado:
+                  summary: 'Mismo `weekday` repetido'
+                  value:
+                    type: https://housebroker.pe/errors/invalid-time-range
+                    title: Rango horario inválido
+                    status: 400
+                    detail: El día 'LUNES' aparece más de una vez en la configuración semanal.
+                    instance: /api/v1/properties/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/schedules
+                    code: invalid_time_range
+                    errors:
+                      - parameter: days[1]
+                        message: El día 'LUNES' está duplicado; agrupe ambas listas de franjas en una sola entrada.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Propiedad no encontrada
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemNotFound'
+        '409':
+          description: |
+            El inmueble tiene citas ya confirmadas en franjas que el reemplazo
+            desactivaría. El cliente debe reasignar o cancelar esas visitas antes
+            de aplicar el cambio.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemConflict'
+              example:
+                type: https://housebroker.pe/errors/schedule-has-bookings
+                title: La configuración choca con visitas agendadas
+                status: 409
+                detail: 3 franjas a desactivar tienen visitas confirmadas.
+                instance: /api/v1/properties/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/schedules
+                code: schedule_has_bookings
+                errors:
+                  - parameter: days[1].slots[0]
+                    message: La franja 14:00-18:00 del JUEVES tiene 1 visita confirmada (cita a9c1d2e3).
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Token JWT emitido por `POST /api/v1/auth/login` y enviado como
+        `Authorization: Bearer <token>`. Cubre los tres roles del MVP:
+        `CLIENTE`, `AGENTE` y `ADMINISTRADOR`.
+
+        El cliente adjunta el token en `frontend/src/services/axios.ts` leyendo
+        `localStorage.hb_token`.
+
+  responses:
+    Unauthorized:
+      description: Token ausente, vencido o con firma inválida
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemUnauthorized'
+          example:
+            type: https://housebroker.pe/errors/unauthorized
+            title: No autenticado
+            status: 401
+            detail: Falta el encabezado 'Authorization' con un token Bearer válido.
+            instance: /api/v1/properties/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/status
+            code: unauthorized
+    Forbidden:
+      description: |
+        El token es válido pero el usuario no tiene permiso sobre el recurso.
+        Ocurre cuando un `CLIENTE` intenta modificar el estado o los horarios,
+        o cuando un `AGENTE` que no está asignado al inmueble intenta hacerlo.
+        `ADMINISTRADOR` tiene acceso directo a cualquier inmueble.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemForbidden'
+          examples:
+            rolInsuficiente:
+              summary: El rol del usuario no permite la operación
+              value:
+                type: https://housebroker.pe/errors/forbidden
+                title: Sin permisos sobre el recurso
+                status: 403
+                detail: Solo los roles AGENTE y ADMINISTRADOR pueden actualizar el estado de una propiedad.
+                instance: /api/v1/properties/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/status
+                code: forbidden
+                required_roles:
+                  - AGENTE
+                  - ADMINISTRADOR
+            agenteNoAsignado:
+              summary: El agente no está asignado al inmueble
+              value:
+                type: https://housebroker.pe/errors/forbidden
+                title: Sin permisos sobre el recurso
+                status: 403
+                detail: Solo el agente asignado a este inmueble o un administrador pueden modificar sus horarios.
+                instance: /api/v1/properties/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/status
+                code: forbidden
+                required_roles:
+                  - AGENTE
+    InternalServerError:
+      description: Error interno del servidor
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemInternalServerError'
+          example:
+            type: https://housebroker.pe/errors/internal-server-error
+            title: Error interno del servidor
+            status: 500
+            detail: No fue posible completar la operación solicitada.
+            instance: /api/v1/properties/b2c1f5a0-1a2b-4c3d-9e0f-111111111111/schedules
+            code: internal_server_error
+            request_id: 8b1a0f5c-2d3e-4a5b-9c7d-0e1f2a3b4c5d
+
   parameters:
+    PropertyId:
+      name: id
+      in: path
+      required: true
+      description: Identificador único del inmueble.
+      schema:
+        type: string
+        format: uuid
+
     MinPrice:
       name: minPrice
       in: query
@@ -809,6 +1296,296 @@ components:
         - ALQUILER
       example: VENTA
 
+    UserRole:
+      type: string
+      description: |
+        Rol del usuario autenticado. Determina si puede consultar el catálogo y
+        si puede modificar estado y horarios.
+      enum:
+        - CLIENTE
+        - AGENTE
+        - ADMINISTRADOR
+      example: AGENTE
+
+    PropertyStatus:
+      type: string
+      description: |
+        Estado operativo del inmueble (RF-PROP-04). Es distinto de `is_active`:
+        `is_active` decide la visibilidad en el catálogo, mientras `status`
+        describe en qué etapa comercial está. Los cuatro primeros estados
+        mantienen el inmueble visible; `SUSPENDIDO` lo retira del catálogo.
+      enum:
+        - DISPONIBLE
+        - RESERVADO
+        - ALQUILADO
+        - VENDIDO
+        - SUSPENDIDO
+
+    PropertyStatusInput:
+      type: object
+      description: |
+        Cuerpo del `PATCH` de estado. Solo se procesan `status` y `reason`; el
+        resto de campos del inmueble no se ven afectados.
+      required:
+        - status
+      additionalProperties: false
+      properties:
+        status:
+          $ref: '#/components/schemas/PropertyStatus'
+        reason:
+          type: string
+          minLength: 5
+          maxLength: 500
+          description: |
+            Motivo del cambio, en español. Obligatorio para transiciones a
+            `SUSPENDIDO`, `RESERVADO`, `ALQUILADO` y `VENDIDO` porque son
+            decisiones comerciales auditables; opcional al volver a
+            `DISPONIBLE`.
+          example: El propietario inicio tramite de reserva con seña.
+      example:
+        status: RESERVADO
+        reason: El propietario inicio tramite de reserva con seña.
+
+    PropertyStatusResult:
+      type: object
+      description: |
+        Estado vigente tras aplicar el parche, con trazabilidad del cambio.
+        `status` es el estado nuevo y `previous_status` el anterior.
+      required:
+        - id
+        - status
+        - previous_status
+        - is_active
+        - changed_by
+        - changed_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador del inmueble al que se aplicó el cambio.
+        status:
+          $ref: '#/components/schemas/PropertyStatus'
+        previous_status:
+          allOf:
+            - $ref: '#/components/schemas/PropertyStatus'
+          description: |
+            Estado antes del cambio. Permite al frontend revertir la UI cuando
+            observa un fallo de red después de haber aplicado el parche
+            optimista.
+        is_active:
+          type: boolean
+          description: |
+            Visibilidad resultante en el catálogo. Es `false` exactamente
+            cuando `status` es `SUSPENDIDO`.
+          example: true
+        reason:
+          type: string
+          nullable: true
+          description: Motivo registrado para el cambio, si se envió.
+          example: El propietario inicio tramite de reserva con seña.
+        changed_by:
+          type: string
+          format: uuid
+          description: Usuario que ejecutó la transición.
+        changed_at:
+          type: string
+          format: date-time
+          description: Momento del cambio en formato ISO 8601.
+          example: '2026-09-30T14:20:00Z'
+
+    Weekday:
+      type: string
+      description: |
+        Día de la semana. Los horarios se repiten semanalmente: un bloque de
+        `LUNES` aplica a todos los lunes futuros, sin fecha concreta.
+      enum:
+        - LUNES
+        - MARTES
+        - MIERCOLES
+        - JUEVES
+        - VIERNES
+        - SABADO
+        - DOMINGO
+      example: LUNES
+
+    TimeSlotInput:
+      type: object
+      description: |
+        Franja horaria en formato de 24 horas, con intervalo semiabierto
+        `[start_time, end_time)`. El solapamiento entre dos franjas equivale a
+        intersección no vacía de esos intervalos, de modo que 09:00-12:00 y
+        12:00-15:00 son contiguas y válidas.
+      required:
+        - start_time
+        - end_time
+      additionalProperties: false
+      properties:
+        start_time:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          description: |
+            Hora de inicio en `HH:MM`. Valida tanto el formato como el rango
+            00:00-23:59; un valor como `9:00 am` o `25:00` produce `400`.
+          example: '09:00'
+        end_time:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          description: |
+            Hora de cierre en `HH:MM`, posterior a `start_time`. La duración
+            resultante se valida entre 30 minutos y 8 horas.
+          example: '12:00'
+
+    WeekdayScheduleInput:
+      type: object
+      description: |
+        Conjunto de franjas de un día concreto. Máximo 6 franjas por día.
+      required:
+        - weekday
+        - slots
+      additionalProperties: false
+      properties:
+        weekday:
+          $ref: '#/components/schemas/Weekday'
+        slots:
+          type: array
+          minItems: 1
+          maxItems: 6
+          description: |
+            Franjas del día, ordenadas por `start_time` y sin solapamientos. Una
+            lista vacía se rechaza con `400`: los días sin atención se omiten
+            del cuerpo, no se declaran con `slots: []`.
+          items:
+            $ref: '#/components/schemas/TimeSlotInput'
+      example:
+        weekday: LUNES
+        slots:
+          - start_time: '09:00'
+            end_time: '12:00'
+          - start_time: '14:00'
+            end_time: '18:00'
+
+    PropertySchedulesInput:
+      type: object
+      description: |
+        Configuración semanal completa que reemplaza a la anterior. Máximo 28
+        franjas en total. Un día no incluido queda sin franjas; `days: []`
+        deja el inmueble sin posibilidad de agendamiento sin desactivarlo.
+      required:
+        - days
+      additionalProperties: false
+      properties:
+        days:
+          type: array
+          minItems: 0
+          maxItems: 7
+          description: |
+            Días configurables. Cada día de la semana aparece **a lo sumo una
+            vez**: un `weekday` repetido produce `400` en lugar de fusionar en
+            silencio las listas de franjas.
+          items:
+            $ref: '#/components/schemas/WeekdayScheduleInput'
+      example:
+        days:
+          - weekday: LUNES
+            slots:
+              - start_time: '09:00'
+                end_time: '12:00'
+              - start_time: '14:00'
+                end_time: '18:00'
+          - weekday: SABADO
+            slots:
+              - start_time: '10:00'
+                end_time: '13:00'
+
+    ScheduleSlot:
+      type: object
+      description: |
+        Franja almacenada: los mismos campos de `TimeSlotInput` más su
+        identidad y su estado de activación.
+      required:
+        - id
+        - start_time
+        - end_time
+        - is_active
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador de la franja, estable entre reemplazos.
+        start_time:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          description: Hora de inicio en `HH:MM`.
+          example: '09:00'
+        end_time:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          description: Hora de cierre en `HH:MM`.
+          example: '12:00'
+        is_active:
+          type: boolean
+          description: |
+            Indica si la franja admite visitas. Un `PUT` desactiva las franjas
+            ausentes del cuerpo en lugar de borrarlas, de modo que las citas ya
+            agendadas conserven su referencia.
+          example: true
+
+    WeekdaySchedule:
+      type: object
+      description: |
+        Día con sus franjas, tal como quedan tras el reemplazo. A diferencia de
+        `WeekdayScheduleInput`, admite `slots: []` y cada franja trae `id` e
+        `is_active`.
+      required:
+        - weekday
+        - slots
+      properties:
+        weekday:
+          $ref: '#/components/schemas/Weekday'
+        slots:
+          type: array
+          description: Franjas vigentes del día, ordenadas por `start_time`.
+          items:
+            $ref: '#/components/schemas/ScheduleSlot'
+
+    PropertySchedules:
+      type: object
+      description: |
+        Estado completo de la agenda semanal del inmueble. Siempre incluye los
+        siete días: los que no tienen franjas vienen con `slots: []`, para que
+        el frontend pueda pintar la semana completa sin tratar la ausencia como
+        un día no cargado.
+      required:
+        - property_id
+        - timezone
+        - total_slots
+        - days
+      properties:
+        property_id:
+          type: string
+          format: uuid
+          description: Inmueble al que corresponden estas franjas.
+        timezone:
+          type: string
+          description: |
+            Zona horaria en la que se interpretan todas las horas del recurso.
+            Fijada por el MVP a `America/Lima`; el frontend no debe aplicar su
+            propia conversión sobre los valores `HH:MM`.
+          example: America/Lima
+        total_slots:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Suma de franjas activas en la semana.
+          example: 4
+        days:
+          type: array
+          minItems: 7
+          maxItems: 7
+          description: Los siete días de la semana, en orden de lunes a domingo.
+          items:
+            $ref: '#/components/schemas/WeekdaySchedule'
+
     PaginatedProperties:
       type: object
       description: Envoltorio paginado del catálogo de propiedades.
@@ -948,6 +1725,81 @@ components:
               type: string
               description: Código de error estable.
               example: resource_not_found
+
+    ProblemUnauthorized:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required:
+            - code
+          properties:
+            code:
+              type: string
+              description: |
+                Código de error estable. `unauthorized` cubre el token ausente,
+                vencido o con firma inválida.
+              example: unauthorized
+
+    ProblemForbidden:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required:
+            - code
+          properties:
+            code:
+              type: string
+              description: |
+                Código de error estable. `forbidden` significa que el token es
+                válido y el recurso existe, pero el usuario no tiene permiso
+                sobre él. No confundir con `404`: el backend no debe revelar la
+                existencia de un inmueble ajeno al Agente que lo consulta.
+              example: forbidden
+            required_roles:
+              type: array
+              description: |
+                Roles que sí habrían tenido permiso. Permite al frontend mostrar
+                un mensaje accionable ("solo administradores pueden hacer esto")
+                en lugar de un error genérico. Opcional: se omite cuando la
+                regla depende del recurso concreto y no de un rol.
+              items:
+                $ref: '#/components/schemas/UserRole'
+
+    ProblemConflict:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required:
+            - code
+          properties:
+            code:
+              type: string
+              description: |
+                Código de error estable. `property_state_conflict` impide
+                suspender un inmueble con visitas confirmadas;
+                `schedule_has_bookings` impide desactivar franjas que ya tienen
+                citas. El cambio no se aplica parcialmente.
+              example: schedule_has_bookings
+            errors:
+              type: array
+              description: |
+                Franjas o campos en conflicto. Permite al frontend señalar los
+                bloques concretos que deben reasignarse en lugar de mostrar un
+                error genérico.
+              items:
+                type: object
+                required:
+                  - parameter
+                  - message
+                properties:
+                  parameter:
+                    type: string
+                    description: Ruta del campo o franja en conflicto.
+                    example: days[1].slots[0]
+                  message:
+                    type: string
+                    description: Motivo del conflicto, en español.
+                    example: La franja 14:00-18:00 del JUEVES tiene 1 visita confirmada (cita a9c1d2e3).
 
     ProblemInternalServerError:
       allOf:

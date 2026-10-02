@@ -2,8 +2,9 @@
 
 Contratos REST del backend (Django REST Framework) bajo especificación **OpenAPI 3.0**.
 
-> **Tarea actual:** [TASK-ARC-PROP-03] Especificación de query parameters para
-> filtros de búsqueda — [issue #43](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/43) (HU-PROP-03).
+> **Tarea actual:** [TASK-ARC-PROP-04] Especificación OpenAPI 3.0 para estado de
+> propiedades y horarios de visita —
+> [issue #83](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/83) (HU-PROP-04).
 
 ## Archivo único de contrato
 
@@ -17,6 +18,7 @@ que al cierre (Sprint 7) exista un solo `.yml` con la API completa.
 | 1.1.0 | Sprint 2 | `TASK-ARC-PROP-02` | [#34](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/34) | Catálogo paginado + errores RFC 7807 (HU-PROP-02) |
 | 1.1.0 | Sprint 2 | — | — | Sincronizado con `Property` de `types.ts`: `moneda`, `mode` y atributos |
 | 1.2.0 | Sprint 2 | `TASK-ARC-PROP-03` | [#43](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/43) | Query params de filtros: `minPrice`, `maxPrice`, `propertyType`, `ubigeo`, `search` (HU-PROP-03) |
+| 1.3.0 | Sprint 3 | `TASK-ARC-PROP-04` | [#83](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/83) | Estado operativo (`PATCH .../status`) y horarios (`GET`/`PUT .../schedules`), con `401`/`403`/`409` (HU-PROP-04) |
 
 Al crecer el documento, extrae las secciones a `components/schemas` y referencia
 con `$ref`. No dupliques esquemas entre operaciones.
@@ -35,6 +37,9 @@ el schema en el mismo commit.
 | GET | `/api/v1/properties/{id}` | `getProperty` | 1 |
 | PUT | `/api/v1/properties/{id}` | `updateProperty` | 1 |
 | DELETE | `/api/v1/properties/{id}` | `deleteProperty` — eliminación lógica | 1 |
+| PATCH | `/api/v1/properties/{id}/status` | `updatePropertyStatus` — estado operativo | 3 |
+| GET | `/api/v1/properties/{id}/schedules` | `getPropertySchedules` | 3 |
+| PUT | `/api/v1/properties/{id}/schedules` | `replacePropertySchedules` | 3 |
 
 ## Catálogo paginado (HU-PROP-02)
 
@@ -189,6 +194,86 @@ curl "http://localhost:8000/api/v1/properties?minPrice=100000&maxPrice=450000&pr
 `detail`, `instance`); `code`, `errors` y `request_id` son extensiones propias de
 la API. Los tres esquemas de error heredan de `Problem` con `allOf`.
 
+## Estado y horarios de visita (HU-PROP-04)
+
+`TASK-ARC-PROP-04` especifica la parte del catálogo que solo escriben Agentes y
+Administradores. Todos los endpoints de esta sección exigen
+`Authorization: Bearer <jwt>` (`securitySchemes.bearerAuth`).
+
+| Método | Ruta | Operación |
+|---|---|---|
+| PATCH | `/api/v1/properties/{id}/status` | `updatePropertyStatus` |
+| GET | `/api/v1/properties/{id}/schedules` | `getPropertySchedules` |
+| PUT | `/api/v1/properties/{id}/schedules` | `replacePropertySchedules` |
+
+### Estado operativo — `PATCH .../status`
+
+Enum `PropertyStatus`, distinto de `is_active`: `is_active` decide la visibilidad
+en el catálogo, `status` describe la etapa comercial.
+
+| Estado | En catálogo | Agendable |
+|---|---|---|
+| `DISPONIBLE` | Sí | Sí |
+| `RESERVADO` | Sí | No |
+| `ALQUILADO` | Sí | No |
+| `VENDIDO` | Sí | No |
+| `SUSPENDIDO` | No (`is_active = false`) | No |
+
+El cuerpo acepta `status` (obligatorio) y `reason`. `reason` es obligatorio para
+cualquier transición que no sea volver a `DISPONIBLE`, porque son decisiones
+comerciales auditables.
+
+`VENDIDO` y `ALQUILADO` son terminales: revertirlos produce `400` con
+`invalid_property_transition`. La respuesta devuelve `previous_status` para que
+el frontend pueda deshacer su actualización optimista tras un fallo de red.
+
+La transición a `SUSPENDIDO` es equivalente a `DELETE /api/v1/properties/{id}` en
+cuanto a visibilidad, pero deja registro de que fue una suspensión y por qué.
+
+### Horarios — `GET` y `PUT .../schedules`
+
+Cada franja es un intervalo semiabierto `[start_time, end_time)` en `HH:MM` de 24
+horas, repetido semanalmente sin fecha concreta. El extremo derecho exclusivo hace
+que `09:00-12:00` y `12:00-15:00` sean contiguas, no solapadas.
+
+El `PUT` es de reemplazo completo: el cuerpo es la nueva configuración semanal
+entera. Las franjas ausentes se desactivan con `is_active = false` en vez de
+borrarse, para que las citas ya agendadas conserven su referencia. `days: []`
+deja el inmueble sin franjas, lo que bloquea el agendamiento sin desactivar la
+propiedad; es preferible a `DELETE`.
+
+El `GET` devuelve siempre los siete días, con `slots: []` en los que no tienen
+atención, para que el frontend no confunda un día vacío con un día no cargado.
+
+#### Reglas de validación
+
+| Regla | Código de error |
+|---|---|
+| `start_time` anterior a `end_time` | `invalid_time_range` |
+| Formato `HH:MM` (`^([01]\d|2[0-3]):[0-5]\d$`) | `invalid_time_range` |
+| Duración entre 30 minutos y 8 horas | `invalid_time_range` |
+| Sin solapamiento entre franjas del mismo día | `schedule_overlap` |
+| Cada `weekday` como máximo una vez | `invalid_time_range` |
+| Máximo 6 franjas por día y 28 por semana | `invalid_time_range` |
+| Sin desactivar franjas con visitas confirmadas | `schedule_has_bookings` (`409`) |
+
+Los horarios se interpretan en `America/Lima`, que es el `timezone` de la
+respuesta. El frontend no debe aplicar conversión sobre los valores `HH:MM`.
+
+### Permisos
+
+| Código | Esquema | Cuándo |
+|---|---|---|
+| `401` | `ProblemUnauthorized` | Token ausente, vencido o con firma inválida |
+| `403` | `ProblemForbidden` | Token válido sin permiso: un `CLIENTE`, o un `AGENTE` no asignado al inmueble |
+| `409` | `ProblemConflict` | El cambio colisiona con visitas ya confirmadas; no se aplica parcialmente |
+
+`403` incluye `required_roles` con los roles que sí habrían tenido permiso, para
+que el frontend muestre un mensaje accionable en lugar de un error genérico. El
+backend no debe revelar la existencia de un inmueble ajeno al Agente que lo
+consulta: la ausencia de permiso se responde con `403` solo cuando el recurso es
+visible para el usuario.
+
 ## Validación con Spectral
 
 El ruleset `.spectral.yaml` (en esta carpeta) extiende `spectral:oas` y sube a
@@ -227,3 +312,19 @@ npx @apidevtools/swagger-cli validate docs/api/openapi_spec.yaml
 - `minPrice`/`maxPrice` filtran por el número de `price` sin conversión de
   moneda: un rango en PEN no excluye automáticamente los resultados en USD. Es una
   limitación conocida del MVP, no un error del backend.
+- `TASK-ARC-PROP-04` define `bearerAuth` (HTTP bearer, JWT) siguiendo lo que ya
+  envía `frontend/src/services/axios.ts` con `localStorage.hb_token`. El contrato
+  de `POST /api/v1/auth/login` es `TASK-ARC-SEC-01`, de la misma unidad de trabajo;
+  cuando se documente, su `securitySchemes` debe ser el mismo `bearerAuth`.
+- Los horarios son bloques semanales recurrentes, sin fecha concreta. Si el
+  agendamiento de citas (`TASK-ARC-CRM-01`, Sprint 4) necesita reservar una
+  instancia concreta de una franja, encaja contra el `id` de `ScheduleSlot` más
+  la fecha elegida por el cliente.
+- `PropertySchedulesInput` y `ScheduleSlot` comparten los campos `HH:MM` pero no
+  el esquema: la entrada no lleva `id` ni `is_active` porque son asignados por el
+  servidor. Mantener `additionalProperties: false` en los esquemas de entrada
+  hace que un cliente que invente campos reciba `400` en vez de ignorarlos en
+  silencio.
+- La v1.3.0 no toca los endpoints existentes del catálogo: solo añade rutas bajo
+  `{id}` y el esquema `securitySchemes`. Las operaciones de lectura del catálogo
+  siguen siendo públicas hasta que `TASK-BACK-SEC-01` defina el nivel de acceso.
