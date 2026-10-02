@@ -15,14 +15,17 @@ info:
     |---|---|---|
     | Sprint 1 | `TASK-ARC-PROP-01` | CRUD de propiedades (HU-PROP-01) |
     | Sprint 2 | `TASK-ARC-PROP-02` | Catálogo paginado `GET /api/v1/properties` (HU-PROP-02) |
+    | Sprint 2 | `TASK-ARC-PROP-03` | Filtros de búsqueda en `GET /api/v1/properties` (HU-PROP-03) |
 
     ### Convenciones
     - Todos los endpoints están bajo el prefijo `/api/v1`.
     - Los parámetros de paginación son opcionales; el servidor aplica
       `DEFAULT_PAGE` y `DEFAULT_LIMIT` cuando se omiten.
+    - Los filtros de búsqueda (`minPrice`, `maxPrice`, `propertyType`, `ubigeo`,
+      `search`) son opcionales y se combinan con conjunción (AND).
     - Los errores se serializan como `application/problem+json` conforme a
       **RFC 7807 (Problem Details for HTTP APIs)**.
-  version: 1.1.0
+  version: 1.2.0
   contact:
     name: Equipo HouseBroker Perú
     url: https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru
@@ -53,6 +56,27 @@ paths:
         Solo se incluyen propiedades activas (`is_active = true`). El orden por
         defecto es `created_at` descendente (más recientes primero).
 
+        ### Búsqueda y filtros (HU-PROP-03)
+
+        Los filtros se aplican sobre el mismo recurso del catálogo, como *query
+        parameters* opcionales. Los filtros presentes se combinan entre sí con
+        conjunción lógica (AND) y con `is_active = true`:
+
+        | Filtro | Campo |
+        |---|---|
+        | `minPrice` / `maxPrice` | `price`, inclusivo en ambos extremos |
+        | `propertyType` | `property_type` |
+        | `ubigeo` | `ubigeo` del distrito (código INEI de 6 dígitos) |
+        | `search` | `title` y `address` |
+
+        Cada filtro se omite cuando no se envía. Un parámetro enviado con valor
+        vacío (`?propertyType=`) equivale a omitirlo, para que el frontend pueda
+        limpiar un filtro sin recargar la URL completa.
+
+        `count` y el header `X-Total-Count` reflejan el total **después** de
+        aplicar los filtros, de modo que la paginación del frontend sea
+        coherente con el conjunto filtrado.
+
         Si la página solicitada queda fuera de rango, la respuesta es `200` con
         `results` vacío y `next` en `null`; no es un error.
       parameters:
@@ -79,6 +103,11 @@ paths:
             maximum: 100
             default: 12
             example: 12
+        - $ref: '#/components/parameters/MinPrice'
+        - $ref: '#/components/parameters/MaxPrice'
+        - $ref: '#/components/parameters/PropertyTypeFilter'
+        - $ref: '#/components/parameters/UbigeoFilter'
+        - $ref: '#/components/parameters/Search'
         - name: X-Request-Id
           in: header
           required: false
@@ -188,6 +217,46 @@ paths:
                         negociable: true
                         destacado: false
                         mantenimiento: 0.0
+                catalogoFiltrado:
+                  summary: >-
+                    Consulta con filtros: `count` refleja solo el conjunto filtrado
+                  value:
+                    count: 2
+                    next: null
+                    previous: null
+                    results:
+                      - id: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+                        title: Departamento amoblado en Miraflores
+                        price: 150000.0
+                        moneda: PEN
+                        mode: VENTA
+                        address: Av. Larco 456, Miraflores
+                        property_type: DEPARTAMENTO
+                        is_active: true
+                        created_at: '2026-09-07T10:00:00Z'
+                        area_total: 85.5
+                        dormitorios: 3
+                        banos: 2
+                        estacionamientos: 1
+                        negociable: true
+                        destacado: false
+                        mantenimiento: 850.0
+                      - id: c3d2a6b1-2b3c-5d4e-0f11-123456789001
+                        title: Casa en San Isidro
+                        price: 850000.0
+                        moneda: USD
+                        mode: VENTA
+                        address: Av. El Golf 120, San Isidro
+                        property_type: CASA
+                        is_active: true
+                        created_at: '2026-09-06T09:30:00Z'
+                        area_total: 320.0
+                        dormitorios: 5
+                        banos: 4
+                        estacionamientos: 2
+                        negociable: false
+                        destacado: true
+                        mantenimiento: 0.0
         '400':
           description: Parámetros de consulta inválidos
           headers:
@@ -197,16 +266,81 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemBadRequest'
-              example:
-                type: https://housebroker.pe/errors/invalid-query-parameter
-                title: Parámetro de consulta inválido
-                status: 400
-                detail: El parámetro 'page' debe ser un entero mayor o igual a 1.
-                instance: /api/v1/properties?page=0
-                code: invalid_query_parameter
-                errors:
-                  - parameter: page
-                    message: El valor '0' es menor que el mínimo permitido (1).
+              examples:
+                paginacionInvalida:
+                  summary: Parámetro de paginación fuera de rango
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Parámetro de consulta inválido
+                    status: 400
+                    detail: El parámetro 'page' debe ser un entero mayor o igual a 1.
+                    instance: /api/v1/properties?page=0
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: page
+                        message: El valor '0' es menor que el mínimo permitido (1).
+                enumDeFiltroInvalido:
+                  summary: '`propertyType` fuera del enum'
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Parámetro de consulta inválido
+                    status: 400
+                    detail: El parámetro 'propertyType' admite los valores DEPARTAMENTO, CASA, TERRENO, OFICINA.
+                    instance: /api/v1/properties?propertyType=DUPLEX
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: propertyType
+                        message: El valor 'DUPLEX' no pertenece al conjunto permitido (DEPARTAMENTO, CASA, TERRENO, OFICINA).
+                ubigeoMalFormado:
+                  summary: '`ubigeo` que no cumple el patrón de 6 dígitos'
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Parámetro de consulta inválido
+                    status: 400
+                    detail: El parámetro 'ubigeo' debe ser un código INEI de 6 dígitos.
+                    instance: /api/v1/properties?ubigeo=1501
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: ubigeo
+                        message: El valor '1501' no cumple el formato de 6 dígitos (patrón ^\d{6}$).
+                searchDemasiadoCorto:
+                  summary: '`search` por debajo del mínimo de caracteres'
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Parámetro de consulta inválido
+                    status: 400
+                    detail: El parámetro 'search' debe tener entre 2 y 120 caracteres.
+                    instance: /api/v1/properties?search=a
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: search
+                        message: El valor 'a' tiene 1 carácter y el mínimo es 2.
+                rangoDePrecioInvertido:
+                  summary: '`minPrice` mayor que `maxPrice`'
+                  value:
+                    type: https://housebroker.pe/errors/invalid-filter-range
+                    title: Rango de precio incoherente
+                    status: 400
+                    detail: '`minPrice` no puede ser mayor que `maxPrice`.'
+                    instance: /api/v1/properties?minPrice=450000&maxPrice=150000
+                    code: invalid_filter_range
+                    errors:
+                      - parameter: minPrice
+                        message: El valor '450000.0' es mayor que 'maxPrice' (150000.0).
+                variosErrores:
+                  summary: 'Múltiples filtros rechazados en una sola respuesta'
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Parámetros de consulta inválidos
+                    status: 400
+                    detail: Se detectaron 2 parámetros de consulta inválidos.
+                    instance: /api/v1/properties?propertyType=DUPLEX&search=a
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: propertyType
+                        message: El valor 'DUPLEX' no pertenece al conjunto permitido (DEPARTAMENTO, CASA, TERRENO, OFICINA).
+                      - parameter: search
+                        message: El valor 'a' tiene 1 carácter y el mínimo es 2.
         '500':
           description: Error interno del servidor
           headers:
@@ -362,6 +496,93 @@ paths:
                 $ref: '#/components/schemas/ProblemInternalServerError'
 
 components:
+  parameters:
+    MinPrice:
+      name: minPrice
+      in: query
+      required: false
+      description: |
+        Precio mínimo del inmueble, en la moneda de `price`. El extremo es
+        **inclusivo**: `minPrice=150000` incluye el inmueble de 150000.0.
+      schema:
+        type: number
+        format: double
+        minimum: 0.0001
+      example: 150000.0
+    MaxPrice:
+      name: maxPrice
+      in: query
+      required: false
+      description: |
+        Precio máximo del inmueble, en la moneda de `price`. El extremo es
+        **inclusivo**: `maxPrice=150000` incluye el inmueble de 150000.0.
+      schema:
+        type: number
+        format: double
+        minimum: 0.0001
+      example: 450000.0
+    PropertyTypeFilter:
+      name: propertyType
+      in: query
+      required: false
+      description: |
+        Tipo de inmueble. Acepta **uno o varios valores** del enum `PropertyType`;
+        varios valores actúa como un OR dentro de este filtro
+        (`?propertyType=CASA&propertyType=DEPARTAMENTO`).
+
+        Repetir el parámetro es la única forma soportada de combinar valores: no
+        se acepta una lista separada por comas. Un valor fuera del enum produce
+        `400`.
+      schema:
+        type: array
+        items:
+          $ref: '#/components/schemas/PropertyType'
+      style: form
+      explode: true
+      example:
+        - CASA
+        - DEPARTAMENTO
+    UbigeoFilter:
+      name: ubigeo
+      in: query
+      required: false
+      description: |
+        Código INEI de 6 dígitos del distrito. Acepta **uno o varios valores**
+        con la misma semántica OR que `propertyType`
+        (`?ubigeo=150131&ubigeo=150143`).
+
+        Los códigos válidos provienen del catálogo de distritos de Lima
+        Metropolitana. Un código mal formado (no numérico o de longitud distinta
+        a 6) produce `400`.
+      schema:
+        type: array
+        items:
+          type: string
+          pattern: '^[0-9]{6}$'
+      style: form
+      explode: true
+      example:
+        - '150131'
+        - '150143'
+    Search:
+      name: search
+      in: query
+      required: false
+      description: |
+        Búsqueda de texto libre sobre `title` y `address`. La comparación es
+        **case-insensitive** y sin distinción de acentos, de modo que
+        `search=depto` encuentra "Departamento..." y `search=MIRAFLORES`
+        encuentra "Miraflores".
+
+        Los espacios iniciales, finales y dobles se colapsan antes de comparar.
+        Se exige un mínimo de 2 caracteres para acotar el costo de la búsqueda;
+        un texto más corto produce `400`.
+      schema:
+        type: string
+        minLength: 2
+        maxLength: 120
+      example: departamento miraflores
+
   headers:
     XRequestId:
       description: Identificador de correlación devuelto para trazar la petición.
@@ -681,11 +902,23 @@ components:
           properties:
             code:
               type: string
-              description: Código de error estable.
+              description: |
+                Código de error estable. Para la query del catálogo,
+                `invalid_query_parameter` cubre el rechazo de un parámetro
+                individual por tipo, formato, longitud o pertenencia a un enum;
+                `invalid_filter_range` cubre la incoherencia entre `minPrice` y
+                `maxPrice`, que es válida en cada parámetro por separado pero
+                rechazada en conjunto.
               example: invalid_query_parameter
             errors:
               type: array
-              description: Detalle del error por cada parámetro o campo rechazado.
+              description: |
+                Detalle del error por cada parámetro o campo rechazado. La
+                validación no corta en el primer fallo: la lista contiene una
+                entrada por cada parámetro inválido de la misma petición, de modo
+                que el frontend pueda marcar todos los controles con error a la
+                vez. El orden sigue el de los parámetros declarados en la
+                operación.
               items:
                 type: object
                 required:
@@ -698,7 +931,10 @@ components:
                     example: page
                   message:
                     type: string
-                    description: Motivo del rechazo, en español.
+                    description: |
+                      Motivo del rechazo, en español. Redactado de forma que
+                      pueda mostrarse tal cual junto al control del formulario,
+                      sin código ni jargon.
                     example: El valor '0' es menor que el mínimo permitido (1).
 
     ProblemNotFound:

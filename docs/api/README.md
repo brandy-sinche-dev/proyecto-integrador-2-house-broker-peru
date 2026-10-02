@@ -2,8 +2,8 @@
 
 Contratos REST del backend (Django REST Framework) bajo especificación **OpenAPI 3.0**.
 
-> **Tarea actual:** [TASK-ARC-PROP-02] Especificación OpenAPI 3.0 para catálogo
-> paginado — [issue #34](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/34) (HU-PROP-02).
+> **Tarea actual:** [TASK-ARC-PROP-03] Especificación de query parameters para
+> filtros de búsqueda — [issue #43](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/43) (HU-PROP-03).
 
 ## Archivo único de contrato
 
@@ -16,6 +16,7 @@ que al cierre (Sprint 7) exista un solo `.yml` con la API completa.
 | 1.0.0 | Sprint 1 | `TASK-ARC-PROP-01` | — | CRUD de propiedades (HU-PROP-01) |
 | 1.1.0 | Sprint 2 | `TASK-ARC-PROP-02` | [#34](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/34) | Catálogo paginado + errores RFC 7807 (HU-PROP-02) |
 | 1.1.0 | Sprint 2 | — | — | Sincronizado con `Property` de `types.ts`: `moneda`, `mode` y atributos |
+| 1.2.0 | Sprint 2 | `TASK-ARC-PROP-03` | [#43](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/43) | Query params de filtros: `minPrice`, `maxPrice`, `propertyType`, `ubigeo`, `search` (HU-PROP-03) |
 
 Al crecer el documento, extrae las secciones a `components/schemas` y referencia
 con `$ref`. No dupliques esquemas entre operaciones.
@@ -44,6 +45,90 @@ el schema en el mismo commit.
 | `page` | integer (int32) | `1` | `minimum: 1` |
 | `limit` | integer (int32) | `12` | `minimum: 1`, `maximum: 100` |
 | `X-Request-Id` (header) | uuid | — | Correlación para trazar la petición |
+
+## Filtros de búsqueda (HU-PROP-03)
+
+`TASK-ARC-PROP-03` especifica los query params de filtrado sobre el mismo
+recurso `GET /api/v1/properties`, sin crear un endpoint nuevo. Cada parámetro
+está definido en `components/parameters` del spec (`MinPrice`, `MaxPrice`,
+`PropertyTypeFilter`, `UbigeoFilter`, `Search`) y referenciado desde la
+operación.
+
+| Parámetro | Tipo | Formato | Campo filtrado |
+|---|---|---|---|
+| `minPrice` | number (double) | `minimum: 0.0001` | `price`, extremo **inclusivo** |
+| `maxPrice` | number (double) | `minimum: 0.0001` | `price`, extremo **inclusivo** |
+| `propertyType` | array de `PropertyType` | `style: form`, `explode: true` | `property_type` |
+| `ubigeo` | array de string | patrón `^[0-9]{6}$` | `ubigeo` del distrito |
+| `search` | string | `minLength: 2`, `maxLength: 120` | `title`, `address` |
+
+### Semántica
+
+- **Combinación AND entre filtros distintos.** `?minPrice=100000&propertyType=CASA`
+  exige precio *y* tipo. `count` y `X-Total-Count` se calculan sobre el conjunto
+  ya filtrado.
+- **OR dentro de un filtro multivaluado.** `propertyType` y `ubigeo` aceptan
+  varios valores repitiendo el parámetro (`?propertyType=CASA&propertyType=TERRENO`),
+  no listas separadas por comas. Repetir el parámetro encaja con
+  `explode: true` y con la convención de `django-filter` en el backend.
+- **`propertyType` reutiliza el enum `PropertyType`**, de modo que el contrato no
+  duplica la lista de tipos ni se desincroniza con `PROPERTY_TYPES` de
+  `types.ts`.
+- **`ubigeo` son 6 dígitos**, el código INEI del distrito, alineado con el
+  catálogo `District` del MVP (Lima Metropolitana).
+- **`search` es case-insensitive y sin acentos**, y colapsa espacios
+  múltiples. El mínimo de 2 caracteres acota el costo de la búsqueda.
+- **Parámetro vacío equivale a omitido.** `?propertyType=` se trata como filtro no
+  aplicado, para que el frontend pueda limpiar un control sin reescribir la URL.
+- **Los filtros se reflejan en `next`/`previous`.** Los enlaces de paginación
+  arrastran los filtros activos, de modo que saltar de página no los pierde.
+
+### Validación de parámetros inválidos
+
+Un parámetro enviado con valor que no cumple su esquema produce `400`
+(`ProblemBadRequest`), nunca un `200` con resultados silenciosamente filtrados ni
+un `500`.
+
+| Código | Cuándo |
+|---|---|
+| `invalid_query_parameter` | Tipo, formato, longitud o pertenencia a enum inválidos |
+| `invalid_filter_range` | `minPrice` > `maxPrice` (cada valor es válido, el rango no) |
+
+Casos rechazados:
+
+| Petición | Motivo |
+|---|---|
+| `?propertyType=DUPLEX` | Valor fuera del enum `PropertyType` |
+| `?ubigeo=1501` | No cumple `^[0-9]{6}$` |
+| `?search=a` | 1 carácter, por debajo del `minLength: 2` |
+| `?minPrice=450000&maxPrice=150000` | Rango invertido (`invalid_filter_range`) |
+| `?page=0` | Paginación fuera de rango (contrato de `TASK-ARC-PROP-02`) |
+
+La validación **no corta en el primer fallo**: `errors` contiene una entrada por
+cada parámetro inválido de la misma petición, en el orden en que los declara la
+operación, para que el frontend marque todos los controles con error a la vez.
+
+### Sincronización con la URL
+
+`TASK-ARC-PROP-03` incluye la sincronización con la URL, que habilita
+`TASK-FRONT-PROP-03` y `TASK-TEST-PROP-03`:
+
+- Los filtros viven en el *query string*, no en el estado de React, de modo que
+  el catálogo sea enlazable y compartible.
+- Al aplicar o limpiar un filtro el frontend reescribe la URL con
+  `history.replaceState` y **restablece `page=1`**: conservar la página actual
+  dejaría al usuario en un índice fuera de rango del conjunto filtrado.
+- El orden de los parámetros es indiferente para el servidor, pero la
+  serialización del frontend es determinista para que dos búsquedas iguales
+  produzcan URLs iguales.
+- Al eliminar el último filtro se quita el parámetro del *query string* en vez de
+  dejarlo vacío; `?propertyType=` sigue siendo válido por compatibilidad, pero no
+  es la forma que debe generar el cliente.
+
+```bash
+# 2 casas o terrenos en Miraflores o San Isidro, entre 100k y 450k
+curl "http://localhost:8000/api/v1/properties?minPrice=100000&maxPrice=450000&propertyType=CASA&propertyType=TERRENO&ubigeo=150131&ubigeo=150143"
+```
 
 ### Respuesta `200` — `application/json`
 
@@ -84,7 +169,7 @@ el schema en el mismo commit.
 
 | Código | Esquema | Cuándo |
 |---|---|---|
-| `400` | `ProblemBadRequest` | `page`/`limit` inválidos, o cuerpo de entrada con errores de validación |
+| `400` | `ProblemBadRequest` | `page`/`limit` o filtros inválidos, o cuerpo de entrada con errores de validación |
 | `404` | `ProblemNotFound` | El recurso con el `id` indicado no existe |
 | `500` | `ProblemInternalServerError` | Fallo no controlado; incluye `request_id` para trazar |
 
@@ -133,3 +218,12 @@ npx @apidevtools/swagger-cli validate docs/api/openapi_spec.yaml
 - La v1.0.0 devolvía un arreglo plano en `GET /api/v1/properties`. Desde la v1.1.0
   devuelve el envoltorio `PaginatedProperties`; es un cambio incompatible y el
   mock del frontend aún sirve la forma antigua (ver `TASK-MOCK-PROP-02`).
+- La v1.2.0 solo **añade** query params opcionales: `GET /api/v1/properties` sin
+  filtros se comporta igual que en v1.1.0.
+- `search` es texto libre sobre `title` y `address`; el filtrado por número de
+  dormitorios, cochera, mascotas y modalidad que menciona RF-PROP-03 no está en
+  el contrato todavía. Si `TASK-BACK-PROP-03` los implementa, deben entrar como
+  parámetros nuevos en este mismo spec.
+- `minPrice`/`maxPrice` filtran por el número de `price` sin conversión de
+  moneda: un rango en PEN no excluye automáticamente los resultados en USD. Es una
+  limitación conocida del MVP, no un error del backend.
