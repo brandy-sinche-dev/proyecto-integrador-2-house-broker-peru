@@ -17,6 +17,7 @@ info:
     | Sprint 2 | `TASK-ARC-PROP-02` | Catálogo paginado `GET /api/v1/properties` (HU-PROP-02) |
     | Sprint 2 | `TASK-ARC-PROP-03` | Filtros de búsqueda en `GET /api/v1/properties` (HU-PROP-03) |
     | Sprint 3 | `TASK-ARC-PROP-04` | Estado operativo y horarios de visita (HU-PROP-04) |
+    | Sprint 4 | `TASK-ARC-CRM-02` | Agenda de citas filtrada por rol y estados de cita (HU-CRM-02) |
 
     ### Convenciones
     - Todos los endpoints están bajo el prefijo `/api/v1`.
@@ -29,7 +30,7 @@ info:
     - Los endpoints mutables exigen `Authorization: Bearer <jwt>` y rol `AGENTE`
       o `ADMINISTRADOR`. Un `401` significa token ausente o inválido; un `403`
       significa token válido sin permiso sobre el recurso.
-  version: 1.3.0
+  version: 1.4.0
   contact:
     name: Equipo HouseBroker Perú
     url: https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru
@@ -50,6 +51,12 @@ tags:
     description: |
       Estado operativo del inmueble y franjas horarias habilitadas para agendar
       visitas. Solo accesible para Agentes asignados y Administradores.
+  - name: Citas
+    description: |
+      Agenda de visitas: consulta de la cita según el rol del usuario y gestión
+      de su estado (confirmar, reprogramar, cancelar, completar o registrar la
+      inasistencia). Solo los Agentes asignados y Administradores modifican el
+      estado de una cita.
 
 security:
   - bearerAuth: []
@@ -91,41 +98,14 @@ paths:
         Si la página solicitada queda fuera de rango, la respuesta es `200` con
         `results` vacío y `next` en `null`; no es un error.
       parameters:
-        - name: page
-          in: query
-          required: false
-          description: Número de página solicitada, empezando en 1.
-          schema:
-            type: integer
-            format: int32
-            minimum: 1
-            default: 1
-            example: 1
-        - name: limit
-          in: query
-          required: false
-          description: |
-            Cantidad máxima de elementos por página. Si se solicita un valor
-            mayor a 100, el servidor lo ajusta a 100 en lugar de devolver un error.
-          schema:
-            type: integer
-            format: int32
-            minimum: 1
-            maximum: 100
-            default: 12
-            example: 12
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/MinPrice'
         - $ref: '#/components/parameters/MaxPrice'
         - $ref: '#/components/parameters/PropertyTypeFilter'
         - $ref: '#/components/parameters/UbigeoFilter'
         - $ref: '#/components/parameters/Search'
-        - name: X-Request-Id
-          in: header
-          required: false
-          description: Identificador de correlación para trazar la petición en los logs.
-          schema:
-            type: string
-            format: uuid
+        - $ref: '#/components/parameters/XRequestIdParam'
       responses:
         '200':
           description: Catálogo paginado obtenido exitosamente
@@ -888,6 +868,431 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/appointments:
+    get:
+      tags:
+        - Citas
+      operationId: listAppointments
+      summary: Obtener listado paginado de citas
+      description: |
+        Devuelve la agenda de citas del usuario autenticado en formato paginado
+        (RF-CRM-02).
+
+        ### Alcance según el rol
+
+        El conjunto de citas visibles depende del rol del token, y el parámetro
+        `role` selecciona explícitamente una de esas perspectiva:
+
+        | `role` | Citas devueltas |
+        |---|---|
+        | `CLIENTE` | Citas en las que el usuario actúa como cliente |
+        | `AGENTE` | Citas en las que el usuario es el agente asignado |
+        | `ADMINISTRADOR` | Todas las citas de la plataforma |
+
+        Si se omite `role`, se aplica el rol del usuario autenticado. Un
+        `CLIENTE` y un `AGENTE` no pueden consultar la perspectiva de otro: el
+        `403` se produce cuando el recurso existe pero el token no lo autoriza.
+
+        ### Filtros
+
+        Todos los filtros son opcionales, se combinan entre sí con conjunción
+        (AND) y un parámetro enviado con valor vacío equivale a omitirlo. La
+        validación no corta en el primer fallo: `errors` contiene una entrada
+        por cada parámetro inválido de la misma petición.
+
+        | Filtro | Tipo | Campo | Semántica |
+        |---|---|---|---|
+        | `status` | array de `AppointmentStatus` | `status` | OR entre valores repetidos |
+        | `role` | `UserRole` | perspectiva del usuario | — |
+        | `dateFrom` | date | `scheduled_at` | extremo **inclusivo** |
+        | `dateTo` | date | `scheduled_at` | extremo **inclusivo** |
+
+        `dateFrom` y `dateTo` acotan la **fecha de la visita** (`scheduled_at`),
+        no la fecha de creación del registro, y se interpretan en
+        `America/Lima`. Si se envía `dateTo` sin `dateFrom`, el rango se abre
+        hacia el pasado sin límite; si se envía `dateFrom` sin `dateTo`, hacia
+        el futuro. Un rango invertido produce `400` con `invalid_filter_range`.
+
+        El orden por defecto es `scheduled_at` ascendente: la agenda del agente
+        empieza por lo próximo. `count` y el header `X-Total-Count` reflejan el
+        total **después** de aplicar los filtros.
+
+        Si la página solicitada queda fuera de rango, la respuesta es `200` con
+        `results` vacío y `next` en `null`; no es un error.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/XRequestIdParam'
+        - $ref: '#/components/parameters/AppointmentStatusFilter'
+        - $ref: '#/components/parameters/AppointmentRoleFilter'
+        - $ref: '#/components/parameters/AppointmentDateFrom'
+        - $ref: '#/components/parameters/AppointmentDateTo'
+      responses:
+        '200':
+          description: Listado de citas obtenido exitosamente
+          headers:
+            X-Total-Count:
+              description: Total de citas que cumplen los filtros, sin paginar.
+              schema:
+                type: integer
+                format: int32
+              example: 12
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAppointments'
+              example:
+                count: 12
+                next: http://localhost:8000/api/v1/appointments?limit=3&page=2
+                previous: null
+                results:
+                  - id: a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e
+                    status: CONFIRMED
+                    scheduled_at: '2026-10-08T15:00:00Z'
+                    duration_minutes: 45
+                    property:
+                      id: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+                      title: Departamento amoblado en Miraflores
+                      district: Miraflores
+                      address: Av. Larco 456, Miraflores
+                    client:
+                      id: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+                      full_name: Maria Fernanda Quispe
+                    agent:
+                      id: 7c4a9d21-3b6e-4f80-9a2d-5e7c1b3f8d40
+                      full_name: Brandy Sinche
+                    created_at: '2026-10-05T09:12:44Z'
+                    updated_at: '2026-10-06T14:03:21Z'
+        '400':
+          description: Parámetros de consulta o de paginación inválidos
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemBadRequest'
+              examples:
+                estadoInvalido:
+                  summary: '`status` fuera del enum'
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Parámetro de consulta inválido
+                    status: 400
+                    detail: El parámetro 'status' admite los valores PENDING, CONFIRMED, RESCHEDULED, COMPLETED, CANCELLED, NO_SHOW.
+                    instance: /api/v1/appointments?status=AGENDADA
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: status
+                        message: El valor 'AGENDADA' no pertenece al conjunto permitido (PENDING, CONFIRMED, RESCHEDULED, COMPLETED, CANCELLED, NO_SHOW).
+                rangoInvertido:
+                  summary: Rango de fechas incoherente
+                  value:
+                    type: https://housebroker.pe/errors/invalid-filter-range
+                    title: Rango de fechas inválido
+                    status: 400
+                    detail: El parámetro 'dateTo' no puede ser anterior a 'dateFrom'.
+                    instance: /api/v1/appointments?dateFrom=2026-10-31&dateTo=2026-10-01
+                    code: invalid_filter_range
+                    errors:
+                      - parameter: dateTo
+                        message: El valor '2026-10-01' es anterior a 'dateFrom' (2026-10-31).
+                fechaMalformada:
+                  summary: 'Formato de fecha inválido'
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Parámetro de consulta inválido
+                    status: 400
+                    detail: El parámetro 'dateFrom' debe tener formato ISO 8601 (YYYY-MM-DD).
+                    instance: /api/v1/appointments?dateFrom=08-10-2026
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: dateFrom
+                        message: El valor '08-10-2026' no cumple el formato YYYY-MM-DD.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: |
+            El token es válido pero no puede consultar la perspectiva solicitada:
+            un `CLIENTE` o un `AGENTE` que pide `role=ADMINISTRADOR`.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemForbidden'
+              example:
+                type: https://housebroker.pe/errors/forbidden
+                title: Sin permisos sobre el recurso
+                status: 403
+                detail: El rol AGENTE solo puede consultar las citas que tiene asignadas.
+                instance: /api/v1/appointments?role=ADMINISTRADOR
+                code: forbidden
+                required_roles:
+                  - ADMINISTRADOR
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/appointments/{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/AppointmentId'
+
+    patch:
+      tags:
+        - Citas
+      operationId: updateAppointmentStatus
+      summary: Actualizar el estado de una cita
+      description: |
+        Cambia el estado de una cita (RF-CRM-02). Es un `PATCH` semántico: el
+        cuerpo puede contener `status`, `scheduled_at` o `reason`, y el resto de
+        campos de la cita queda intacto.
+
+        Cubre las acciones de **aceptar**, **rechazar** y **reprogramar** que
+        describe RF-CRM-02, más el cierre de la visita y el registro de la
+        inasistencia.
+
+        | Estado | Significado |
+        |---|---|
+        | `PENDING` | Solicitud del cliente pendiente de confirmación del agente |
+        | `CONFIRMED` | Visita aceptada por el agente |
+        | `RESCHEDULED` | Visita movida a un nuevo horario, pendiente de reconfirmar |
+        | `COMPLETED` | Visita realizada |
+        | `CANCELLED` | Visita cancelada |
+        | `NO_SHOW` | El cliente no asistió |
+
+        Transiciones admitidas:
+
+        | Estado actual | Se puede mover a |
+        |---|---|
+        | `PENDING` | `CONFIRMED`, `RESCHEDULED`, `CANCELLED` |
+        | `CONFIRMED` | `RESCHEDULED`, `COMPLETED`, `NO_SHOW`, `CANCELLED` |
+        | `RESCHEDULED` | `CONFIRMED`, `CANCELLED` |
+        | `COMPLETED` | — (terminal) |
+        | `CANCELLED` | — (terminal) |
+        | `NO_SHOW` | — (terminal) |
+
+        Cualquier transición no listada produce `400` con
+        `invalid_appointment_transition`. Los tres estados terminales no admiten
+        cambio: una visita ya realizada no puede cancelarse, que es la regla que
+        `TASK-TEST-CRM-02` verifica en el backend.
+
+        ### Reprogramación
+
+        La reprogramación es una transición a `RESCHEDULED` y exige enviar
+        `scheduled_at` con el nuevo horario. El campo es obligatorio en esa
+        transición y está prohibido en las demás. El nuevo horario debe:
+
+        - ser posterior al momento actual,
+        - coincidir con una franja de `ScheduleSlot` habilitada de la propiedad
+          (`GET /api/v1/properties/{id}/schedules` del Sprint 3), y
+        - no solaparse con otra cita del mismo agente, lo que produce `409` con
+          `appointment_slot_conflict`.
+
+        Al reprogramar se conservan `client`, `agent` y `property`: la cita no
+        cambia de participantes, solo de horario.
+
+        ### Idempotencia y respuesta
+
+        La operación es idempotente respecto al estado de destino: repetirla
+        con el mismo `status` devuelve `200` sin efectos adicionales, no `409`.
+
+        La respuesta devuelve `previous_status` y `previous_scheduled_at` para
+        que el cliente pueda revertir su actualización optimista tras un fallo
+        de red.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppointmentStatusInput'
+            examples:
+              confirmar:
+                summary: Aceptar una cita pendiente
+                value:
+                  status: CONFIRMED
+              cancelar:
+                summary: Rechazar una cita pendiente
+                value:
+                  status: CANCELLED
+                  reason: El cliente solicito postergar la visita por viaje de trabajo.
+              completar:
+                summary: Registrar una visita realizada
+                value:
+                  status: COMPLETED
+              inasistencia:
+                summary: Registrar que el cliente no asistio
+                value:
+                  status: NO_SHOW
+                  reason: El agente espero 15 minutos sin que el cliente llegue.
+              reprogramar:
+                summary: Mover la cita a un horario disponible
+                value:
+                  status: RESCHEDULED
+                  scheduled_at: '2026-10-15T17:00:00Z'
+                  reason: El propietario no se encuentra disponible en ese horario.
+      responses:
+        '200':
+          description: Estado de la cita actualizado exitosamente
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentStatusResult'
+              example:
+                id: a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e
+                status: RESCHEDULED
+                previous_status: CONFIRMED
+                scheduled_at: '2026-10-15T17:00:00Z'
+                previous_scheduled_at: '2026-10-08T15:00:00Z'
+                reason: El propietario no se encuentra disponible en ese horario.
+                changed_by: 7c4a9d21-3b6e-4f80-9a2d-5e7c1b3f8d40
+                changed_at: '2026-10-07T11:40:00Z'
+        '400':
+          description: Cuerpo inválido o transición de estado no permitida
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemBadRequest'
+              examples:
+                transicionInvalida:
+                  summary: Transición desde un estado terminal
+                  value:
+                    type: https://housebroker.pe/errors/invalid-appointment-transition
+                    title: Transición de estado de cita no permitida
+                    status: 400
+                    detail: No se puede pasar de 'COMPLETED' a 'CANCELLED'. COMPLETED, CANCELLED y NO_SHOW son estados terminales.
+                    instance: /api/v1/appointments/a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e/status
+                    code: invalid_appointment_transition
+                    errors:
+                      - parameter: status
+                        message: La transición COMPLETED -> CANCELLED no está permitida.
+                estadoInvalido:
+                  summary: '`status` fuera del enum'
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Parámetro de consulta inválido
+                    status: 400
+                    detail: El campo 'status' admite los valores CONFIRMED, RESCHEDULED, COMPLETED, CANCELLED y NO_SHOW.
+                    instance: /api/v1/appointments/a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e/status
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: status
+                        message: El valor 'AGENDADA' no pertenece al conjunto permitido (CONFIRMED, RESCHEDULED, COMPLETED, CANCELLED, NO_SHOW).
+                reprogramacionSinHorario:
+                  summary: '`RESCHEDULED` sin `scheduled_at`'
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Parámetro de consulta inválido
+                    status: 400
+                    detail: El campo 'scheduled_at' es obligatorio para reprogramar una cita.
+                    instance: /api/v1/appointments/a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e/status
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: scheduled_at
+                        message: Este campo es obligatorio cuando 'status' es RESCHEDULED.
+                horarioProhibido:
+                  summary: '`scheduled_at` en una transición que no reprograma'
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Parámetro de consulta inválido
+                    status: 400
+                    detail: El campo 'scheduled_at' solo se admite cuando 'status' es RESCHEDULED.
+                    instance: /api/v1/appointments/a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e/status
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: scheduled_at
+                        message: "Enviar 'scheduled_at' solo tiene sentido junto a 'status: RESCHEDULED'."
+                motivoObligatorio:
+                  summary: Cancelación sin `reason`
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Parámetro de consulta inválido
+                    status: 400
+                    detail: El campo 'reason' es obligatorio para cancelar o reprogramar una cita.
+                    instance: /api/v1/appointments/a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e/status
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: reason
+                        message: Este campo es obligatorio cuando 'status' es CANCELLED o RESCHEDULED.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: |
+            El token es válido pero el usuario no tiene permiso sobre la cita.
+            Ocurre cuando un `CLIENTE` intenta cambiar el estado, o cuando un
+            `AGENTE` que no está asignado a la cita lo intenta.
+            `ADMINISTRADOR` tiene acceso directo a cualquier cita.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemForbidden'
+              examples:
+                rolInsuficiente:
+                  summary: El rol del usuario no permite la operación
+                  value:
+                    type: https://housebroker.pe/errors/forbidden
+                    title: Sin permisos sobre el recurso
+                    status: 403
+                    detail: Solo los roles AGENTE y ADMINISTRADOR pueden cambiar el estado de una cita.
+                    instance: /api/v1/appointments/a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e/status
+                    code: forbidden
+                    required_roles:
+                      - AGENTE
+                      - ADMINISTRADOR
+                agenteNoAsignado:
+                  summary: El agente no está asignado a la cita
+                  value:
+                    type: https://housebroker.pe/errors/forbidden
+                    title: Sin permisos sobre el recurso
+                    status: 403
+                    detail: Solo el agente asignado a esta cita o un administrador pueden modificar su estado.
+                    instance: /api/v1/appointments/a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e/status
+                    code: forbidden
+                    required_roles:
+                      - AGENTE
+        '404':
+          description: La cita solicitada no existe
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemNotFound'
+              example:
+                type: https://housebroker.pe/errors/resource-not-found
+                title: Recurso no encontrado
+                status: 404
+                detail: No existe una cita con el identificador indicado.
+                instance: /api/v1/appointments/a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e/status
+                code: resource_not_found
+        '409':
+          description: |
+            El nuevo horario se solapa con otra cita del mismo agente. El
+            cambio no se aplica parcialmente: la cita conserva su estado y su
+            horario anteriores.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemConflict'
+              example:
+                type: https://housebroker.pe/errors/appointment-slot-conflict
+                title: Conflicto de horario de cita
+                status: 409
+                detail: El agente ya tiene una cita confirmada el 2026-10-15 a las 17:00 (cita f1e2d3c4-5a6b-4c7d-8e9f-0a1b2c3d4e5f).
+                instance: /api/v1/appointments/a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e/status
+                code: appointment_slot_conflict
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1069,6 +1474,114 @@ components:
         minLength: 2
         maxLength: 120
       example: departamento miraflores
+
+    Page:
+      name: page
+      in: query
+      required: false
+      description: Número de página solicitada, empezando en 1.
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        default: 1
+      example: 1
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: |
+        Cantidad máxima de elementos por página. Si se solicita un valor
+        mayor a 100, el servidor lo ajusta a 100 en lugar de devolver un error.
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 100
+        default: 12
+      example: 12
+    XRequestIdParam:
+      name: X-Request-Id
+      in: header
+      required: false
+      description: |
+        Identificador de correlación opcional para trazar la petición. Si el
+        cliente lo envía, el servidor lo devuelve en la respuesta.
+      schema:
+        type: string
+        format: uuid
+      example: 8b1a0f5c-2d3e-4a5b-9c7d-0e1f2a3b4c5d
+    AppointmentId:
+      name: id
+      in: path
+      required: true
+      description: Identificador único de la cita.
+      schema:
+        type: string
+        format: uuid
+      example: a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e
+    AppointmentStatusFilter:
+      name: status
+      in: query
+      required: false
+      description: |
+        Estado de cita. Acepta **uno o varios valores** del enum
+        `AppointmentStatus`; varios valores actúa como un OR dentro de este
+        filtro (`?status=PENDING&status=CONFIRMED`).
+
+        Repetir el parámetro es la única forma soportada de combinar valores: no
+        se acepta una lista separada por comas, igual que en `propertyType`. Un
+        valor fuera del enum produce `400`.
+      schema:
+        type: array
+        items:
+          $ref: '#/components/schemas/AppointmentStatus'
+      style: form
+      explode: true
+      example:
+        - PENDING
+        - CONFIRMED
+    AppointmentRoleFilter:
+      name: role
+      in: query
+      required: false
+      description: |
+        Perspectiva desde la que se consulta la agenda. Reutiliza el enum
+        `UserRole`, de modo que el contrato no duplica la lista de roles:
+
+        - `CLIENTE`: citas en las que el usuario actúa como cliente.
+        - `AGENTE`: citas asignadas al usuario como agente.
+        - `ADMINISTRADOR`: todas las citas de la plataforma.
+
+        Si se omite, se aplica el rol del usuario autenticado. Pedir una
+        perspectiva que el rol del usuario no cubre produce `403`.
+      schema:
+        $ref: '#/components/schemas/UserRole'
+      example: AGENTE
+    AppointmentDateFrom:
+      name: dateFrom
+      in: query
+      required: false
+      description: |
+        Fecha mínima de la visita, en formato ISO 8601 (`YYYY-MM-DD`) y
+        timezone `America/Lima`. El extremo es **inclusivo**: `dateFrom=2026-10-08`
+        incluye las citas agendadas ese día. Un formato inválido produce `400`.
+      schema:
+        type: string
+        format: date
+      example: '2026-10-01'
+    AppointmentDateTo:
+      name: dateTo
+      in: query
+      required: false
+      description: |
+        Fecha máxima de la visita, en formato ISO 8601 (`YYYY-MM-DD`) y
+        timezone `America/Lima`. El extremo es **inclusivo**. No puede ser
+        anterior a `dateFrom`, lo que produce `400` con `invalid_filter_range`.
+      schema:
+        type: string
+        format: date
+      example: '2026-10-31'
 
   headers:
     XRequestId:
@@ -1624,6 +2137,306 @@ components:
           items:
             $ref: '#/components/schemas/Property'
 
+    AppointmentStatus:
+      type: string
+      description: |
+        Estado de la cita en la agenda del agente (RF-CRM-02). Describe en qué
+        punto del ciclo de vida de la visita está la cita, no el estado
+        comercial del inmueble, que es responsabilidad de `PropertyStatus`.
+
+        Los tres últimos estados son terminales: no admiten transición de
+        salida.
+      enum:
+        - PENDING
+        - CONFIRMED
+        - RESCHEDULED
+        - COMPLETED
+        - CANCELLED
+        - NO_SHOW
+      example: CONFIRMED
+
+    AppointmentPropertyRef:
+      type: object
+      description: |
+        Referencia ligera al inmueble objeto de la visita. No replica el
+        esquema `Property` completo: la ficha del inmueble se resuelve con
+        `GET /api/v1/properties/{id}`, y el listado de citas solo necesita
+        identificar y localizar el inmueble.
+      required:
+        - id
+        - title
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador del inmueble.
+          example: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+        title:
+          type: string
+          description: Título del anuncio.
+          example: Departamento amoblado en Miraflores
+        district:
+          type: string
+          nullable: true
+          description: Distrito del inmueble.
+          example: Miraflores
+        address:
+          type: string
+          description: Dirección del inmueble.
+          example: Av. Larco 456, Miraflores
+
+    AppointmentPersonRef:
+      type: object
+      description: |
+        Referencia ligera a un participante de la cita, reutilizada tanto para
+        el cliente como para el agente. El perfil completo se resuelve con
+        `GET /api/v1/auth/me` y los datos de contacto del cliente con la ficha
+        de CRM (HU-CRM-03).
+      required:
+        - id
+        - full_name
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador del usuario.
+          example: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+        full_name:
+          type: string
+          description: Nombre completo del usuario.
+          example: Maria Fernanda Quispe
+        email:
+          type: string
+          format: email
+          nullable: true
+          description: |
+            Correo del usuario. Es la vía por la que se envían los avisos de
+            confirmación, reprogramación y cancelación (RF-SEC-05).
+          example: maria.quispe@correo.com
+        phone:
+          type: string
+          nullable: true
+          description: Teléfono de contacto.
+          example: '+51 987 654 321'
+
+    Appointment:
+      type: object
+      description: |
+        Cita de visita a un inmueble. El modelo se crea en
+        `TASK-ARC-CRM-01` (Sprint 4); esta tarea define su representación de
+        lectura y la actualización de estado.
+      required:
+        - id
+        - status
+        - scheduled_at
+        - property
+        - client
+        - agent
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador de la cita.
+          example: a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e
+        status:
+          $ref: '#/components/schemas/AppointmentStatus'
+        scheduled_at:
+          type: string
+          format: date-time
+          description: |
+            Fecha y hora de la visita, en UTC con sufijo `Z`. Es el valor que
+            filtran `dateFrom` y `dateTo`, y el que se compara contra los
+            `ScheduleSlot` de la propiedad al agendar o reprogramar.
+          example: '2026-10-08T15:00:00Z'
+        duration_minutes:
+          type: integer
+          format: int32
+          minimum: 15
+          maximum: 480
+          default: 45
+          description: |
+            Duración de la visita en minutos. Deriva del `ScheduleSlot`
+            reservado y determina la ventana `[scheduled_at,
+            scheduled_at + duration_minutes)` que se usa para detectar
+            solapamientos entre citas del mismo agente.
+          example: 45
+        reason:
+          type: string
+          nullable: true
+          description: |
+            Último motivo registrado por el agente al cancelar, reprogramar o
+            registrar una inasistencia. Es `null` mientras la cita no tenga
+            ninguno.
+          example: El propietario no se encuentra disponible en ese horario.
+        property:
+          $ref: '#/components/schemas/AppointmentPropertyRef'
+        client:
+          $ref: '#/components/schemas/AppointmentPersonRef'
+        agent:
+          $ref: '#/components/schemas/AppointmentPersonRef'
+        created_at:
+          type: string
+          format: date-time
+          description: Momento de creación del registro.
+          example: '2026-10-05T09:12:44Z'
+        updated_at:
+          type: string
+          format: date-time
+          description: |
+            Momento de la última modificación, incluido el último cambio de
+            estado. Permite al frontend detectar que la cita cambió mientras
+            el usuario tenía el detalle abierto.
+          example: '2026-10-06T14:03:21Z'
+
+    AppointmentStatusInput:
+      type: object
+      description: |
+        Cuerpo del `PATCH` de estado. Solo se procesan `status`, `scheduled_at`
+        y `reason`; el resto de campos de la cita no se ven afectados.
+
+        `PENDING` se excluye del conjunto de destinos a propósito: una cita
+        nace en `PENDING` al ser solicitada y ninguna transición válida
+        devuelve el estado a ese valor.
+      required:
+        - status
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          description: Estado de destino de la cita.
+          enum:
+            - CONFIRMED
+            - RESCHEDULED
+            - COMPLETED
+            - CANCELLED
+            - NO_SHOW
+          example: CONFIRMED
+        scheduled_at:
+          type: string
+          format: date-time
+          description: |
+            Nuevo horario de la visita. **Obligatorio** cuando `status` es
+            `RESCHEDULED` y **prohibido** en cualquier otra transición, para
+            que reprogramar y mover una cita sin cambiar su estado no se
+            confundan.
+          example: '2026-10-15T17:00:00Z'
+        reason:
+          type: string
+          minLength: 5
+          maxLength: 500
+          description: |
+            Motivo del cambio, en español. Obligatorio para `CANCELLED` y
+            `RESCHEDULED` porque ambas decisiones se comunican al cliente por
+            correo; recomendado para `NO_SHOW`. Opcional al confirmar o
+            completar.
+          example: El propietario no se encuentra disponible en ese horario.
+      example:
+        status: RESCHEDULED
+        scheduled_at: '2026-10-15T17:00:00Z'
+        reason: El propietario no se encuentra disponible en ese horario.
+
+    AppointmentStatusResult:
+      type: object
+      description: |
+        Estado vigente tras aplicar el parche, con trazabilidad del cambio.
+        Sigue el mismo patrón que `PropertyStatusResult`: `status` es el valor
+        nuevo y `previous_status` el anterior, de modo que el cliente pueda
+        revertir su actualización optimista ante un fallo de red.
+      required:
+        - id
+        - status
+        - previous_status
+        - scheduled_at
+        - previous_scheduled_at
+        - changed_by
+        - changed_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador de la cita modificada.
+          example: a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e
+        status:
+          $ref: '#/components/schemas/AppointmentStatus'
+        previous_status:
+          allOf:
+            - $ref: '#/components/schemas/AppointmentStatus'
+          description: |
+            Estado antes del cambio. Permite al frontend revertir la UI cuando
+            observa un fallo de red después de haber aplicado el parche
+            optimista.
+        scheduled_at:
+          type: string
+          format: date-time
+          description: |
+            Horario vigente tras el cambio. Solo difiere del anterior cuando la
+            transición fue una reprogramación.
+          example: '2026-10-15T17:00:00Z'
+        previous_scheduled_at:
+          type: string
+          format: date-time
+          description: |
+            Horario antes del cambio. Se devuelve siempre, incluso si no cambió,
+            para que el cliente tenga el valor completo con el que revertir.
+          example: '2026-10-08T15:00:00Z'
+        reason:
+          type: string
+          nullable: true
+          description: Motivo registrado para el cambio, si se envió.
+          example: El propietario no se encuentra disponible en ese horario.
+        changed_by:
+          type: string
+          format: uuid
+          description: Usuario que ejecutó la transición.
+        changed_at:
+          type: string
+          format: date-time
+          description: Momento del cambio en formato ISO 8601.
+          example: '2026-10-07T11:40:00Z'
+
+    PaginatedAppointments:
+      type: object
+      description: |
+        Envoltorio paginado de la agenda de citas. replica la forma de
+        `PaginatedProperties` para que el cliente reutilice un único
+        envoltorio de paginación contra ambos listados.
+      required:
+        - count
+        - next
+        - previous
+        - results
+      additionalProperties: false
+      properties:
+        count:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Total de citas que cumplen los filtros, sin paginar.
+          example: 12
+        next:
+          type: string
+          format: uri
+          nullable: true
+          description: |
+            URL absoluta de la siguiente página, arrastrando los filtros
+            activos, o `null` si la página solicitada es la última.
+          example: http://localhost:8000/api/v1/appointments?limit=3&page=2
+        previous:
+          type: string
+          format: uri
+          nullable: true
+          description: |
+            URL absoluta de la página anterior, o `null` si la página
+            solicitada es la primera.
+          example: null
+        results:
+          type: array
+          description: Citas correspondientes a la página solicitada.
+          items:
+            $ref: '#/components/schemas/Appointment'
+
     Problem:
       type: object
       description: |
@@ -1686,6 +2499,11 @@ components:
                 `invalid_filter_range` cubre la incoherencia entre `minPrice` y
                 `maxPrice`, que es válida en cada parámetro por separado pero
                 rechazada en conjunto.
+
+                En el módulo CRM se suman `invalid_filter_range` para un rango
+                de fechas invertido (`dateFrom` > `dateTo`) y
+                `invalid_appointment_transition` cuando el `status` de destino no
+                es alcanzable desde el estado actual de la cita.
               example: invalid_query_parameter
             errors:
               type: array
@@ -1779,6 +2597,9 @@ components:
                 suspender un inmueble con visitas confirmadas;
                 `schedule_has_bookings` impide desactivar franjas que ya tienen
                 citas. El cambio no se aplica parcialmente.
+
+                En el módulo CRM, `appointment_slot_conflict` impide reprogramar
+                una cita a un horario ya ocupado por otra cita del mismo agente.
               example: schedule_has_bookings
             errors:
               type: array
