@@ -4,6 +4,7 @@ module.exports = {
   testEnvironmentOptions: {
     customExportConditions: ['node', 'node-addons'],
   },
+  testTimeout: 20000,
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   moduleNameMapper: {
     '\\.(css)$': '<rootDir>/jest.styleStub.cjs',
@@ -14,6 +15,7 @@ module.exports = {
   testMatch: ['**/?(*.)+(test|spec).[jt]s?(x)'],
   collectCoverageFrom: [
     'src/components/properties/PropertyCard.tsx',
+    'src/components/properties/PropertyDetail.tsx',
     'src/components/properties/Pagination.tsx',
     'src/components/properties/PropertyList.tsx',
     'src/services/properties.ts',

@@ -1,0 +1,228 @@
+.hpd {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+  font-family: var(--font);
+}
+
+.hpd__back {
+  margin-bottom: 16px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--chip-2);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.hpd__back:hover {
+  background: #dedcda;
+}
+
+.hpd__card {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.hpd__media {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #e9e8e7;
+}
+
+.hpd__media--departamento {
+  background: linear-gradient(150deg, #d9cdb8 0%, #a98f6c 55%, #6f5837 120%);
+}
+
+.hpd__media--casa {
+  background: linear-gradient(150deg, #ccd6c6 0%, #8ea283 55%, #4c5f45 120%);
+}
+
+.hpd__media--terreno {
+  background: linear-gradient(150deg, #e2d6b8 0%, #bda679 55%, #6f5c34 120%);
+}
+
+.hpd__media--oficina {
+  background: linear-gradient(150deg, #cdd3da 0%, #8e9aa8 55%, #4d5866 120%);
+}
+
+.hpd__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hpd__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px;
+}
+
+.hpd__badge {
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: var(--radius-md);
+  background: var(--brand-bronze);
+  color: var(--white);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.hpd__title {
+  margin: 4px 0 0;
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 700;
+  letter-spacing: -0.7px;
+  color: var(--ink);
+}
+
+.hpd__price {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--brand-bronze);
+}
+
+.hpd__address {
+  color: var(--muted);
+}
+
+.hpd__specs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+  padding: 16px;
+  background: var(--field);
+  border-radius: var(--radius-sm);
+}
+
+.hpd__spec {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hpd__spec dt {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted-light);
+}
+
+.hpd__spec dd {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.hpd__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hpd__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.hpd__cta--primary {
+  background: var(--brand-bronze);
+  color: var(--white);
+}
+
+.hpd__cta--primary:hover {
+  background: var(--brand-bronze-dark);
+}
+
+.hpd__cta--ghost {
+  background: var(--chip-2);
+  color: var(--ink);
+}
+
+.hpd__cta--ghost:hover {
+  background: #dedcda;
+}
+
+.hpd__state {
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.hpd__state-title {
+  margin-bottom: 8px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.hpd__state-sub {
+  margin-bottom: 16px;
+  color: var(--muted);
+}
+
+.hpd__retry {
+  padding: 10px 18px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--brand-bronze);
+  color: var(--white);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hpd__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hpd__skeleton-media {
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, #ececec 25%, #f5f5f5 37%, #ececec 63%);
+  background-size: 400% 100%;
+  animation: hpd-shimmer 1.4s ease infinite;
+}
+
+.hpd__skeleton-line {
+  height: 20px;
+  border-radius: var(--radius-sm);
+  background: #ececec;
+}
+
+.hpd__skeleton-line--short {
+  width: 45%;
+}
+
+@keyframes hpd-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}

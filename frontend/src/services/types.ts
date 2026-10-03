@@ -20,6 +20,12 @@ export const TRANSACTION_MODE_LABELS: Record<TransactionMode, string> = {
   ALQUILER: 'Alquiler',
 }
 
+export interface PropertyImage {
+  id?: string
+  url: string
+  es_principal?: boolean
+}
+
 export interface Property {
   id: string
   title: string
@@ -37,6 +43,7 @@ export interface Property {
   estacionamientos?: number
   link_galeria?: string
   link_planos?: string
+  images?: PropertyImage[]
   negociable?: boolean
   destacado?: boolean
   mantenimiento?: number

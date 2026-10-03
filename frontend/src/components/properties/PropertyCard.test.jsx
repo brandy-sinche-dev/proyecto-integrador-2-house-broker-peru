@@ -188,4 +188,66 @@ describe('PropertyCard', () => {
       )
     })
   })
+
+  describe('Imagen de portada (WPO)', () => {
+    it('renderiza la portada con carga diferida y dimensiones reservadas', () => {
+      renderCard({ property: { link_galeria: 'https://cdn.test/foto.jpg' } })
+
+      const img = screen.getByRole('img', { name: 'Vista de Departamento en Miraflores' })
+      expect(img).toHaveAttribute('src', 'https://cdn.test/foto.jpg')
+      expect(img).toHaveAttribute('loading', 'lazy')
+      expect(img).toHaveAttribute('decoding', 'async')
+      expect(img).toHaveAttribute('width', '640')
+      expect(img).toHaveAttribute('height', '256')
+    })
+
+    it('prefiere la imagen principal de images[] sobre link_galeria', () => {
+      renderCard({
+        property: {
+          link_galeria: 'https://cdn.test/fallback.jpg',
+          images: [
+            { url: 'https://cdn.test/secundaria.jpg' },
+            { url: 'https://cdn.test/principal.jpg', es_principal: true },
+          ],
+        },
+      })
+
+      expect(screen.getByRole('img')).toHaveAttribute('src', 'https://cdn.test/principal.jpg')
+    })
+
+    it('usa la primera imagen cuando ninguna está marcada como principal', () => {
+      renderCard({ property: { images: [{ url: 'https://cdn.test/unica.jpg' }] } })
+
+      expect(screen.getByRole('img')).toHaveAttribute('src', 'https://cdn.test/unica.jpg')
+    })
+
+    it('no renderiza imagen cuando la propiedad no tiene portada', () => {
+      renderCard()
+
+      expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('Navegación al detalle (WPO-PROP-01)', () => {
+    it('expone el título como botón que notifica el id cuando onOpen está definido', async () => {
+      const user = userEvent.setup()
+      const onOpen = jest.fn()
+      renderCard({ onOpen })
+
+      await user.click(screen.getByRole('button', { name: 'Departamento en Miraflores' }))
+
+      expect(onOpen).toHaveBeenCalledWith('prop-1')
+    })
+
+    it('mantiene el título como texto plano cuando no hay onOpen', () => {
+      renderCard()
+
+      expect(
+        screen.getByRole('heading', { level: 3, name: 'Departamento en Miraflores' }),
+      ).toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: 'Departamento en Miraflores' }),
+      ).not.toBeInTheDocument()
+    })
+  })
 })

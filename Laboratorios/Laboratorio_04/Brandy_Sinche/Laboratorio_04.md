@@ -193,9 +193,12 @@ Formato: *Si aplicamos X, entonces Y mejorará, porque Z.*
 
 ---
 
-## 12. Optimización propuesta para React (sin implementar)
+## 12. Optimización propuesta para React
 
-> Estas tareas **no se han implementado** (no se tocó código de Front-End ni Back-End). Son la propuesta del laboratorio, trazable con el Sprint 2.
+> Estado: las técnicas **WPO-PROP-01/02/04/05 se implementaron y midieron** en la
+> tarea `TASK-WPO-PROP-02` (rama `feat/task-wpo-prop-02-catalogo`, ver
+> `docs/13_TASK_WPO_PROP_02.md`). El debounce (`WPO-PROP-03`) corresponde a la
+> tarea independiente `TASK-WPO-PROP-03`.
 
 | Tarea | Descripción | Tickets |
 |-------|-------------|---------|
@@ -240,27 +243,41 @@ Criterio de aceptación de la instrumentación: registrar el tiempo desde `fetch
 |---|--------|------|--------|
 | 1 | Build de producción (`npm run build`) | Automática | **Ejecutada** (evidencia sección 1) |
 | 2 | Corrección del scaffold (`manage.py check` en Back-End) | Automática | **Ejecutada** (Lab 2) |
-| 3 | Auditoría Lighthouse (rendimiento, accesibilidad, SEO) | Manual/Automática | **Pendiente** |
-| 4 | Simulación de red lenta (DevTools) al catálogo | Manual | **Pendiente** |
-| 5 | Verificación de estabilidad visual (toggle CLS) | Manual | **Pendiente** |
+| 3 | Auditoría Lighthouse (rendimiento, accesibilidad, SEO) | Manual/Automática | **Ejecutada** (Lighthouse 11.7.1, headless Edge) |
+| 4 | Simulación de red lenta (DevTools) al catálogo | Manual | **Ejecutada** (throttling móvil de Lighthouse) |
+| 5 | Verificación de estabilidad visual (toggle CLS) | Manual | **Ejecutada** (CLS 0.000) |
 | 6 | Monitoreo de logs Back-End (latencia/tasa de error) | Automática | **Pendiente** |
 
 ---
 
 ## 15. Medición antes / después
 
-| Métrica | Antes (real) | Después | Diferencia | Variación % |
-|---------|---------------|---------|------------|-------------|
-| Bundle JS crudo | **193.28 kB** | Pendiente de medición | — | — |
-| Bundle JS gzip | **60.63 kB** | Pendiente de medición | — | — |
-| CSS | **4.10 kB (1.47 kB gzip)** | Pendiente de medición | — | — |
-| LCP | Pendiente de medición | Pendiente de medición | — | — |
-| CLS | Pendiente de medición | Pendiente de medición | — | — |
-| TBT | Pendiente de medición | Pendiente de medición | — | — |
-| p95 latencia API | Pendiente de medición | Pendiente de medición | — | — |
-| Tasa de error | Pendiente de medición | Pendiente de medición | — | — |
+### 15.1 Línea base del scaffold (histórica)
 
-> Compromiso: los datos "Pendiente" se completan al ejecutar la auditoría y tras implementar TASK-WPO-PROP-02/03, respetando la regla de no inventar métricas.
+| Métrica | Valor | Nota |
+|---------|------:|------|
+| Bundle JS crudo | **193.28 kB** | Scaffold previo al catálogo |
+| Bundle JS gzip | **60.63 kB** | Scaffold previo al catálogo |
+| CSS | **4.10 kB (1.47 kB gzip)** | Scaffold previo al catálogo |
+
+### 15.2 `TASK-WPO-PROP-02` sobre el catálogo (medición real)
+
+| Métrica | Antes (rama base) | Después (WPO) | Variación |
+|---------|------------------:|--------------:|-----------|
+| Bundle JS inicial crudo | **353.22 kB** | **238.47 kB** | **−32.5 %** |
+| Bundle JS inicial gzip | **116.73 kB** | **76.85 kB** | **−34.2 %** |
+| Mocks (`axios-mock-adapter` + fixtures) en el bundle inicial | 66.44 kB | 0 (diferido) | −100 % |
+| LCP | Pendiente (línea base) | 3.26 s | — |
+| CLS | Pendiente (línea base) | **0.000** | — |
+| TBT | Pendiente (línea base) | 258 ms | — |
+| p95 latencia API | Pendiente | Pendiente (fuera de alcance) | — |
+| Tasa de error | Pendiente | Pendiente (fuera de alcance) | — |
+
+> Auditoría con **Lighthouse 11.7.1** sobre el build de producción (headless Edge,
+> perfil móvil por defecto). El build se sirvió con `VITE_ENABLE_MOCKS=true` para
+> renderizar el catálogo sin backend; ese chunk no se descarga en producción.
+> Detalle y evidencia: `docs/13_TASK_WPO_PROP_02.md` y
+> `docs/scrum/sprint-2/evidencias/Anderson_Villanes/TASK-WPO-PROP-02/`.
 
 ---
 
@@ -268,8 +285,8 @@ Criterio de aceptación de la instrumentación: registrar el tiempo desde `fetch
 
 1. La base del proyecto quedó preparada para medir: el bundle del scaffold es la línea base real (JS único de ~193 kB crudo / 60.6 kB gzip) y el Back-End expone `/api/health/`.
 2. Se definieron 4 SLI (latencia, disponibilidad, tasa de error, CLS) con SLO **provisionales**, alineados a los RNF-02/RNF-03 del proyecto.
-3. Las optimizaciones propuestas (React.lazy/Suspense, imágenes lazy, debounce, memoización) **no se implementaron** — se documentan como parte del Sprint 2.
-4. El laboratorio queda ejecutable: próximos pasos son correr Lighthouse y completar la tabla antes/después con datos reales.
+3. Las optimizaciones de `TASK-WPO-PROP-02` (`React.lazy`/`Suspense`, imágenes lazy, memoización e instrumentación de Web Vitals) **ya se implementaron y midieron**: el JS inicial bajó 32.5 % y el CLS quedó en 0.000. El debounce (`TASK-WPO-PROP-03`) queda como tarea independiente.
+4. Se ejecutó Lighthouse y se completó la comparación de bundle; quedan pendientes las métricas de backend (p95 y tasa de error).
 
 ---
 
@@ -286,12 +303,12 @@ Criterio de aceptación de la instrumentación: registrar el tiempo desde `fetch
 
 ## 18. PR y evidencias
 
-- **Pull Request previsto:** rama `feature/WPO-catalogo-rendimiento` sobre `develop` (aún **no creada**, no se toca git).
-- **Evidencia 1 (real):** registro del build de producción (sección 1) — carpeta `dist/` generada por Vite.
-- **Evidencia 2 (pendiente):** screenshot de Lighthouse con LCP/CLS/TBT (sección 10).
+- **Pull Request:** rama `feat/task-wpo-prop-02-catalogo` (parte del catálogo ya implementado) hacia `main`; cierra el issue `#42` (`TASK-WPO-PROP-02`).
+- **Evidencia 1 (real):** registro del build de producción (`docs/scrum/sprint-2/evidencias/Anderson_Villanes/TASK-WPO-PROP-02/build-despues.txt`).
+- **Evidencia 2 (real):** reporte de Lighthouse con LCP/CLS/TBT (`.../TASK-WPO-PROP-02/lighthouse-report.json`).
 - **Evidencia 3 (pendiente):** captura de red de DevTools mostrando tiempos del `GET /api/v1/properties/`.
 - **Ubicación de evidencias:** `Laboratorios/Laboratorio_04/Brandy_Sinche/evidencias/` (por asociar al crear la carpeta).
 
 ---
 
-*Registro de ejecución: 07/09/2026 — Sin implementación de código en Front-End ni en Back-End para este laboratorio; solo se documentó la línea base con el build existente.*
+*Registro de ejecución: 07/09/2026 (línea base) — actualizado al implementar `TASK-WPO-PROP-02` sobre el catálogo; mediciones y evidencia en `docs/13_TASK_WPO_PROP_02.md`.*

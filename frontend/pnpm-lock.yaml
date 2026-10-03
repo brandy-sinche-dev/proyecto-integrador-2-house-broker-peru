@@ -11,9 +11,6 @@ importers:
       axios:
         specifier: ^1.20.0
         version: 1.20.0
-      axios-mock-adapter:
-        specifier: ^2.1.0
-        version: 2.1.0(axios@1.20.0)
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -63,6 +60,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.1.0
         version: 6.1.1(vite@8.2.2(@types/node@24.13.3))
+      axios-mock-adapter:
+        specifier: ^2.1.0
+        version: 2.1.0(axios@1.20.0)
       babel-jest:
         specifier: ^30.5.1
         version: 30.5.1(@babel/core@7.29.7)

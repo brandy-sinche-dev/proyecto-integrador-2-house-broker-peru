@@ -19,6 +19,7 @@ interface PropertyListProps {
   onToggleSave: (id: string) => void
   onToggleVisit: (id: string) => void
   onNavigate: (target: NavTarget) => void
+  onOpen?: (id: string) => void
 }
 
 type Status = 'loading' | 'error' | 'ready'
@@ -80,7 +81,7 @@ function IconChat() {
   )
 }
 
-export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit, onNavigate }: PropertyListProps) {
+export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit, onNavigate, onOpen }: PropertyListProps) {
   const [status, setStatus] = useState<Status>('loading')
   const [error, setError] = useState<string | null>(null)
   const [properties, setProperties] = useState<Property[]>([])
@@ -384,6 +385,7 @@ const chips: { key: string; label: string; onRemove: () => void }[] = []
                           visit={visits.includes(p.id)}
                           onToggleSave={onToggleSave}
                           onToggleVisit={onToggleVisit}
+                          onOpen={onOpen}
                         />
                       ))}
                     </div>
