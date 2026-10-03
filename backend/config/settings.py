@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
+    'apps.properties',
 ]
 
 MIDDLEWARE = [
@@ -87,6 +88,13 @@ DATABASES = {
     }
 }
 
+# Permite correr la suite de pruebas sin PostgreSQL (`DJANGO_DB_ENGINE=sqlite`).
+if os.environ.get('DJANGO_DB_ENGINE') == 'sqlite':
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': ':memory:',
+    }
+
 # CORS para el frontend de desarrollo (React en Vite)
 CORS_ALLOWED_ORIGINS = os.environ.get(
     'CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173'
@@ -94,9 +102,15 @@ CORS_ALLOWED_ORIGINS = os.environ.get(
 
 # Django REST Framework
 REST_FRAMEWORK = {
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10,
+    'DEFAULT_PAGINATION_CLASS': 'apps.properties.pagination.PropertyPagination',
+    'PAGE_SIZE': 12,
+    'COERCE_DECIMAL_TO_STRING': False,
 }
+
+# URL base para componer las URLs de las imágenes de propiedades.
+PROPERTY_MEDIA_BASE_URL = os.environ.get(
+    'PROPERTY_MEDIA_BASE_URL', 'https://cdn.housebroker.pe'
+)
 
 
 # Password validation
