@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PropertyCard } from './PropertyCard'
 import { FilterSidebar } from './FilterSidebar'
-import { emptyFilters } from './filters'
 import type { Filters } from './filters'
 import { Pagination } from './Pagination'
 import { getProperties } from '../../services/properties'
