@@ -79,3 +79,5 @@ export function Pagination({ page, totalPages, total, pageSize, onChange }: Pagi
     </nav>
   )
 }
+
+export const PaginationControl = Pagination

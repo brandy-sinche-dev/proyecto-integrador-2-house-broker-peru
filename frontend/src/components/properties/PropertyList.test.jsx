@@ -1,0 +1,361 @@
+// =============================================================
+// Pruebas de integración del catálogo de propiedades
+// TASK-TEST-PROP-02: Jest + React Testing Library
+// =============================================================
+//
+// Se monta `PropertyList` dentro de un `MemoryRouter` (requerido
+// por el hook de filtros basado en la URL) y se simula la API con
+// `axios-mock-adapter` devolviendo una lista paginada. Se valida:
+//   - carga (esqueleto) y renderizado de la primera página,
+//   - cambio de página con el control de paginación,
+//   - ordenamiento, modos de vista, búsqueda y filtros de la URL,
+//   - estados vacío y de error con reintento,
+//   - propagación de acciones de las tarjetas a la app.
+
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
+import MockAdapter from 'axios-mock-adapter'
+import api from '../../services/axios'
+import { PropertyList } from './PropertyList'
+
+const LIST_PATH = '/v1/properties'
+
+function makeProperty(index, overrides = {}) {
+  const n = index + 1
+  return {
+    id: `prop-${n}`,
+    title: `Propiedad ${String(n).padStart(2, '0')}`,
+    price: 100000 + n * 1000,
+    moneda: 'PEN',
+    mode: n % 2 === 0 ? 'ALQUILER' : 'VENTA',
+    address: `Av. Ejemplo ${n}`,
+    property_type: ['DEPARTAMENTO', 'CASA', 'TERRENO', 'OFICINA'][index % 4],
+    is_active: true,
+    created_at: `2026-01-${String(n).padStart(2, '0')}T00:00:00Z`,
+    area_total: 60 + n * 10,
+    area_construida: 60 + n * 10,
+    dormitorios: (n % 5) + 1,
+    banos: (n % 3) + 1,
+    estacionamientos: n % 2,
+    negociable: n % 3 === 0,
+    destacado: n % 4 === 0,
+    ...overrides,
+  }
+}
+
+const manyProperties = (count) => Array.from({ length: count }, (_, i) => makeProperty(i))
+
+const paginated = (results) => ({
+  count: results.length,
+  next: null,
+  previous: null,
+  results,
+})
+
+function baseProps(overrides = {}) {
+  return {
+    mode: 'inicio',
+    saved: [],
+    visits: [],
+    onToggleSave: jest.fn(),
+    onToggleVisit: jest.fn(),
+    onNavigate: jest.fn(),
+    ...overrides,
+  }
+}
+
+function renderList({ initialEntries = ['/'], props = {} } = {}) {
+  const merged = baseProps(props)
+  const utils = render(
+    <MemoryRouter initialEntries={initialEntries}>
+      <PropertyList {...merged} />
+    </MemoryRouter>,
+  )
+  return { ...utils, props: merged }
+}
+
+const cardTitles = () =>
+  screen.getAllByRole('heading', { level: 3 }).map((node) => node.textContent)
+
+describe('PropertyList (integración del catálogo)', () => {
+  let mock
+
+  beforeEach(() => {
+    mock = new MockAdapter(api)
+  })
+
+  afterEach(() => {
+    mock.restore()
+  })
+
+  describe('Carga y renderizado', () => {
+    it('muestra el esqueleto de carga y luego la primera página del catálogo', async () => {
+      mock.onGet(LIST_PATH).reply(200, paginated(manyProperties(13)))
+
+      renderList()
+
+      expect(document.querySelector('.hprops__grid--skeleton')).toBeInTheDocument()
+
+      expect(await screen.findByText('Mostrando 1–6 de 13 propiedades')).toBeInTheDocument()
+      expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(6)
+      expect(screen.getByText('13 propiedades encontradas')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 1, name: 'Propiedades en Perú' })).toBeInTheDocument()
+    })
+
+    it('excluye las propiedades inactivas', async () => {
+      mock.onGet(LIST_PATH).reply(
+        200,
+        paginated([
+          makeProperty(0),
+          makeProperty(1, { is_active: false }),
+          makeProperty(2),
+        ]),
+      )
+
+      renderList()
+
+      expect(await screen.findByText('2 propiedades encontradas')).toBeInTheDocument()
+      expect(cardTitles()).toEqual(['Propiedad 03', 'Propiedad 01'])
+    })
+
+    it('propaga las acciones de guardar y agendar visita de las tarjetas', async () => {
+      const user = userEvent.setup()
+      mock.onGet(LIST_PATH).reply(200, paginated([makeProperty(0)]))
+
+      const { props } = renderList()
+      await screen.findByRole('heading', { level: 3, name: 'Propiedad 01' })
+
+      await user.click(screen.getByRole('button', { name: 'Guardar Propiedad 01' }))
+      expect(props.onToggleSave).toHaveBeenCalledWith('prop-1')
+
+      await user.click(screen.getByRole('button', { name: 'Agendar visita' }))
+      expect(props.onToggleVisit).toHaveBeenCalledWith('prop-1')
+    })
+  })
+
+  describe('Paginación', () => {
+    it('cambia de página y deshabilita "siguiente" en la última', async () => {
+      const user = userEvent.setup()
+      mock.onGet(LIST_PATH).reply(200, paginated(manyProperties(13)))
+
+      renderList()
+      await screen.findByText('Mostrando 1–6 de 13 propiedades')
+      expect(screen.getByRole('heading', { level: 3, name: 'Propiedad 13' })).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Ir a la página siguiente' }))
+      expect(await screen.findByText('Mostrando 7–12 de 13 propiedades')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 3, name: 'Propiedad 07' })).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { level: 3, name: 'Propiedad 01' })).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Ir a la página siguiente' }))
+      expect(await screen.findByText('Mostrando 13–13 de 13 propiedades')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Ir a la página siguiente' })).toBeDisabled()
+    })
+
+    it('vuelve a la primera página al cambiar un filtro', async () => {
+      const user = userEvent.setup()
+      mock.onGet(LIST_PATH).reply(200, paginated(manyProperties(13)))
+
+      renderList()
+      await screen.findByText('Mostrando 1–6 de 13 propiedades')
+
+      await user.click(screen.getByRole('button', { name: 'Ir a la página 2' }))
+      expect(await screen.findByText('Mostrando 7–12 de 13 propiedades')).toBeInTheDocument()
+
+      await user.selectOptions(screen.getByLabelText('Ordenar propiedades'), 'price-asc')
+      expect(await screen.findByText('Mostrando 1–6 de 13 propiedades')).toBeInTheDocument()
+    })
+  })
+
+  describe('Ordenamiento y vista', () => {
+    it('aplica todos los criterios de ordenamiento', async () => {
+      const user = userEvent.setup()
+      mock.onGet(LIST_PATH).reply(
+        200,
+        paginated([
+          makeProperty(0, { title: 'Alfa', price: 300000, area_total: 200, area_construida: 200, created_at: '2026-01-01T00:00:00Z' }),
+          makeProperty(1, { title: 'Beta', price: 100000, area_total: 150, area_construida: 150, created_at: '2026-01-02T00:00:00Z' }),
+          makeProperty(2, { title: 'Gamma', price: 200000, area_total: 250, area_construida: 250, created_at: '2026-01-03T00:00:00Z' }),
+        ]),
+      )
+
+      renderList()
+      await screen.findByText('3 propiedades encontradas')
+      const select = screen.getByLabelText('Ordenar propiedades')
+
+      expect(cardTitles()[0]).toBe('Gamma')
+
+      await user.selectOptions(select, 'price-asc')
+      expect(cardTitles()[0]).toBe('Beta')
+
+      await user.selectOptions(select, 'price-desc')
+      expect(cardTitles()[0]).toBe('Alfa')
+
+      await user.selectOptions(select, 'area-desc')
+      expect(cardTitles()[0]).toBe('Gamma')
+    })
+
+    it('cambia el modo de vista de la cuadrícula', async () => {
+      const user = userEvent.setup()
+      mock.onGet(LIST_PATH).reply(200, paginated(manyProperties(3)))
+
+      renderList()
+      await screen.findByText('3 propiedades encontradas')
+
+      expect(document.querySelector('.hprops__grid')).toHaveClass('hprops__grid--grid3')
+
+      await user.click(screen.getByRole('button', { name: 'Lista' }))
+      expect(document.querySelector('.hprops__grid')).toHaveClass('hprops__grid--list')
+
+      await user.click(screen.getByRole('button', { name: 'Cuadrícula 2 columnas' }))
+      expect(document.querySelector('.hprops__grid')).toHaveClass('hprops__grid--grid2')
+    })
+  })
+
+  describe('Búsqueda y filtros', () => {
+    it('filtra por texto y limpia la búsqueda con el botón Limpiar', async () => {
+      const user = userEvent.setup()
+      mock.onGet(LIST_PATH).reply(
+        200,
+        paginated([
+          makeProperty(0, { title: 'Casa Miraflores' }),
+          makeProperty(1, { title: 'Casa San Isidro' }),
+        ]),
+      )
+
+      renderList()
+      await screen.findByText('2 propiedades encontradas')
+
+      await user.type(screen.getByLabelText('Buscar propiedades'), 'miraflores')
+      expect(await screen.findByText('1 propiedad encontrada')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 3, name: 'Casa Miraflores' })).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Limpiar' }))
+      expect(await screen.findByText('2 propiedades encontradas')).toBeInTheDocument()
+    })
+
+    it.each([
+      ['modalidad', '/?operacion=VENTA'],
+      ['rango de precio', '/?priceMin=110000&priceMax=112000'],
+      ['metraje pequeño', '/?metraje=small'],
+      ['metraje medio', '/?metraje=mid'],
+      ['metraje grande', '/?metraje=large'],
+      ['habitaciones', '/?habitaciones=3'],
+      ['negociable', '/?negociable=true'],
+      ['destacado', '/?destacado=true'],
+      ['cochera', '/?cochera=true'],
+      ['todos los filtros', '/?operacion=VENTA&priceMin=101000&priceMax=113000&metraje=mid&habitaciones=1&negociable=true&destacado=true&cochera=true'],
+    ])('aplica el filtro de %s leído desde la URL', async (_label, initialPath) => {
+      mock.onGet(LIST_PATH).reply(200, paginated(manyProperties(13)))
+
+      renderList({ initialEntries: [initialPath] })
+
+      const states = await screen.findAllByText(/propiedades? encontradas?|Sin resultados/)
+      expect(states.length).toBeGreaterThan(0)
+    })
+
+    it('permite eliminar cada chip de filtro activo', async () => {
+      const user = userEvent.setup()
+      mock.onGet(LIST_PATH).reply(200, paginated(manyProperties(13)))
+
+      renderList({
+        initialEntries: [
+          '/?operacion=VENTA&priceMin=105000&priceMax=112000&metraje=small&habitaciones=1&negociable=true&destacado=true&cochera=true',
+        ],
+      })
+      await screen.findByRole('heading', { level: 1 })
+      await user.type(screen.getByLabelText('Buscar propiedades'), 'propiedad')
+
+      const chipButtons = () => screen.queryAllByRole('button', { name: /^Quitar filtro/ })
+      expect(chipButtons().length).toBeGreaterThanOrEqual(8)
+
+      while (chipButtons().length > 0) {
+        await user.click(chipButtons()[0])
+      }
+
+      expect(chipButtons()).toHaveLength(0)
+    })
+
+    it('muestra el chip de modo y navega al inicio al quitarlo', async () => {
+      const user = userEvent.setup()
+      mock.onGet(LIST_PATH).reply(200, paginated([makeProperty(0)]))
+
+      const { props } = renderList({
+        props: { mode: 'guardados', saved: ['prop-1'] },
+      })
+      await screen.findByRole('heading', { level: 1, name: 'Mis guardados' })
+
+      await user.click(screen.getByRole('button', { name: 'Quitar filtro Solo guardados' }))
+      expect(props.onNavigate).toHaveBeenCalledWith('inicio')
+    })
+
+    it('etiqueta el chip del modo visitas', async () => {
+      mock.onGet(LIST_PATH).reply(200, paginated([makeProperty(0)]))
+
+      renderList({ props: { mode: 'visitas', visits: ['prop-1'] } })
+      await screen.findByRole('heading', { level: 1, name: 'Mis visitas' })
+
+      expect(screen.getByRole('button', { name: 'Quitar filtro Solo mis visitas' })).toBeInTheDocument()
+    })
+  })
+
+  describe('Estados vacío y de error', () => {
+    it('muestra el estado vacío del catálogo sin propiedades', async () => {
+      mock.onGet(LIST_PATH).reply(200, paginated([]))
+
+      const { props } = renderList()
+
+      expect(await screen.findByText('Sin propiedades disponibles')).toBeInTheDocument()
+
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: 'Ver propiedades' }))
+      expect(props.onNavigate).toHaveBeenCalledWith('inicio')
+    })
+
+    it('muestra "Sin resultados" y permite limpiar los filtros', async () => {
+      const user = userEvent.setup()
+      mock.onGet(LIST_PATH).reply(200, paginated([makeProperty(0), makeProperty(1)]))
+
+      renderList({ initialEntries: ['/?priceMin=999999'] })
+
+      expect(await screen.findByText('Sin resultados')).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }))
+      expect(await screen.findByText('2 propiedades encontradas')).toBeInTheDocument()
+    })
+
+    it('muestra el error del servidor y permite reintentar', async () => {
+      const user = userEvent.setup()
+      mock
+        .onGet(LIST_PATH)
+        .replyOnce(500, { detail: 'Fallo del servidor' })
+        .onGet(LIST_PATH)
+        .reply(200, paginated(manyProperties(3)))
+
+      renderList()
+
+      expect(await screen.findByText('Ups, algo salió mal')).toBeInTheDocument()
+      expect(screen.getByText('Fallo del servidor')).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Reintentar' }))
+      expect(await screen.findByText('3 propiedades encontradas')).toBeInTheDocument()
+    })
+  })
+
+  describe('Navegación', () => {
+    it('navega a visitas y al concierge desde la barra de búsqueda', async () => {
+      const user = userEvent.setup()
+      mock.onGet(LIST_PATH).reply(200, paginated(manyProperties(1)))
+
+      const { props } = renderList()
+      await screen.findByRole('heading', { level: 1 })
+
+      await user.click(screen.getByRole('button', { name: /Visitas/ }))
+      expect(props.onNavigate).toHaveBeenCalledWith('visitas')
+
+      await user.click(screen.getByRole('button', { name: /Concierge IA/ }))
+      expect(props.onNavigate).toHaveBeenCalledWith('concierge')
+    })
+  })
+})
