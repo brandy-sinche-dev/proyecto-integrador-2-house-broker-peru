@@ -42,15 +42,6 @@ export function FilterSidebar({ filters, bounds, currency, onApply, onClear }: F
 
   const set = (patch: Partial<Filters>) => setDraft((prev) => clampPrice({ ...prev, ...patch }))
 
-  // 2. Asegúrate de que las funciones de Aplicar y Limpiar queden así:
-  const handleApply = () => {
-    onApply(draft)
-  }
-
-  const handleClear = () => {
-    onClear()
-  }
-
   const minPct = ((draft.priceMin - bounds.min) / (bounds.max - bounds.min || 1)) * 100
   const maxPct = ((draft.priceMax - bounds.min) / (bounds.max - bounds.min || 1)) * 100
 
