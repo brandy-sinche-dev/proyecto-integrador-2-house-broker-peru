@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { Property, TransactionMode } from '../../services/types'
 import { formatMoney } from './money'
 import './PropertyCard.css'
@@ -8,6 +9,7 @@ interface PropertyCardProps {
   visit: boolean
   onToggleSave: (id: string) => void
   onToggleVisit: (id: string) => void
+  onOpen?: (id: string) => void
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -62,7 +64,14 @@ function IconCalendar() {
   )
 }
 
-export function PropertyCard({ property, saved, visit, onToggleSave, onToggleVisit }: PropertyCardProps) {
+export const PropertyCard = memo(function PropertyCard({
+  property,
+  saved,
+  visit,
+  onToggleSave,
+  onToggleVisit,
+  onOpen,
+}: PropertyCardProps) {
   const specs: { key: string; value: string; label: string }[] = []
   if (property.dormitorios != null) specs.push({ key: 'dorm', value: String(property.dormitorios), label: 'DORM.' })
   if (property.banos != null) specs.push({ key: 'banos', value: String(property.banos), label: 'BAÑOS' })
@@ -78,9 +87,26 @@ export function PropertyCard({ property, saved, visit, onToggleSave, onToggleVis
 
   const glassBadge = property.destacado ? 'DESTACADO' : property.negociable ? 'NEGOCIABLE' : null
 
+  // Imagen de portada: `images[]` del backend o, en su defecto, `link_galeria`.
+  const cover =
+    property.images?.find((img) => img.es_principal)?.url ??
+    property.images?.[0]?.url ??
+    property.link_galeria
+
   return (
     <article className="hpc">
       <div className={`hpc__media hpc__media--${property.property_type.toLowerCase()}`}>
+        {cover && (
+          <img
+            className="hpc__img"
+            src={cover}
+            alt={`Vista de ${property.title}`}
+            width={640}
+            height={256}
+            loading="lazy"
+            decoding="async"
+          />
+        )}
         <div className="hpc__badges">
           <span className={`hpc__badge hpc__badge--${primaryBadge.variant}`}>{primaryBadge.text}</span>
           {glassBadge && (
@@ -112,7 +138,15 @@ export function PropertyCard({ property, saved, visit, onToggleSave, onToggleVis
               Mantenimiento: {formatMoney(property.mantenimiento, property.moneda)} / mes
             </p>
           )}
-          <h3 className="hpc__title">{property.title}</h3>
+          <h3 className="hpc__title">
+            {onOpen ? (
+              <button type="button" className="hpc__title-btn" onClick={() => onOpen(property.id)}>
+                {property.title}
+              </button>
+            ) : (
+              property.title
+            )}
+          </h3>
           <p className="hpc__address">
             <IconPin />
             {property.address}
@@ -148,4 +182,4 @@ export function PropertyCard({ property, saved, visit, onToggleSave, onToggleVis
       </div>
     </article>
   )
-}
+})

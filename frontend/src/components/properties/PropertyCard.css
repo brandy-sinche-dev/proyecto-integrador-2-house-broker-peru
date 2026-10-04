@@ -24,6 +24,15 @@
   background: #e9e8e7;
 }
 
+/* Imagen de portada: reserva de dimensiones fijas para evitar CLS. */
+.hpc__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .hpc__media--departamento {
   background: linear-gradient(150deg, #d9cdb8 0%, #a98f6c 55%, #6f5837 120%);
 }
@@ -183,6 +192,20 @@
   line-height: 24px;
   font-weight: 600;
   color: var(--ink);
+}
+
+.hpc__title-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hpc__title-btn:hover {
+  text-decoration: underline;
 }
 
 .hpc__address {
