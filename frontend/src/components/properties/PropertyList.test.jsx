@@ -12,9 +12,10 @@
 //   - estados vacío y de error con reintento,
 //   - propagación de acciones de las tarjetas a la app.
 
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
+import { useEffect, useRef } from 'react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation, useNavigationType } from 'react-router-dom'
 import MockAdapter from 'axios-mock-adapter'
 import api from '../../services/axios'
 import { PropertyList } from './PropertyList'
@@ -267,6 +268,11 @@ describe('PropertyList (integración del catálogo)', () => {
       await screen.findByRole('heading', { level: 1 })
       await user.type(screen.getByLabelText('Buscar propiedades'), 'propiedad')
 
+      // TASK-WPO-PROP-03: el chip de búsqueda no aparece al terminar de
+      // escribir, sino 300 ms después, que es cuando el debounce publica el
+      // texto en la URL.
+      await screen.findByRole('button', { name: 'Quitar filtro “propiedad”' })
+
       const chipButtons = () => screen.queryAllByRole('button', { name: /^Quitar filtro/ })
       expect(chipButtons().length).toBeGreaterThanOrEqual(8)
 
@@ -297,6 +303,244 @@ describe('PropertyList (integración del catálogo)', () => {
       await screen.findByRole('heading', { level: 1, name: 'Mis visitas' })
 
       expect(screen.getByRole('button', { name: 'Quitar filtro Solo mis visitas' })).toBeInTheDocument()
+    })
+  })
+
+  // TASK-WPO-PROP-03: el debounce de 300 ms en la barra de busqueda. Con
+  // temporizadores falsos se comprueba lo que el reloj real no deja ver de
+  // forma fiable: que durante la escritura no hay ni una sola escritura en la
+  // URL, y que al terminar hay exactamente una.
+  describe('Búsqueda con debounce', () => {
+    // `advanceTimers` deja que `userEvent` mueva el reloj falso por su cuenta
+    // (si no, cada pulsación se quedaría colgada esperando un temporizador que
+    // nadie avanza). El margen del debounce no lo avanza: eso lo hace la
+    // prueba, a propósito.
+    function setup() {
+      return userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
+    }
+
+    // El probe expone lo que realmente se escribió en la URL y con qué tipo de
+    // navegación, que es lo que permite contar las escrituras por pulsación.
+    function Probe({ onUrlWrite }) {
+      const location = useLocation()
+      const mounted = useRef(false)
+
+      // Cada navegación de React Router genera una `key` nueva, también cuando
+      // es un `replace`, así que cambiar de `key` es exactamente "se reescribió
+      // la URL". El montaje inicial no cuenta como escritura.
+      useEffect(() => {
+        if (!mounted.current) {
+          mounted.current = true
+          return
+        }
+        onUrlWrite(location.search)
+      }, [location.key, location.search, onUrlWrite])
+
+      return (
+        <>
+          <span data-testid="search">{location.search}</span>
+          <span data-testid="navigation-type">{useNavigationType()}</span>
+        </>
+      )
+    }
+
+    function renderListWithProbe({ initialEntries = ['/'], props = {}, onUrlWrite = jest.fn() } = {}) {
+      const merged = baseProps(props)
+      const utils = render(
+        <MemoryRouter initialEntries={initialEntries}>
+          <Probe onUrlWrite={onUrlWrite} />
+          <PropertyList {...merged} />
+        </MemoryRouter>,
+      )
+      return { ...utils, props: merged, onUrlWrite }
+    }
+
+    const search = () => screen.getByTestId('search').textContent
+    const catalog = () => screen.getByRole('searchbox', { name: 'Buscar propiedades' })
+
+    const CATALOG = () => [
+      makeProperty(0, { title: 'Casa Miraflores' }),
+      makeProperty(1, { title: 'Casa San Isidro' }),
+    ]
+
+    beforeEach(() => {
+      jest.useFakeTimers()
+    })
+
+    afterEach(() => {
+      act(() => {
+        jest.runOnlyPendingTimers()
+      })
+      jest.useRealTimers()
+    })
+
+    it('no escribe en la URL ni refiltra mientras se escribe', async () => {
+      const user = setup()
+      mock.onGet(LIST_PATH).reply(200, paginated(CATALOG()))
+
+      renderListWithProbe()
+      await screen.findByText('2 propiedades encontradas')
+
+      await user.type(catalog(), 'miraflores')
+
+      // El input responde al instante, pero la URL sigue intacta y el catálogo
+      // todavía muestra todo.
+      expect(catalog()).toHaveValue('miraflores')
+      expect(search()).toBe('')
+      expect(screen.getByText('2 propiedades encontradas')).toBeInTheDocument()
+    })
+
+    it('publica una sola vez el texto final al dejar de escribir 300 ms', async () => {
+      const user = setup()
+      mock.onGet(LIST_PATH).reply(200, paginated(CATALOG()))
+
+      renderListWithProbe()
+      await screen.findByText('2 propiedades encontradas')
+
+      await user.type(catalog(), 'miraflores')
+      expect(search()).toBe('')
+
+      await act(async () => {
+        jest.advanceTimersByTime(300)
+      })
+
+      expect(search()).toBe('?q=miraflores')
+      expect(screen.getByText('1 propiedad encontrada')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Quitar filtro “miraflores”' })).toBeInTheDocument()
+    })
+
+    it('reinicia el margen en cada pulsación aunque la búsqueda dure más de 300 ms', async () => {
+      const user = setup()
+      mock.onGet(LIST_PATH).reply(200, paginated(CATALOG()))
+
+      renderListWithProbe()
+      await screen.findByText('2 propiedades encontradas')
+
+      const input = catalog()
+      for (const char of 'miraflores') {
+        await user.type(input, char)
+        await act(async () => {
+          jest.advanceTimersByTime(200)
+        })
+      }
+
+      // 2 s escribiendo: si el margen no se reiniciara, habría publicaciones
+      // intermedias por el camino.
+      expect(search()).toBe('')
+
+      await act(async () => {
+        jest.advanceTimersByTime(300)
+      })
+
+      expect(search()).toBe('?q=miraflores')
+    })
+
+    it('no lanza una petición HTTP por carácter tipeado', async () => {
+      const user = setup()
+      mock.onGet(LIST_PATH).reply(200, paginated(manyProperties(13)))
+
+      renderListWithProbe()
+      await screen.findByText('13 propiedades encontradas')
+      expect(mock.history.get).toHaveLength(1)
+
+      await user.type(catalog(), 'prop')
+      await act(async () => {
+        jest.advanceTimersByTime(300)
+      })
+
+      expect(search()).toBe('?q=prop')
+      expect(mock.history.get).toHaveLength(1)
+    })
+
+    it('escribe la búsqueda una sola vez y sin apilar historial', async () => {
+      const user = setup()
+      mock.onGet(LIST_PATH).reply(200, paginated(CATALOG()))
+
+      const { onUrlWrite } = renderListWithProbe()
+      await screen.findByText('2 propiedades encontradas')
+
+      await user.type(catalog(), 'miraflores')
+
+      expect(onUrlWrite).not.toHaveBeenCalled()
+
+      await act(async () => {
+        jest.advanceTimersByTime(300)
+      })
+
+      // Diez caracteres, una sola reescritura de la URL, con el texto completo.
+      expect(onUrlWrite.mock.calls).toEqual([['?q=miraflores']])
+      expect(screen.getByTestId('navigation-type')).toHaveTextContent('REPLACE')
+    })
+
+    it('muestra en el input la búsqueda que llega por la URL', async () => {
+      mock.onGet(LIST_PATH).reply(200, paginated(CATALOG()))
+
+      renderListWithProbe({ initialEntries: ['/?q=miraflores'] })
+
+      await screen.findByText('1 propiedad encontrada')
+      expect(catalog()).toHaveValue('miraflores')
+    })
+
+    it('no resucita el término borrado cuando el debounce está pendiente', async () => {
+      const user = setup()
+      mock.onGet(LIST_PATH).reply(200, paginated(CATALOG()))
+
+      renderListWithProbe()
+      await screen.findByText('2 propiedades encontradas')
+
+      await user.type(catalog(), 'casa')
+      await act(async () => {
+        jest.advanceTimersByTime(300)
+      })
+      expect(search()).toBe('?q=casa')
+
+      // Una pulsación más deja el debounce pendiente y después se limpia todo.
+      await user.type(catalog(), 'x')
+      await user.click(screen.getByRole('button', { name: 'Limpiar' }))
+
+      expect(search()).toBe('')
+      expect(catalog()).toHaveValue('')
+
+      await act(async () => {
+        jest.advanceTimersByTime(1000)
+      })
+
+      expect(search()).toBe('')
+      expect(screen.getByText('2 propiedades encontradas')).toBeInTheDocument()
+    })
+
+    it('quitar el chip de búsqueda vacía el input y la URL', async () => {
+      const user = setup()
+      mock.onGet(LIST_PATH).reply(200, paginated(CATALOG()))
+
+      renderListWithProbe({ initialEntries: ['/?q=miraflores'] })
+      await screen.findByText('1 propiedad encontrada')
+
+      await user.click(screen.getByRole('button', { name: 'Quitar filtro “miraflores”' }))
+
+      expect(search()).toBe('')
+      expect(catalog()).toHaveValue('')
+      expect(screen.getByText('2 propiedades encontradas')).toBeInTheDocument()
+    })
+
+    it('conserva la búsqueda al aplicar un filtro del panel', async () => {
+      const user = setup()
+      mock.onGet(LIST_PATH).reply(
+        200,
+        paginated([
+          makeProperty(0, { title: 'Casa Miraflores', negociable: true }),
+          makeProperty(1, { title: 'Casa San Isidro' }),
+        ]),
+      )
+
+      renderListWithProbe({ initialEntries: ['/?q=casa'] })
+      await screen.findByText('2 propiedades encontradas')
+
+      await user.click(screen.getByRole('checkbox', { name: 'Negociable' }))
+      await user.click(screen.getByRole('button', { name: /Aplicar filtros/ }))
+
+      expect(screen.getByTestId('search')).toHaveTextContent('q=casa')
+      expect(screen.getByText('1 propiedad encontrada')).toBeInTheDocument()
     })
   })
 
