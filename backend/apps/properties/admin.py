@@ -1,6 +1,13 @@
 from django.contrib import admin
 
-from .models import District, Property, PropertyImage, PropertyOwner
+from .models import (
+    District,
+    Property,
+    PropertyImage,
+    PropertyOwner,
+    PropertySchedule,
+    PropertyStatusChange,
+)
 
 
 @admin.register(District)
@@ -38,3 +45,32 @@ class PropertyImageAdmin(admin.ModelAdmin):
 class PropertyOwnerAdmin(admin.ModelAdmin):
     list_display = ("full_name", "property", "is_representative")
     search_fields = ("full_name", "document_number")
+
+
+@admin.register(PropertySchedule)
+class PropertyScheduleAdmin(admin.ModelAdmin):
+    list_display = ("property", "weekday", "start_time", "end_time", "is_active")
+    list_filter = ("weekday", "is_active")
+    raw_id_fields = ("property",)
+
+
+@admin.register(PropertyStatusChange)
+class PropertyStatusChangeAdmin(admin.ModelAdmin):
+    list_display = ("property", "previous_status", "new_status", "changed_by", "changed_at")
+    list_filter = ("new_status", "previous_status")
+    raw_id_fields = ("property", "changed_by")
+    # Tabla append-only: el admin tampoco debe editar el historial.
+    readonly_fields = (
+        "property",
+        "previous_status",
+        "new_status",
+        "reason",
+        "changed_by",
+        "changed_at",
+    )
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
