@@ -1,0 +1,95 @@
+# CI — HouseBroker Perú
+#
+# Gates mínimos: los mismos que ya se ejecutan a mano antes de cada PR
+# (ver docs/12_Pruebas_Automatizadas.md §5). El objetivo de este workflow
+# no es cobertura completa sino que la suite deixe de depender de que
+# alguien se acuerde de correrla: dos jobs en paralelo, sin servicios
+# externos.
+#
+# Lo que deliberadamente NO está aquí, para no romper el primer run:
+#   - Spectral / Lighthouse: Spectral tiene desviaciones conocidas
+#     (docs/api/README.md) y Lighthouse necesita levantar `vite preview`.
+#   - Subida de artefactos de cobertura y `required status checks`.
+# Queda como siguiente paso, con el pipeline ya en verde.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancela la ejecución anterior del mismo ref: siempre gana la última y
+# no gastamos minutos en commits que ya fueron reemplazados.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend (lint, pruebas, cobertura, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          # Sin `packageManager` en package.json, esta versión es la que
+          # decide el `pnpm install`. El lockfile es `lockfileVersion: 9.0`.
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Instalar dependencias
+        # `--frozen-lockfile` falla si el lockfile no está al día con
+        # package.json: es lo que impide que CI pase con dependencias
+        # distintas a las que se probaron en local.
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Pruebas con cobertura
+        # El umbral de 80% vive en jest.config.cjs (`coverageThreshold.global`),
+        # así que este paso también es el gate de cobertura.
+        run: pnpm test:coverage --ci
+
+      - name: Build
+        run: pnpm run build
+
+  backend:
+    name: Backend (pruebas de API)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-python@v5
+        with:
+          # Requisito declarado en pyproject.toml: requires-python >= 3.12
+          python-version: '3.12'
+
+      - name: Instalar dependencias
+        run: uv sync --frozen
+
+      - name: Pruebas
+        # SQLite en memoria a propósito: la suite no necesita un servicio de
+        # PostgreSQL para correr. `settings.py` trae defaults para
+        # DJANGO_SECRET_KEY y DJANGO_DEBUG, así que no hay secretos en el CI.
+        env:
+          DJANGO_DB_ENGINE: sqlite
+        run: uv run python manage.py test apps.properties
