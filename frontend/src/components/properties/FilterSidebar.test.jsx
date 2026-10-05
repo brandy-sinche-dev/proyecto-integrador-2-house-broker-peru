@@ -53,8 +53,8 @@ describe('FilterSidebar (panel de filtros)', () => {
 
       expect(screen.getByRole('button', { name: 'Venta' })).toHaveAttribute('aria-pressed', 'true')
       expect(screen.getByRole('button', { name: 'Alquiler' })).toHaveAttribute('aria-pressed', 'false')
-      expect(screen.getByRole('button', { name: '80–150' })).toHaveAttribute('aria-pressed', 'true')
-      expect(screen.getByRole('button', { name: '3', exact: true })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByRole('button', { name: 'Entre 80 y 150 m²' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByRole('button', { name: '3 habitaciones' })).toHaveAttribute('aria-pressed', 'true')
       expect(screen.getByRole('checkbox', { name: 'Negociable' })).toBeChecked()
       expect(screen.getByRole('checkbox', { name: 'Destacado' })).not.toBeChecked()
       expect(screen.getByRole('checkbox', { name: 'Con cochera' })).not.toBeChecked()
@@ -91,7 +91,7 @@ describe('FilterSidebar (panel de filtros)', () => {
       )
 
       expect(screen.getByRole('button', { name: 'Alquiler' })).toHaveAttribute('aria-pressed', 'true')
-      expect(screen.getByRole('button', { name: '2', exact: true })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByRole('button', { name: '2 habitaciones' })).toHaveAttribute('aria-pressed', 'true')
     })
   })
 
@@ -111,8 +111,8 @@ describe('FilterSidebar (panel de filtros)', () => {
       const { onApply } = renderSidebar()
 
       await user.click(screen.getByRole('button', { name: 'Venta' }))
-      await user.click(screen.getByRole('button', { name: '+150' }))
-      await user.click(screen.getByRole('button', { name: '4', exact: true }))
+      await user.click(screen.getByRole('button', { name: 'Más de 150 m²' }))
+      await user.click(screen.getByRole('button', { name: '4 habitaciones' }))
       await user.click(screen.getByRole('checkbox', { name: 'Negociable' }))
       await user.click(screen.getByRole('checkbox', { name: 'Con cochera' }))
       await user.click(applyButton())
@@ -144,7 +144,7 @@ describe('FilterSidebar (panel de filtros)', () => {
       const { onApply } = renderSidebar({ filters: APPLIED })
 
       await user.click(screen.getByRole('button', { name: 'Venta' }))
-      await user.click(screen.getByRole('button', { name: '80–150' }))
+      await user.click(screen.getByRole('button', { name: 'Entre 80 y 150 m²' }))
       await user.click(applyButton())
 
       expect(onApply).toHaveBeenCalledWith({ ...APPLIED, operacion: '', metraje: '' })
@@ -154,7 +154,7 @@ describe('FilterSidebar (panel de filtros)', () => {
       const user = userEvent.setup()
       const { onApply } = renderSidebar({ filters: APPLIED })
 
-      await user.click(screen.getByRole('button', { name: '3', exact: true }))
+      await user.click(screen.getByRole('button', { name: '3 habitaciones' }))
       await user.click(applyButton())
 
       expect(onApply).toHaveBeenCalledWith({ ...APPLIED, habitaciones: null })

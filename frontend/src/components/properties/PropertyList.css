@@ -35,6 +35,15 @@
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
+/*
+  El input de búsqueda es un campo sin borde propio: para que el foco sea
+  visible (WCAG 2.4.7) el anillo se pinta en la barra que lo contiene,
+  sumando el `box-shadow` inset que ya tenía en vez de reemplazarlo.
+*/
+.hsearch__bar:focus-within {
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05), 0 0 0 2px rgba(118, 90, 37, 0.25);
+}
+
 .hsearch__icon {
   width: 18px;
   height: 18px;
@@ -302,8 +311,17 @@
   background-position: right center;
 }
 
-.hprops__sort-select:focus {
-  outline: none;
+/*
+  Este selector suprimía el `outline` sin reemplazarlo, dejando el select
+  sin indicador de foco (WCAG 2.4.7). Se devuelve el anillo global de
+  `index.css` y se refuerza con el mismo `box-shadow` que usan `TextInput` y
+  `Select`, en vez de quitarlo.
+*/
+.hprops__sort-select:focus-visible {
+  outline: 2px solid var(--brand-bronze);
+  outline-offset: 2px;
+  border-color: var(--brand-gold);
+  box-shadow: var(--ring);
 }
 
 .hprops__views {

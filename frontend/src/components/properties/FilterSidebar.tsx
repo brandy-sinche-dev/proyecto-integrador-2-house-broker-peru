@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useId } from 'react'
 import { formatMoney } from './money'
 import type { Filters } from './filters'
 import './FilterSidebar.css'
@@ -12,10 +12,10 @@ interface FilterSidebarProps {
   onClear: () => void
 }
 
-const METRAJE: { value: Filters['metraje']; label: string }[] = [
-  { value: 'small', label: '≤ 80' },
-  { value: 'mid', label: '80–150' },
-  { value: 'large', label: '+150' },
+const METRAJE: { value: Filters['metraje']; label: string; description: string }[] = [
+  { value: 'small', label: '≤ 80', description: 'Hasta 80 m²' },
+  { value: 'mid', label: '80–150', description: 'Entre 80 y 150 m²' },
+  { value: 'large', label: '+150', description: 'Más de 150 m²' },
 ]
 
 const HABITACIONES = [1, 2, 3, 4, 5]
@@ -28,6 +28,10 @@ const CARACTERISTICAS: { key: 'negociable' | 'destacado' | 'cochera'; label: str
 
 export function FilterSidebar({ filters, bounds, currency, onApply, onClear }: FilterSidebarProps) {
   const [draft, setDraft] = useState<Filters>(filters)
+  // `useId` garantiza ids únicos aunque el panel se monte más de una vez en
+  // el árbol, y cada `<label>` queda enlazado a su checkbox por `htmlFor`
+  // en vez de solo por asociación implícita.
+  const uid = useId()
 
   // 1. Sincroniza el borrador local cada vez que cambien las props desde afuera (URL, chips, etc.)
   useEffect(() => {
@@ -100,6 +104,7 @@ export function FilterSidebar({ filters, bounds, currency, onApply, onClear }: F
         aria-valuemin={bounds.min}
         aria-valuemax={bounds.max}
         aria-valuenow={draft.priceMin}
+        aria-valuetext={formatMoney(draft.priceMin, currency)}
         onChange={(e) => set({ priceMin: Number(e.target.value) })}
       />
       <input
@@ -113,6 +118,7 @@ export function FilterSidebar({ filters, bounds, currency, onApply, onClear }: F
         aria-valuemin={bounds.min}
         aria-valuemax={bounds.max}
         aria-valuenow={draft.priceMax}
+        aria-valuetext={formatMoney(draft.priceMax, currency)}
         onChange={(e) => set({ priceMax: Number(e.target.value) })}
       />
     </div>
@@ -131,6 +137,7 @@ export function FilterSidebar({ filters, bounds, currency, onApply, onClear }: F
           key={m.value}
           type="button"
           aria-pressed={draft.metraje === m.value}
+          aria-label={m.description}
           className={`hfs__metraje-btn ${draft.metraje === m.value ? 'is-active' : ''}`}
           onClick={() => set({ metraje: draft.metraje === m.value ? '' : m.value })}
         >
@@ -149,6 +156,7 @@ export function FilterSidebar({ filters, bounds, currency, onApply, onClear }: F
           key={n}
           type="button"
           aria-pressed={draft.habitaciones === n}
+          aria-label={n === 5 ? '5 o más habitaciones' : `${n} ${n === 1 ? 'habitación' : 'habitaciones'}`}
           className={`hfs__room ${draft.habitaciones === n ? 'is-active' : ''}`}
           onClick={() => set({ habitaciones: draft.habitaciones === n ? null : n })}
         >
@@ -162,10 +170,13 @@ export function FilterSidebar({ filters, bounds, currency, onApply, onClear }: F
   <fieldset className="hfs__group">
     <legend className="hfs__label">Características requeridas</legend>
     <ul className="hfs__checks">
-      {CARACTERISTICAS.map((c) => (
+      {CARACTERISTICAS.map((c) => {
+        const checkboxId = `${uid}-${c.key}`
+        return (
         <li key={c.key}>
-          <label className="hfs__check">
+          <label className="hfs__check" htmlFor={checkboxId}>
             <input
+              id={checkboxId}
               type="checkbox"
               checked={draft[c.key]}
               onChange={(e) => set({ [c.key]: e.target.checked } as Partial<Filters>)}
@@ -178,7 +189,8 @@ export function FilterSidebar({ filters, bounds, currency, onApply, onClear }: F
             {c.label}
           </label>
         </li>
-      ))}
+        )
+      })}
     </ul>
   </fieldset>
 

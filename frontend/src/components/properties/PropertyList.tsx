@@ -297,7 +297,15 @@ const chips: { key: string; label: string; onRemove: () => void }[] = []
                 <span className="hprops__accent" aria-hidden="true" />
                 <div>
                   <h1 className="hprops__title">{TITLES[mode]}</h1>
-                  <p className="hprops__subtitle">
+                  {/*
+                    Región viva: los cambios de filtro, búsqueda, orden o
+                    página reescriben este texto, y sin ella un usuario de
+                    lector de pantalla no se entera del nuevo conteo. Vive
+                    dentro de `status === 'ready'` pero los cambios de
+                    filtro no la desmontan, así que todos los anuncios
+                    posteriores a la carga inicial se anuncian.
+                  */}
+                  <p className="hprops__subtitle" aria-live="polite" aria-atomic="true">
                     {filtered.length} {filtered.length === 1 ? 'propiedad encontrada' : 'propiedades encontradas'}
                   </p>
                 </div>
