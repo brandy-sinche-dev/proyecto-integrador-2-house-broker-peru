@@ -19,8 +19,12 @@ Cobertura de código del frontend (módulos del catálogo y de filtros): **98.61
 
 Además de las pruebas automatizadas, el proyecto mantiene una capa de **verificaciones de
 calidad** (lint, tipos, build, contrato OpenAPI y performance) documentada en la
-[sección 5](#5-verificaciones-de-calidad). El repositorio **no tiene CI** (no existe
-`.github/`), por lo que esa capa se ejecuta de forma manual antes de abrir un PR.
+[sección 5](#5-verificaciones-de-calidad).
+
+Desde `TASK-CI-01` esa capa ya no depende de que alguien la ejecute a mano: `.github/workflows/ci.yml`
+corre en cada push y PR a `main` los gates de **frontend** (lint, pruebas con cobertura, build)
+y **backend** (pruebas de API con SQLite). El contrato OpenAPI, Lighthouse y la auditoría de
+accesibilidad siguen siendo manuales, por los motivos que se explican en la sección 5.
 
 ---
 
@@ -165,19 +169,42 @@ quedan al 100%.
 
 ## 5. Verificaciones de calidad
 
-Esta capa complementa a las pruebas automatizadas. Al no haber CI, se ejecuta manualmente
-antes de abrir cada PR.
+Esta capa complementa a las pruebas automatizadas. Los cuatro gates de la tabla están
+automatizados en `.github/workflows/ci.yml` (`TASK-CI-01`) y se ejecutan en cada push y PR a
+`main`; los tres últimos siguen siendo manuales, y por eso se mantienen aquí con su comando.
 
-| Verificación | Comando | Estado actual |
-| ------------ | ------- | ------------- |
-| Suite de pruebas | `cd frontend && pnpm test` | 222/222 |
-| Cobertura | `cd frontend && pnpm test:coverage` | 98.61% stmts / 95.54% branches (umbral 80%) |
-| Suite de API | `cd backend && DJANGO_DB_ENGINE=sqlite uv run python manage.py test apps.properties` | 10/10 |
-| Lint | `cd frontend && pnpm run lint` | Sin errores. 1 *warning* preexistente: `FilterSidebar.tsx:38` (`react/set-state-in-effect`) |
-| Tipos y build | `cd frontend && pnpm run build` | Correcto |
-| Contrato OpenAPI | `npx @stoplight/spectral-cli lint docs/api/openapi_spec.yaml --ruleset docs/api/.spectral.yaml` | Ver desviaciones conocidas en `docs/api/README.md` |
-| Performance | Lighthouse sobre `vite preview` | Evidencia en `docs/scrum/sprint-2/evidencias/Anderson_Villanes/TASK-WPO-PROP-02/lighthouse-report.json` (performance 84) |
-| Accesibilidad | Suite automatizada + revisión manual con AXE DevTools | `docs/08_TASK_A11Y_PROP_02.md` y `docs/15_TASK_A11Y_PROP_03.md` (39 pruebas) |
+| Verificación | Comando | ¿En CI? | Estado actual |
+| ------------ | ------- | ------- | ------------- |
+| Suite de pruebas | `cd frontend && pnpm test` | Sí | 222/222 |
+| Cobertura | `cd frontend && pnpm test:coverage` | Sí | 98.61% stmts / 95.54% branches (umbral 80%) |
+| Lint | `cd frontend && pnpm run lint` | Sí | Sin errores. 1 *warning* preexistente: `FilterSidebar.tsx:38` (`react/set-state-in-effect`) |
+| Tipos y build | `cd frontend && pnpm run build` | Sí | Correcto |
+| Suite de API | `cd backend && DJANGO_DB_ENGINE=sqlite uv run python manage.py test apps.properties` | Sí | 10/10 |
+| Contrato OpenAPI | `npx @stoplight/spectral-cli lint docs/api/openapi_spec.yaml --ruleset docs/api/.spectral.yaml` | No | Ver desviaciones conocidas en `docs/api/README.md` |
+| Performance | Lighthouse sobre `vite preview` | No | Evidencia en `docs/scrum/sprint-2/evidencias/Anderson_Villanes/TASK-WPO-PROP-02/lighthouse-report.json` (performance 84) |
+| Accesibilidad | Suite automatizada + revisión manual con AXE DevTools | Parcial | `docs/08_TASK_A11Y_PROP_02.md` y `docs/15_TASK_A11Y_PROP_03.md` (39 pruebas) |
+
+### 5.1 Por qué Spectral y Lighthouse no están en el CI
+
+No es una omisión por descuido, son las dos verificaciones que fallan si se agregan hoy:
+
+* **Spectral** reporta desviaciones conocidas ya documentadas en `docs/api/README.md`. Ponerlo
+  como gate bloquearía todos los PRs hasta arreglar el contrato, que es trabajo aparte.
+* **Lighthouse** necesita levantar `vite preview` y esperar a que el build esté servido. Es un
+  job con servidor, puertos y espera: no pertenece a un primer workflow que solo quiere ser
+  rápido y fiable.
+
+### 5.2 Configuración del workflow
+
+| Aspecto | Decisión | Motivo |
+| ------- | -------- | ------ |
+| Versión de Node | 22 | Declarada en el workflow; no existe `.nvmrc` en el repo |
+| Versión de pnpm | 10 (`pnpm/action-setup@v4`) | No hay campo `packageManager` en `package.json`; el lockfile es `lockfileVersion: 9.0` |
+| Versión de Python | 3.12 | `requires-python = ">=3.12"` en `backend/pyproject.toml` |
+| Instalación | `pnpm install --frozen-lockfile` y `uv sync --frozen` | Falla si el lockfile no coincide con el manifiesto, en vez de resolver dependencias distintas a las probadas en local |
+| Base de datos | `DJANGO_DB_ENGINE=sqlite` (en memoria) | Evita un servicio de PostgreSQL; la suite no lo necesita |
+| Secretos | Ninguno | `settings.py` trae default para `DJANGO_SECRET_KEY` y `DJANGO_DEBUG` |
+| Ejecuciones concurrentes | `cancel-in-progress: true` | En pushes seguidos solo cuenta el último commit |
 
 > La verificación de accesibilidad tiene dos capas. La automática (nombres accesibles, roles,
 > estados y teclado) sí corre en `pnpm test`. La del anillo de foco es CSS y la auditoría de
@@ -214,4 +241,5 @@ antes de abrir cada PR.
 * `backend/apps/properties/tests/test_catalog.py` — suite del backend.
 * `frontend/jest.config.cjs` — configuración de Jest, módulos incluidos en cobertura y
   umbrales.
+* `.github/workflows/ci.yml` — gates automatizados de `TASK-CI-01`.
 * `docs/06_UX_UI_PROP.md` y `docs/api/openapi_spec.yaml` — contrato funcional del catálogo.
