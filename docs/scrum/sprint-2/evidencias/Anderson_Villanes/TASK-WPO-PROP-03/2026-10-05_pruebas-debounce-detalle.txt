@@ -1,0 +1,55 @@
+TASK-WPO-PROP-03 - pruebas del debounce (300 ms) en la busqueda por texto
+Ejecutado con: pnpm exec jest src/hooks/useDebounce.test.jsx src/components/properties/PropertyList.test.jsx --json
+
+frontend\src\hooks\useDebounce.test.jsx
+  [OK] useDebounce > devuelve el valor inicial sin esperar
+  [OK] useDebounce > no publica el cambio hasta que se cumple el margen
+  [OK] useDebounce > publica el último valor al cumplirse el margen
+  [OK] useDebounce > colapsa una ráfaga de cambios en una sola publicación
+  [OK] useDebounce > reinicia el margen con cada cambio en vez de acumularlos
+  [OK] useDebounce > acepta un margen distinto al de por defecto
+  [OK] useDebounce > ignora un margen de 0 (publica en el siguiente tick)
+  [OK] useDebounce > no publica nada al desmontar el componente
+frontend\src\components\properties\PropertyList.test.jsx
+  [OK] PropertyList (integración del catálogo) > Carga y renderizado > muestra el esqueleto de carga y luego la primera página del catálogo
+  [OK] PropertyList (integración del catálogo) > Carga y renderizado > excluye las propiedades inactivas
+  [OK] PropertyList (integración del catálogo) > Carga y renderizado > propaga las acciones de guardar y agendar visita de las tarjetas
+  [OK] PropertyList (integración del catálogo) > Paginación > cambia de página y deshabilita "siguiente" en la última
+  [OK] PropertyList (integración del catálogo) > Paginación > vuelve a la primera página al cambiar un filtro
+  [OK] PropertyList (integración del catálogo) > Ordenamiento y vista > aplica todos los criterios de ordenamiento
+  [OK] PropertyList (integración del catálogo) > Ordenamiento y vista > cambia el modo de vista de la cuadrícula
+  [OK] PropertyList (integración del catálogo) > Búsqueda y filtros > filtra por texto y limpia la búsqueda con el botón Limpiar
+  [OK] PropertyList (integración del catálogo) > Búsqueda y filtros > aplica el filtro de modalidad leído desde la URL
+  [OK] PropertyList (integración del catálogo) > Búsqueda y filtros > aplica el filtro de rango de precio leído desde la URL
+  [OK] PropertyList (integración del catálogo) > Búsqueda y filtros > aplica el filtro de metraje pequeño leído desde la URL
+  [OK] PropertyList (integración del catálogo) > Búsqueda y filtros > aplica el filtro de metraje medio leído desde la URL
+  [OK] PropertyList (integración del catálogo) > Búsqueda y filtros > aplica el filtro de metraje grande leído desde la URL
+  [OK] PropertyList (integración del catálogo) > Búsqueda y filtros > aplica el filtro de habitaciones leído desde la URL
+  [OK] PropertyList (integración del catálogo) > Búsqueda y filtros > aplica el filtro de negociable leído desde la URL
+  [OK] PropertyList (integración del catálogo) > Búsqueda y filtros > aplica el filtro de destacado leído desde la URL
+  [OK] PropertyList (integración del catálogo) > Búsqueda y filtros > aplica el filtro de cochera leído desde la URL
+  [OK] PropertyList (integración del catálogo) > Búsqueda y filtros > aplica el filtro de todos los filtros leído desde la URL
+  [OK] PropertyList (integración del catálogo) > Búsqueda y filtros > permite eliminar cada chip de filtro activo
+  [OK] PropertyList (integración del catálogo) > Búsqueda y filtros > muestra el chip de modo y navega al inicio al quitarlo
+  [OK] PropertyList (integración del catálogo) > Búsqueda y filtros > etiqueta el chip del modo visitas
+  [OK] PropertyList (integración del catálogo) > Búsqueda con debounce > no escribe en la URL ni refiltra mientras se escribe
+  [OK] PropertyList (integración del catálogo) > Búsqueda con debounce > publica una sola vez el texto final al dejar de escribir 300 ms
+  [OK] PropertyList (integración del catálogo) > Búsqueda con debounce > reinicia el margen en cada pulsación aunque la búsqueda dure más de 300 ms
+  [OK] PropertyList (integración del catálogo) > Búsqueda con debounce > no lanza una petición HTTP por carácter tipeado
+  [OK] PropertyList (integración del catálogo) > Búsqueda con debounce > escribe la búsqueda una sola vez y sin apilar historial
+  [OK] PropertyList (integración del catálogo) > Búsqueda con debounce > muestra en el input la búsqueda que llega por la URL
+  [OK] PropertyList (integración del catálogo) > Búsqueda con debounce > no resucita el término borrado cuando el debounce está pendiente
+  [OK] PropertyList (integración del catálogo) > Búsqueda con debounce > quitar el chip de búsqueda vacía el input y la URL
+  [OK] PropertyList (integración del catálogo) > Búsqueda con debounce > conserva la búsqueda al aplicar un filtro del panel
+  [OK] PropertyList (integración del catálogo) > Estados vacío y de error > muestra el estado vacío del catálogo sin propiedades
+  [OK] PropertyList (integración del catálogo) > Estados vacío y de error > muestra "Sin resultados" y permite limpiar los filtros
+  [OK] PropertyList (integración del catálogo) > Estados vacío y de error > muestra el error del servidor y permite reintentar
+  [OK] PropertyList (integración del catálogo) > Navegación > navega a visitas y al concierge desde la barra de búsqueda
+  [OK] PropertyList (integración del catálogo) > Accesibilidad > expone el contador de resultados en una región viva y atómica
+  [OK] PropertyList (integración del catálogo) > Accesibilidad > anuncia el nuevo conteo al aplicar un filtro desde el panel
+  [OK] PropertyList (integración del catálogo) > Accesibilidad > anuncia el conteo singular cuando queda una sola propiedad
+  [OK] PropertyList (integración del catálogo) > Accesibilidad > mantiene la región viva montada al cambiar de página
+  [OK] PropertyList (integración del catálogo) > Accesibilidad > da nombre accesible al campo de búsqueda y al select de orden
+  [OK] PropertyList (integración del catálogo) > Accesibilidad > expone el grupo de vistas con nombre accesible
+
+Total: 48/48 pruebas, 2/2 suites

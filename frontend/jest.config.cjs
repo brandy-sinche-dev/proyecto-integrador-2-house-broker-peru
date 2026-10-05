@@ -21,6 +21,7 @@ module.exports = {
     'src/components/properties/FilterSidebar.tsx',
     'src/components/properties/useFilterParams.ts',
     'src/components/properties/filters.ts',
+    'src/hooks/useDebounce.ts',
     'src/services/properties.ts',
   ],
   coverageThreshold: {

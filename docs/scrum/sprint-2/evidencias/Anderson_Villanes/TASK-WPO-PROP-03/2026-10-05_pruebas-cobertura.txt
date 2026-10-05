@@ -1,0 +1,33 @@
+﻿
+> frontend@0.0.0 test:coverage C:\Users\User\Documents\Proyectos\proyecto-integrador-2-house-broker-peru\frontend
+> jest --coverage "--ci"
+
+-----------------------|---------|----------|---------|---------|-------------------
+File                   | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-----------------------|---------|----------|---------|---------|-------------------
+All files              |   98.78 |     95.7 |   99.08 |   99.61 |                   
+ components/properties |   98.67 |    95.97 |   98.93 |   99.59 |                   
+  FilterSidebar.tsx    |     100 |      100 |     100 |     100 |                   
+  Pagination.tsx       |     100 |      100 |     100 |     100 |                   
+  PropertyCard.tsx     |     100 |    97.43 |     100 |     100 | 84                
+  PropertyDetail.tsx   |   95.83 |    90.24 |     100 |     100 | 28-34,81,107      
+  PropertyList.tsx     |   98.03 |    94.69 |   97.67 |   99.15 | 264               
+  filters.ts           |     100 |      100 |     100 |     100 |                   
+  useFilterParams.ts   |     100 |      100 |     100 |     100 |                   
+ hooks                 |     100 |      100 |     100 |     100 |                   
+  useDebounce.ts       |     100 |      100 |     100 |     100 |                   
+ services              |     100 |       75 |     100 |     100 |                   
+  properties.ts        |     100 |       75 |     100 |     100 | 20                
+-----------------------|---------|----------|---------|---------|-------------------
+node.exe : 
+En C:\nvm4w\nodejs\pnpm.ps1: 16 Carácter: 5
++     & "$basedir/node$exe"  "$basedir/node_modules/pnpm/bin/pnpm.cjs"  ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Test Suites: 11 passed, 11 total
+Tests:       239 passed, 239 total
+Snapshots:   0 total
+Time:        11.857 s
+Ran all test suites.

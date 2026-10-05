@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PropertyCard } from './PropertyCard'
 import { FilterSidebar } from './FilterSidebar'
 import type { Filters } from './filters'
@@ -10,6 +10,7 @@ import type { Property } from '../../services/types'
 import type { NavTarget, Section } from '../../components/Header'
 import './PropertyList.css'
 import { useFilterParams } from './useFilterParams'
+import { useDebounce } from '../../hooks/useDebounce'
 
 
 interface PropertyListProps {
@@ -27,6 +28,11 @@ type Sort = 'recent' | 'price-asc' | 'price-desc' | 'area-desc'
 type ViewMode = 'grid3' | 'grid2' | 'list'
 
 const PAGE_SIZE = 6
+
+// TASK-WPO-PROP-03: la búsqueda por texto es la única entrada que se alimenta
+// tecla a tecla, así que su publicación en la URL (y con ella el refiltrado del
+// catálogo) espera este margen sin pulsaciones.
+const SEARCH_DEBOUNCE_MS = 300
 
 const TITLES: Record<Section, string> = {
   inicio: 'Propiedades en Perú',
@@ -85,7 +91,6 @@ export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit,
   const [status, setStatus] = useState<Status>('loading')
   const [error, setError] = useState<string | null>(null)
   const [properties, setProperties] = useState<Property[]>([])
-  const [query, setQuery] = useState('')
   const [sort, setSort] = useState<Sort>('recent')
   const [view, setView] = useState<ViewMode>('grid3')
   const [page, setPage] = useState(1)
@@ -98,8 +103,26 @@ export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit,
     return { min, max: max || 1 }
   }, [properties])
 
-  // 2. Reemplazamos el useState tradicional por el hook de URL
-  const { filters, applyFilters, clearFilters: clearUrlFilters } = useFilterParams(bounds)
+  // 2. La URL sigue siendo la fuente de verdad de los filtros, incluida la
+  //    búsqueda por texto (`?q=`). Pero el input no puede leer de ella mientras
+  //    se escribe: el campo es controlado y necesita un valor por pulsación. Por
+  //    eso el texto vive en `query` (respuesta inmediata al teclear) y solo se
+  //    publica en la URL cuando el usuario deja de escribir SEARCH_DEBOUNCE_MS.
+  const {
+    filters,
+    query: urlQuery,
+    setQuery: setUrlQuery,
+    applyFilters,
+    clearFilters: clearUrlFilters,
+  } = useFilterParams(bounds)
+
+  const [query, setQuery] = useState(urlQuery)
+  const debouncedQuery = useDebounce(query, SEARCH_DEBOUNCE_MS)
+
+  // Último valor de búsqueda que esta pantalla ha escrito (o adoptado) en la URL.
+  // Distingue "el URL cambió porque lo escribimos" de "el URL cambió desde fuera"
+  // (back/forward, limpiar filtros, entrar por un enlace con `?q=`).
+  const publishedQuery = useRef(urlQuery)
 
   const fetchData = useCallback(() => {
     getProperties()
@@ -118,7 +141,25 @@ export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit,
     fetchData()
   }, [fetchData])
 
+  // 3. La URL manda cuando el cambio viene de fuera (back/forward, "Limpiar",
+  //    "Limpiar filtros", un enlace con `?q=`): el input se pone al día.
+  useEffect(() => {
+    if (urlQuery === publishedQuery.current) return
+    publishedQuery.current = urlQuery
+    setQuery(urlQuery)
+  }, [urlQuery])
 
+  // 4. Y en sentido contrario: el texto que lleva SEARCH_DEBOUNCE_MS sin pulsaciones
+  //    se publica en la URL, que es lo que dispara el refiltrado. La comparación
+  //    con `query` es la que cancela las publicaciones obsoletas: si la URL cambió
+  //    desde fuera, `query` acaba de cambiar también y el debounce todavía va
+  //    atrasado, así que aquí no se escribe nada hasta que se estabilice.
+  useEffect(() => {
+    if (query !== debouncedQuery) return
+    if (debouncedQuery === publishedQuery.current) return
+    publishedQuery.current = debouncedQuery
+    setUrlQuery(debouncedQuery)
+  }, [query, debouncedQuery, setUrlQuery])
 
   const reload = () => {
     setStatus('loading')
@@ -126,13 +167,18 @@ export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit,
     fetchData()
   }
 
- const clearFilters = () => {
+  const clearSearch = () => {
     setQuery('')
+    setUrlQuery('')
+  }
+
+  const clearFilters = () => {
+    clearSearch()
     clearUrlFilters()
   }
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    const q = urlQuery.trim().toLowerCase()
     const list = properties.filter((p) => {
       if (mode === 'guardados' && !saved.includes(p.id)) return false
       if (mode === 'visitas' && !visits.includes(p.id)) return false
@@ -157,9 +203,9 @@ export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit,
     else if (sort === 'area-desc') sorted.sort((a, b) => areaOf(b) - areaOf(a))
     else sorted.sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
     return sorted
-  }, [properties, query, sort, mode, saved, visits, filters])
+  }, [properties, urlQuery, sort, mode, saved, visits, filters])
 
-  const resetKey = `${mode}\u0000${query}\u0000${sort}\u0000${JSON.stringify(filters)}`
+  const resetKey = `${mode}\u0000${urlQuery}\u0000${sort}\u0000${JSON.stringify(filters)}`
   const [prevResetKey, setPrevResetKey] = useState(resetKey)
   if (prevResetKey !== resetKey) {
     setPrevResetKey(resetKey)
@@ -173,7 +219,7 @@ export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit,
 const chips: { key: string; label: string; onRemove: () => void }[] = []
   if (mode !== 'inicio')
     chips.push({ key: 'mode', label: mode === 'guardados' ? 'Solo guardados' : 'Solo mis visitas', onRemove: () => onNavigate('inicio') })
-  if (query.trim()) chips.push({ key: 'q', label: `“${query.trim()}”`, onRemove: () => setQuery('') })
+  if (urlQuery.trim()) chips.push({ key: 'q', label: `“${urlQuery.trim()}”`, onRemove: clearSearch })
   if (filters.operacion)
     chips.push({
       key: 'op',
