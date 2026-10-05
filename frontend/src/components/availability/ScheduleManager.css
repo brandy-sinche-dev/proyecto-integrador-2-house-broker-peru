@@ -1,0 +1,252 @@
+.hslots {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: var(--shadow-card);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.hslots__head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hslots__title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  margin: 0;
+  color: var(--ink);
+}
+
+.hslots__sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted-light);
+}
+
+.hslots__notice {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--brand-bronze-deep);
+  background: rgba(233, 196, 132, 0.18);
+  border-left: 3px solid var(--brand-gold);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.hslots__days {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hslots__day {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  background: var(--white);
+}
+
+.hslots__day--on {
+  border-color: var(--line-strong);
+  background: var(--field);
+}
+
+.hslots__day-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.hslots__day-check {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--brand-bronze);
+  cursor: pointer;
+}
+
+.hslots__day-check:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+
+.hslots__day-label {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.hslots__day-count {
+  font-size: 12px;
+  color: var(--muted-light);
+}
+
+.hslots__add {
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand-bronze);
+  background: var(--white);
+  border: 1px dashed var(--brand-gold);
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.hslots__add:hover:not(:disabled) {
+  background: rgba(233, 196, 132, 0.2);
+}
+
+.hslots__add:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.hslots__list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hslots__slot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hslots__times {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.hslots__time {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hslots__time-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted-light);
+}
+
+.hslots__time-input {
+  font-family: var(--font);
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--white);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+}
+
+.hslots__time-input--invalid {
+  border-color: var(--danger);
+}
+
+.hslots__dash {
+  padding-bottom: 8px;
+  color: var(--muted-light);
+}
+
+.hslots__remove {
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1;
+  color: var(--danger);
+  background: var(--white);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  width: 30px;
+  height: 30px;
+  margin-bottom: 2px;
+  cursor: pointer;
+}
+
+.hslots__remove:hover:not(:disabled) {
+  background: rgba(186, 26, 26, 0.08);
+}
+
+.hslots__problem {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.hslots__problems {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hslots__problems li {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.hslots__summary {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.hslots__error {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.hslots__feedback {
+  margin: 0;
+  min-height: 18px;
+  font-size: 13px;
+  color: var(--success);
+}
+
+.hslots__feedback-error {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.hslots__actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.hslots__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

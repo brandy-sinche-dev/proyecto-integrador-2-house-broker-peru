@@ -1,0 +1,90 @@
+.havail {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 32px 20px 56px;
+}
+
+.havail__head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.havail__eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--brand-bronze);
+}
+
+.havail__title {
+  font-family: var(--font-display);
+  font-size: clamp(22px, 3vw, 30px);
+  line-height: 1.2;
+  margin: 0;
+  color: var(--ink);
+}
+
+.havail__sub {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.havail--loading {
+  align-items: center;
+  justify-content: center;
+  min-height: 40vh;
+}
+
+.havail__loading-text {
+  font-size: 14px;
+  color: var(--muted-light);
+}
+
+.havail__denied {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: var(--shadow-card);
+  padding: 44px 28px;
+}
+
+.havail__denied-icon {
+  color: var(--danger);
+  width: 40px;
+  height: 40px;
+}
+
+.havail__denied-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.havail__denied-title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--ink);
+}
+
+.havail__denied-sub {
+  margin: 0;
+  font-size: 14px;
+  max-width: 46ch;
+  color: var(--muted);
+}
+
+.havail__denied-actions {
+  margin-top: 12px;
+}

@@ -1,6 +1,12 @@
 import type { AxiosHeaders, AxiosRequestConfig } from 'axios'
 import fixtures from './data/properties'
-import { PROPERTY_TYPES, TRANSACTION_MODES, type Property, type PropertyInput } from '../types'
+import {
+  PROPERTY_TYPES,
+  TRANSACTION_MODES,
+  type Property,
+  type PropertyInput,
+  type PropertyStatus,
+} from '../types'
 
 // Persistencia simulada en memoria (vive durante toda la sesión del navegador)
 let store: Property[] = fixtures.map((p) => ({ ...p }))
@@ -65,6 +71,26 @@ const getBody = (config: Config): PropertyInput | null => {
 }
 
 const findByIndex = (id: string) => store.findIndex((p) => p.id === id)
+
+export const findProperty = (id: string): Property | undefined =>
+  store.find((p) => p.id === id)
+
+/**
+ * Aplica el `PATCH .../status`. `SUSPENDIDO` es el único estado que retira el
+ * inmueble del catálogo, así que también baja `is_active`, igual que hace la
+ * restricción `property_suspended_is_inactive` de la base de datos.
+ */
+export const patchPropertyStatus = (id: string, status: PropertyStatus): Property | undefined => {
+  const index = findByIndex(id)
+  if (index === -1) return undefined
+  const updated: Property = {
+    ...store[index],
+    status,
+    is_active: status !== 'SUSPENDIDO',
+  }
+  store = store.map((p) => (p.id === id ? updated : p))
+  return updated
+}
 
 export const getProperties = (config: Config): Reply => {
   const { 'x-mock-error': mockError } = getHeaders(config)

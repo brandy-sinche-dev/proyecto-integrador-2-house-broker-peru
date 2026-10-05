@@ -1,4 +1,16 @@
-import type { Property } from '../../types'
+import type { Property, Seller } from '../../types'
+
+/**
+ * Agente responsable de la cartera simulada. El panel de disponibilidad exige
+ * que la sesión coincida con este `seller.id`, así que la agenda no se puede
+ * abrir con un usuario cualquiera (ver `services/session.ts`).
+ */
+export const MOCK_SELLER: Seller = {
+  id: '7c4a9d21-3b6e-4f80-9a2d-5e7c1b3f8d40',
+  full_name: 'Yohan Nato',
+  email: 'yohan.nato@housebroker.pe',
+  phone: '+51 987 654 321',
+}
 
 // Fixture mínimo: 25 propiedades variadas (R-08 del sprint 1)
 const now = new Date().toISOString()
@@ -310,4 +322,15 @@ const fixtures: Property[] = [
   },
 ]
 
-export default fixtures
+/**
+ * Todos los inmuebles arrancan con estado operativo derivado de `is_active`, de
+ * forma coherente con `property_suspended_is_inactive`: lo que está fuera del
+ * catálogo está suspendido, y nada más.
+ */
+const withAvailability = fixtures.map<Property>((property) => ({
+  ...property,
+  status: property.is_active ? 'DISPONIBLE' : 'SUSPENDIDO',
+  seller: MOCK_SELLER,
+}))
+
+export default withAvailability
