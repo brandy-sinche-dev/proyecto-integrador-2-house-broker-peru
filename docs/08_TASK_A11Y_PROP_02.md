@@ -23,9 +23,21 @@ Ejemplos:
 
 ### 2.2 Notificación de cambios del catálogo
 
-Se incorporó `aria-live="polite"` en el contenedor correspondiente al catálogo.
+> **Corrección (2026-10-04, `TASK-A11Y-PROP-03`).** La versión original de este apartado
+> declaraba que el contenedor del catálogo tenía `aria-live="polite"`. Al revisar el código
+> actual se comprobó que **el atributo no existe**: la refactorización de
+> `TASK-WPO-PROP-02` (`docs/13_TASK_WPO_PROP_02.md`) rehizo el contenedor del catálogo y lo
+> eliminó, de modo que la auditoría de este documento ya no era reproducible sobre el código
+> vigente. `TASK-A11Y-PROP-03` lo restableció sobre el contador de resultados, que es el
+> elemento cuyo texto cambia al filtrar. Ver `docs/15_TASK_A11Y_PROP_03.md` §2.2.
 
-Esto permite que los lectores de pantalla sean informados cuando el contenido del catálogo cambia como consecuencia de una navegación entre páginas, sin interrumpir inmediatamente la interacción del usuario.
+El contador de resultados (`PropertyList.tsx`, `.hprops__subtitle`) está en una región viva
+`aria-live="polite"` con `aria-atomic="true"`.
+
+Esto permite que los lectores de pantalla sean informados cuando el contenido del catálogo
+cambia como consecuencia de una navegación entre páginas o de un cambio de filtro, sin
+interrumpir inmediatamente la interacción del usuario. `aria-atomic` hace que se anuncie la
+frase completa ("4 propiedades encontradas") y no solo el fragmento modificado.
 
 ### 2.3 Navegación mediante teclado
 
@@ -52,7 +64,7 @@ Se verificaron los criterios correspondientes a los niveles **A y AA**.
 | Criterio                                           | Resultado      |
 | -------------------------------------------------- | -------------- |
 | Botones de paginación con `aria-label` descriptivo | ✅ Cumplido     |
-| Contenedor del catálogo con `aria-live="polite"`   | ✅ Cumplido     |
+| Contador de resultados con `aria-live="polite"` | ✅ Cumplido (restablecido en `TASK-A11Y-PROP-03`, ver §2.2) |
 | Navegación mediante `Tab`                          | ✅ Cumplido     |
 | Navegación mediante `Shift + Tab`                  | ✅ Cumplido     |
 | Activación mediante `Enter`                        | ✅ Cumplido     |
@@ -74,3 +86,8 @@ Se adjuntan como evidencia de la implementación:
 La funcionalidad de catálogo y paginación fue adaptada para mejorar su accesibilidad y facilitar su utilización mediante teclado y tecnologías de asistencia.
 
 La implementación cumple con los puntos establecidos en la tarea **TASK-A11Y-PROP-02** y la auditoría realizada con AXE DevTools no reportó violaciones de nivel A o AA.
+
+**Alcance temporal:** esta auditoría se ejecutó sobre el catálogo previo a `TASK-WPO-PROP-02`.
+Los controles de accesibilidad del formulario de filtros y de la barra de búsqueda se
+re-auditaron en `docs/15_TASK_A11Y_PROP_03.md`, que además cubre con pruebas automatizadas lo
+que la auditoría manual no puede repetir.
