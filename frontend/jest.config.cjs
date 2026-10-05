@@ -18,6 +18,9 @@ module.exports = {
     'src/components/properties/PropertyDetail.tsx',
     'src/components/properties/Pagination.tsx',
     'src/components/properties/PropertyList.tsx',
+    'src/components/properties/FilterSidebar.tsx',
+    'src/components/properties/useFilterParams.ts',
+    'src/components/properties/filters.ts',
     'src/services/properties.ts',
   ],
   coverageThreshold: {
