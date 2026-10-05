@@ -12,7 +12,7 @@
 //   - estados vacío y de error con reintento,
 //   - propagación de acciones de las tarjetas a la app.
 
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import MockAdapter from 'axios-mock-adapter'
@@ -356,6 +356,87 @@ describe('PropertyList (integración del catálogo)', () => {
 
       await user.click(screen.getByRole('button', { name: /Concierge IA/ }))
       expect(props.onNavigate).toHaveBeenCalledWith('concierge')
+    })
+  })
+
+  // TASK-A11Y-PROP-03: la region viva del contador y los nombres
+  // accesibles de la barra de busqueda. El anillo de foco de ambos
+  // controles es CSS y no se puede verificar aqui (ver
+  // docs/15_TASK_A11Y_PROP_03.md).
+  describe('Accesibilidad', () => {
+    const contador = () => document.querySelector('.hprops__subtitle')
+
+    it('expone el contador de resultados en una región viva y atómica', async () => {
+      mock.onGet(LIST_PATH).reply(200, paginated(manyProperties(13)))
+
+      renderList()
+      await screen.findByText('13 propiedades encontradas')
+
+      expect(contador()).toHaveAttribute('aria-live', 'polite')
+      // `aria-atomic` hace que se anuncie el texto completo y no solo el
+      // fragmento que cambió, que es lo que importa al alternar entre
+      // "13 propiedades" y "Sin resultados".
+      expect(contador()).toHaveAttribute('aria-atomic', 'true')
+    })
+
+    it('anuncia el nuevo conteo al aplicar un filtro desde el panel', async () => {
+      const user = userEvent.setup()
+      mock.onGet(LIST_PATH).reply(200, paginated(manyProperties(13)))
+
+      renderList()
+      await screen.findByText('13 propiedades encontradas')
+
+      await user.click(screen.getByRole('checkbox', { name: 'Negociable' }))
+      await user.click(screen.getByRole('button', { name: /Aplicar filtros/ }))
+
+      // Con el filtro aplicado solo 4 de las 13 propiedades son negociables
+      // (`index % 3 === 0` sobre 13 elementos).
+      await waitFor(() => expect(contador()).toHaveTextContent('4 propiedades encontradas'))
+      expect(contador()).toHaveAttribute('aria-live', 'polite')
+    })
+
+    it('anuncia el conteo singular cuando queda una sola propiedad', async () => {
+      mock.onGet(LIST_PATH).reply(200, paginated([makeProperty(0)]))
+
+      renderList()
+
+      expect(await screen.findByText('1 propiedad encontrada')).toBeInTheDocument()
+      expect(contador()).toHaveAttribute('aria-live', 'polite')
+    })
+
+    it('mantiene la región viva montada al cambiar de página', async () => {
+      const user = userEvent.setup()
+      mock.onGet(LIST_PATH).reply(200, paginated(manyProperties(13)))
+
+      renderList()
+      await screen.findByText('13 propiedades encontradas')
+
+      await user.click(screen.getByRole('button', { name: 'Ir a la página siguiente' }))
+      await screen.findByText('Mostrando 7–12 de 13 propiedades')
+
+      // Si la region se desmontara y recreara en cada cambio, el lector de
+      // pantalla no tendria nada que anunciar en laactualizacion siguiente.
+      expect(contador()).toBeInTheDocument()
+      expect(contador()).toHaveTextContent('13 propiedades encontradas')
+    })
+
+    it('da nombre accesible al campo de búsqueda y al select de orden', async () => {
+      mock.onGet(LIST_PATH).reply(200, paginated(manyProperties(3)))
+
+      renderList()
+      await screen.findByRole('heading', { level: 1 })
+
+      expect(screen.getByRole('searchbox', { name: 'Buscar propiedades' })).toBeInTheDocument()
+      expect(screen.getByRole('combobox', { name: 'Ordenar propiedades' })).toBeInTheDocument()
+    })
+
+    it('expone el grupo de vistas con nombre accesible', async () => {
+      mock.onGet(LIST_PATH).reply(200, paginated(manyProperties(3)))
+
+      renderList()
+      await screen.findByRole('heading', { level: 1 })
+
+      expect(screen.getByRole('group', { name: 'Vista' })).toBeInTheDocument()
     })
   })
 })

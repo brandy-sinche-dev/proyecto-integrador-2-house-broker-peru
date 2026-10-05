@@ -1,8 +1,8 @@
 # Pruebas Automatizadas — HouseBroker Perú
 
 **Documento:** Resumen consolidado de la estrategia y las pruebas automatizadas del proyecto
-**Tareas:** `TASK-BACK-PROP-02`, `TASK-TEST-PROP-02`, `TASK-WPO-PROP-02` y `TASK-TEST-PROP-03`
-**Versión:** 2.0
+**Tareas:** `TASK-BACK-PROP-02`, `TASK-TEST-PROP-02`, `TASK-WPO-PROP-02`, `TASK-TEST-PROP-03` y `TASK-A11Y-PROP-03`
+**Versión:** 2.1
 
 ---
 
@@ -11,11 +11,11 @@
 | Capa | Framework | Archivos | Pruebas | Resultado |
 | ---- | --------- | -------- | ------- | --------- |
 | Backend (API) | Django `TestCase` + DRF `APIClient` | 1 | 10 | 10/10 |
-| Frontend (UI/Servicios) | Jest 30 + React Testing Library | 9 | 183 | 183/183 |
-| **Total** | | **10** | **193** | **193/193** |
+| Frontend (UI/Servicios) | Jest 30 + React Testing Library | 10 | 222 | 222/222 |
+| **Total** | | **11** | **232** | **232/232** |
 
-Cobertura de código del frontend (módulos del catálogo y de filtros): **98.6%** sentencias,
-**95.48%** ramas, **99%** funciones, **99.55%** líneas (umbral exigido: 80%).
+Cobertura de código del frontend (módulos del catálogo y de filtros): **98.61%** sentencias,
+**95.54%** ramas, **99%** funciones, **99.55%** líneas (umbral exigido: 80%).
 
 Además de las pruebas automatizadas, el proyecto mantiene una capa de **verificaciones de
 calidad** (lint, tipos, build, contrato OpenAPI y performance) documentada en la
@@ -73,13 +73,17 @@ DJANGO_DB_ENGINE=sqlite uv run python manage.py test apps.properties
 | Servicios HTTP | `src/services/properties.test.jsx` | 8 | `TASK-TEST-PROP-02` | Mocks HTTP |
 | Tarjeta de propiedad | `src/components/properties/PropertyCard.test.jsx` | 25 | `TASK-TEST-PROP-02` | Unitaria |
 | Paginación | `src/components/properties/Pagination.test.jsx` | 9 | `TASK-TEST-PROP-02` | Unitaria |
-| Catálogo | `src/components/properties/PropertyList.test.jsx` | 25 | `TASK-TEST-PROP-02` | Integración |
+| Catálogo | `src/components/properties/PropertyList.test.jsx` | 31 | `TASK-TEST-PROP-02` / `TASK-A11Y-PROP-03` | Integración |
 | Formulario de publicación | `src/components/properties/PropertyForm.test.jsx` | 9 | previa | Unitaria |
 | Detalle de propiedad | `src/components/properties/PropertyDetail.test.jsx` | 7 | `TASK-WPO-PROP-02` | Integración |
 | Filtros: query string y URL parsing | `src/components/properties/useFilterParams.test.jsx` | 74 | `TASK-TEST-PROP-03` | Unitaria |
 | Filtros: estado inicial | `src/components/properties/filters.test.jsx` | 10 | `TASK-TEST-PROP-03` | Unitaria |
 | Filtros: panel lateral | `src/components/properties/FilterSidebar.test.jsx` | 16 | `TASK-TEST-PROP-03` | Unitaria |
-| **Total** | | **183** | | |
+| Filtros: accesibilidad del panel | `src/components/properties/FilterSidebar.a11y.test.jsx` | 33 | `TASK-A11Y-PROP-03` | Unitaria (a11y) |
+| **Total** | | **222** | | |
+
+> El desglose de `PropertyList.test.jsx` (31 = 25 + 6) y el detalle de la suite de
+> accesibilidad están en `docs/15_TASK_A11Y_PROP_03.md` §4.
 
 ### 3.2 Qué se valida
 
@@ -105,6 +109,12 @@ DJANGO_DB_ENGINE=sqlite uv run python manage.py test apps.properties
 * **`FilterSidebar`:** estado inicial reflejando los filtros que llegan aplicados, emisión de
   un único borrador combinado al pulsar *Aplicar filtros*, `clampPrice` del rango de precio y
   el botón de reset.
+* **`FilterSidebar` (accesibilidad, `TASK-A11Y-PROP-03`):** nombres accesibles de los toggles
+  de metraje y habitaciones, asociación `id`/`htmlFor` de los checkboxes, `aria-valuetext`
+  con moneda en los sliders, `role="group"` con nombre, orden de tabulación de los 17
+  controles, ausencia de focus trap y activación con `Enter`/`Espacio`.
+* **Región viva del catálogo (`TASK-A11Y-PROP-03`):** el contador de resultados se anuncia
+  como *status message* y su texto cambia al aplicar un filtro o al paginar.
 
 ### 3.3 Ejecución
 
@@ -130,7 +140,7 @@ pnpm test:coverage   # ejecuta la suite y reporta cobertura
 | `PropertyDetail.tsx` | 95.83 | 90.24 | 100 | 100 |
 | `PropertyList.tsx` | 97.79 | 94.44 | 97.56 | 99.03 |
 | `services/properties.ts` | 100 | 75 | 100 | 100 |
-| **Total** | **98.6** | **95.48** | **99** | **99.55** |
+| **Total** | **98.61** | **95.54** | **99** | **99.55** |
 
 El umbral `coverageThreshold.global` está en **80%** para las cuatro métricas y se supera en
 todas. Los tres módulos del panel de filtros (`FilterSidebar`, `filters`, `useFilterParams`)
@@ -160,14 +170,19 @@ antes de abrir cada PR.
 
 | Verificación | Comando | Estado actual |
 | ------------ | ------- | ------------- |
-| Suite de pruebas | `cd frontend && pnpm test` | 183/183 |
-| Cobertura | `cd frontend && pnpm test:coverage` | 98.6% stmts / 95.48% branches (umbral 80%) |
+| Suite de pruebas | `cd frontend && pnpm test` | 222/222 |
+| Cobertura | `cd frontend && pnpm test:coverage` | 98.61% stmts / 95.54% branches (umbral 80%) |
 | Suite de API | `cd backend && DJANGO_DB_ENGINE=sqlite uv run python manage.py test apps.properties` | 10/10 |
-| Lint | `cd frontend && pnpm run lint` | Sin errores. 1 *warning* preexistente: `FilterSidebar.tsx:34` (`react/set-state-in-effect`) |
+| Lint | `cd frontend && pnpm run lint` | Sin errores. 1 *warning* preexistente: `FilterSidebar.tsx:38` (`react/set-state-in-effect`) |
 | Tipos y build | `cd frontend && pnpm run build` | Correcto |
 | Contrato OpenAPI | `npx @stoplight/spectral-cli lint docs/api/openapi_spec.yaml --ruleset docs/api/.spectral.yaml` | Ver desviaciones conocidas en `docs/api/README.md` |
 | Performance | Lighthouse sobre `vite preview` | Evidencia en `docs/scrum/sprint-2/evidencias/Anderson_Villanes/TASK-WPO-PROP-02/lighthouse-report.json` (performance 84) |
-| Accesibilidad | Revisión manual de la vista | `docs/08_TASK_A11Y_PROP_02.md` |
+| Accesibilidad | Suite automatizada + revisión manual con AXE DevTools | `docs/08_TASK_A11Y_PROP_02.md` y `docs/15_TASK_A11Y_PROP_03.md` (39 pruebas) |
+
+> La verificación de accesibilidad tiene dos capas. La automática (nombres accesibles, roles,
+> estados y teclado) sí corre en `pnpm test`. La del anillo de foco es CSS y la auditoría de
+> AXE DevTools es una extensión de navegador: ambas las ejecuta una persona y están
+> listadas como checklist en `docs/15_TASK_A11Y_PROP_03.md` §5.
 
 ---
 
@@ -177,10 +192,11 @@ antes de abrir cada PR.
 | -------- | --------- |
 | Pruebas de API con paginación, detalle y validaciones | 10/10 |
 | Pruebas de servicios con mocks HTTP | 8/8 |
-| Pruebas de componentes e integración del catálogo | 75/75 |
+| Pruebas de componentes e integración del catálogo | 81/81 |
 | Pruebas de filtros, query string y URL parsing (`TASK-TEST-PROP-03`) | 100/100 |
-| Cobertura frontend ≥ 80% | 98.6% stmts / 95.48% branches |
-| Suite total en verde | 193/193 |
+| Pruebas de accesibilidad del formulario de filtros (`TASK-A11Y-PROP-03`) | 39/39 |
+| Cobertura frontend ≥ 80% | 98.61% stmts / 95.54% branches |
+| Suite total en verde | 232/232 |
 | Documentación de las pruebas | Este documento + los documentos por tarea |
 
 ---
@@ -191,8 +207,10 @@ antes de abrir cada PR.
   (configuración de Jest/Babel, caso `import.meta.env`, cobertura).
 * `docs/14_TASK_TEST_PROP_03.md` — detalle de las pruebas de filtros, query string y URL
   parsing.
+* `docs/15_TASK_A11Y_PROP_03.md` — pruebas de accesibilidad del formulario de filtros y
+  checklist de verificación manual.
 * `docs/13_TASK_WPO_PROP_02.md` — suite de detalle de propiedad y auditoría Lighthouse.
-* `docs/08_TASK_A11Y_PROP_02.md` — revisión de accesibilidad asociada.
+* `docs/08_TASK_A11Y_PROP_02.md` — revisión de accesibilidad del catálogo y la paginación.
 * `backend/apps/properties/tests/test_catalog.py` — suite del backend.
 * `frontend/jest.config.cjs` — configuración de Jest, módulos incluidos en cobertura y
   umbrales.
