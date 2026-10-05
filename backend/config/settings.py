@@ -105,6 +105,10 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'apps.properties.pagination.PropertyPagination',
     'PAGE_SIZE': 12,
     'COERCE_DECIMAL_TO_STRING': False,
+    # Los errores de dominio de disponibilidad salen en `application/problem+json`
+    # con el `code` que documenta `docs/api/openapi_spec.yaml`. El manejador
+    # delega todo lo demás en DRF, así que el catálogo no cambia de forma.
+    'EXCEPTION_HANDLER': 'apps.properties.problems.problem_exception_handler',
 }
 
 # URL base para componer las URLs de las imágenes de propiedades.
