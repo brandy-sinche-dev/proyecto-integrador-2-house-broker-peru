@@ -1,0 +1,5 @@
+Test Suites: 2 passed, 2 total
+Tests:       48 passed, 48 total
+Snapshots:   0 total
+Time:        7.058 s
+Ran all test suites matching src/hooks/useDebounce.test.jsx|src/components/properties/PropertyList.test.jsx.
