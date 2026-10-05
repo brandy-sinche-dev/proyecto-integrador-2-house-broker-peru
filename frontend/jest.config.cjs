@@ -23,6 +23,11 @@ module.exports = {
     'src/components/properties/filters.ts',
     'src/hooks/useDebounce.ts',
     'src/services/properties.ts',
+    'src/services/availability.ts',
+    'src/services/session.ts',
+    'src/components/availability/AvailabilityPanel.tsx',
+    'src/components/availability/PropertyStatusSelector.tsx',
+    'src/components/availability/ScheduleManager.tsx',
   ],
   coverageThreshold: {
     global: {
