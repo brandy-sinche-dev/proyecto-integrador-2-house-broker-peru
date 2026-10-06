@@ -10,6 +10,7 @@ interface PropertyCardProps {
   onToggleSave: (id: string) => void
   onToggleVisit: (id: string) => void
   onOpen?: (id: string) => void
+  onBookVisit?: (title: string, id: string) => void
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -51,7 +52,7 @@ function IconHeart() {
 function IconPhone() {
   return (
     <svg viewBox="0 0 14 14" aria-hidden="true">
-      <path d="M3 2h2.2l1 2.4-1.3 1a8 8 0 0 0 3.7 3.7l1-1.3L12 8.8V11a1 1 0 0 1-1.1 1A9.5 9.5 0 0 1 2 3.1 1 1 0 0 1 3 2Z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M3 2h2.2l1 2.4-1.3 1a8 8 0 0 0 3.7 3.7l1-1.3L12 8.8V11a1 1 0 0 1-1.1 1A9.5 9.5 0 0 1 2 3.1 1 1 0 0 1 3 2Z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
     </svg>
   )
 }
@@ -71,6 +72,7 @@ export const PropertyCard = memo(function PropertyCard({
   onToggleSave,
   onToggleVisit,
   onOpen,
+  onBookVisit,
 }: PropertyCardProps) {
   const specs: { key: string; value: string; label: string }[] = []
   if (property.dormitorios != null) specs.push({ key: 'dorm', value: String(property.dormitorios), label: 'DORM.' })
@@ -87,7 +89,6 @@ export const PropertyCard = memo(function PropertyCard({
 
   const glassBadge = property.destacado ? 'DESTACADO' : property.negociable ? 'NEGOCIABLE' : null
 
-  // Imagen de portada: `images[]` del backend o, en su defecto, `link_galeria`.
   const cover =
     property.images?.find((img) => img.es_principal)?.url ??
     property.images?.[0]?.url ??
@@ -169,7 +170,13 @@ export const PropertyCard = memo(function PropertyCard({
             type="button"
             className={`hpc__cta hpc__cta--ghost ${visit ? 'is-on' : ''}`}
             aria-pressed={visit}
-            onClick={() => onToggleVisit(property.id)}
+            onClick={() => {
+              if (visit) {
+                onToggleVisit(property.id)
+              } else if (onBookVisit) {
+                onBookVisit(property.title, property.id)
+              }
+            }}
           >
             <IconCalendar />
             {visit ? 'Visita agendada' : 'Agendar visita'}
@@ -179,7 +186,9 @@ export const PropertyCard = memo(function PropertyCard({
             Contactar
           </a>
         </div>
+
       </div>
     </article>
+
   )
 })

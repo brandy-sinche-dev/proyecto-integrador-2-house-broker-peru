@@ -4,6 +4,7 @@ import { Header } from './components/Header'
 import type { NavTarget, Section } from './components/Header'
 import { Footer } from './components/Footer'
 import { AssistantWidget } from './components/AssistantWidget'
+import { AppointmentModal } from './components/crm/AppointmentModal'
 
 const PropertyList = lazy(() => import('./components/properties/PropertyList').then(m => ({ default: m.PropertyList })))
 const PropertyDetail = lazy(() => import('./components/properties/PropertyDetail').then(m => ({ default: m.PropertyDetail })))
@@ -33,11 +34,6 @@ function ListSkeleton() {
   )
 }
 
-/**
- * Lee el `:id` de la ruta del agente y se lo pasa al panel. Es un componente
- * aparte y no un `useParams()` en línea porque los hooks solo pueden ejecutarse
- * dentro del contexto de un `<Route>`.
- */
 function AgentAvailability() {
   const { id } = useParams<{ id: string }>()
   return <AvailabilityPanel propertyId={id ?? ''} />
@@ -48,6 +44,9 @@ function App() {
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [saved, setSaved] = useState<string[]>(() => readList('hb_saved'))
   const [visits, setVisits] = useState<string[]>(() => readList('hb_visits'))
+
+  const [isBookingOpen, setIsBookingOpen] = useState(false)
+  const [selectedPropertyTitle, setSelectedPropertyTitle] = useState('Inmueble Seleccionado')
 
   const navigateTo = useNavigate()
   const location = useLocation()
@@ -69,6 +68,15 @@ function App() {
     (id: string) => setVisits((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])),
     [],
   )
+
+  // El truco está aquí: id es opcional (id?: string)
+  const handleBookVisit = useCallback((title: string, id?: string) => {
+    setSelectedPropertyTitle(title)
+    setIsBookingOpen(true)
+    if (id && !visits.includes(id)) {
+      toggleVisit(id)
+    }
+  }, [visits, toggleVisit])
 
   const navigate = useCallback(
     (target: NavTarget) => {
@@ -99,6 +107,7 @@ function App() {
         onToggleVisit={toggleVisit}
         onNavigate={navigate}
         onOpen={openProperty}
+        onBookVisit={handleBookVisit}
       />
     </Suspense>
   )
@@ -119,16 +128,13 @@ function App() {
           path="/properties/:id"
           element={
             <Suspense fallback={<ListSkeleton />}>
-              <PropertyDetail onBack={() => navigateTo('/')} />
+              <PropertyDetail 
+                onBack={() => navigateTo('/')} 
+                onBookVisit={(title) => handleBookVisit(title)}
+              />
             </Suspense>
           }
         />
-        {/*
-          Panel de disponibilidad del agente (TASK-FRONT-PROP-04). Va aparte del
-          catálogo público porque el control de acceso se resuelve dentro del
-          propio panel: el agente asignado lo abre, cualquiera más recibe el
-          aviso de falta de permisos.
-        */}
         <Route
           path="/agente/propiedades/:id/disponibilidad"
           element={
@@ -149,8 +155,16 @@ function App() {
         onToggle={() => setAssistantOpen((open) => !open)}
         onNavigate={navigate}
       />
+
+      <AppointmentModal 
+        isOpen={isBookingOpen} 
+        onClose={() => setIsBookingOpen(false)} 
+        propertyTitle={selectedPropertyTitle}
+        isLoggedIn={true}
+      />
     </>
   )
 }
+
 
 export default App
