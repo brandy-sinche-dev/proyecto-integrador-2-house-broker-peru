@@ -12,7 +12,6 @@ import './PropertyList.css'
 import { useFilterParams } from './useFilterParams'
 import { useDebounce } from '../../hooks/useDebounce'
 
-
 interface PropertyListProps {
   mode: Section
   saved: string[]
@@ -21,6 +20,7 @@ interface PropertyListProps {
   onToggleVisit: (id: string) => void
   onNavigate: (target: NavTarget) => void
   onOpen?: (id: string) => void
+  onBookVisit?: (title: string, id?: string) => void // <-- Corregido para aceptar title e id opcional
 }
 
 type Status = 'loading' | 'error' | 'ready'
@@ -29,9 +29,6 @@ type ViewMode = 'grid3' | 'grid2' | 'list'
 
 const PAGE_SIZE = 6
 
-// TASK-WPO-PROP-03: la búsqueda por texto es la única entrada que se alimenta
-// tecla a tecla, así que su publicación en la URL (y con ella el refiltrado del
-// catálogo) espera este margen sin pulsaciones.
 const SEARCH_DEBOUNCE_MS = 300
 
 const TITLES: Record<Section, string> = {
@@ -87,7 +84,16 @@ function IconChat() {
   )
 }
 
-export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit, onNavigate, onOpen }: PropertyListProps) {
+export function PropertyList({
+  mode,
+  saved,
+  visits,
+  onToggleSave,
+  onToggleVisit,
+  onNavigate,
+  onOpen,
+  onBookVisit,
+}: PropertyListProps) {
   const [status, setStatus] = useState<Status>('loading')
   const [error, setError] = useState<string | null>(null)
   const [properties, setProperties] = useState<Property[]>([])
@@ -95,7 +101,6 @@ export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit,
   const [view, setView] = useState<ViewMode>('grid3')
   const [page, setPage] = useState(1)
 
-  // 1. Calculamos los bounds (mínimo y máximo de precio de las propiedades)
   const bounds = useMemo(() => {
     const prices = properties.map((p) => p.price)
     const min = prices.length ? Math.min(...prices) : 0
@@ -103,11 +108,6 @@ export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit,
     return { min, max: max || 1 }
   }, [properties])
 
-  // 2. La URL sigue siendo la fuente de verdad de los filtros, incluida la
-  //    búsqueda por texto (`?q=`). Pero el input no puede leer de ella mientras
-  //    se escribe: el campo es controlado y necesita un valor por pulsación. Por
-  //    eso el texto vive en `query` (respuesta inmediata al teclear) y solo se
-  //    publica en la URL cuando el usuario deja de escribir SEARCH_DEBOUNCE_MS.
   const {
     filters,
     query: urlQuery,
@@ -118,10 +118,6 @@ export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit,
 
   const [query, setQuery] = useState(urlQuery)
   const debouncedQuery = useDebounce(query, SEARCH_DEBOUNCE_MS)
-
-  // Último valor de búsqueda que esta pantalla ha escrito (o adoptado) en la URL.
-  // Distingue "el URL cambió porque lo escribimos" de "el URL cambió desde fuera"
-  // (back/forward, limpiar filtros, entrar por un enlace con `?q=`).
   const publishedQuery = useRef(urlQuery)
 
   const fetchData = useCallback(() => {
@@ -141,19 +137,12 @@ export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit,
     fetchData()
   }, [fetchData])
 
-  // 3. La URL manda cuando el cambio viene de fuera (back/forward, "Limpiar",
-  //    "Limpiar filtros", un enlace con `?q=`): el input se pone al día.
   useEffect(() => {
     if (urlQuery === publishedQuery.current) return
     publishedQuery.current = urlQuery
     setQuery(urlQuery)
   }, [urlQuery])
 
-  // 4. Y en sentido contrario: el texto que lleva SEARCH_DEBOUNCE_MS sin pulsaciones
-  //    se publica en la URL, que es lo que dispara el refiltrado. La comparación
-  //    con `query` es la que cancela las publicaciones obsoletas: si la URL cambió
-  //    desde fuera, `query` acaba de cambiar también y el debounce todavía va
-  //    atrasado, así que aquí no se escribe nada hasta que se estabilice.
   useEffect(() => {
     if (query !== debouncedQuery) return
     if (debouncedQuery === publishedQuery.current) return
@@ -216,7 +205,7 @@ export function PropertyList({ mode, saved, visits, onToggleSave, onToggleVisit,
   const currentPage = Math.min(page, totalPages)
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
-const chips: { key: string; label: string; onRemove: () => void }[] = []
+  const chips: { key: string; label: string; onRemove: () => void }[] = []
   if (mode !== 'inicio')
     chips.push({ key: 'mode', label: mode === 'guardados' ? 'Solo guardados' : 'Solo mis visitas', onRemove: () => onNavigate('inicio') })
   if (urlQuery.trim()) chips.push({ key: 'q', label: `“${urlQuery.trim()}”`, onRemove: clearSearch })
@@ -343,14 +332,6 @@ const chips: { key: string; label: string; onRemove: () => void }[] = []
                 <span className="hprops__accent" aria-hidden="true" />
                 <div>
                   <h1 className="hprops__title">{TITLES[mode]}</h1>
-                  {/*
-                    Región viva: los cambios de filtro, búsqueda, orden o
-                    página reescriben este texto, y sin ella un usuario de
-                    lector de pantalla no se entera del nuevo conteo. Vive
-                    dentro de `status === 'ready'` pero los cambios de
-                    filtro no la desmontan, así que todos los anuncios
-                    posteriores a la carga inicial se anuncian.
-                  */}
                   <p className="hprops__subtitle" aria-live="polite" aria-atomic="true">
                     {filtered.length} {filtered.length === 1 ? 'propiedad encontrada' : 'propiedades encontradas'}
                   </p>
@@ -398,12 +379,12 @@ const chips: { key: string; label: string; onRemove: () => void }[] = []
 
             <div className="hprops__layout">
               <FilterSidebar
-                  filters={filters}
-                  bounds={bounds}
-                  currency="S/."
-                  onApply={applyFilters}
-                  onClear={clearUrlFilters}
-                />
+                filters={filters}
+                bounds={bounds}
+                currency="S/."
+                onApply={applyFilters}
+                onClear={clearUrlFilters}
+              />
 
               <div className="hprops__results">
                 {filtered.length === 0 ? (
@@ -440,6 +421,7 @@ const chips: { key: string; label: string; onRemove: () => void }[] = []
                           onToggleSave={onToggleSave}
                           onToggleVisit={onToggleVisit}
                           onOpen={onOpen}
+                          onBookVisit={onBookVisit}
                         />
                       ))}
                     </div>
@@ -457,6 +439,7 @@ const chips: { key: string; label: string; onRemove: () => void }[] = []
           </>
         )}
       </main>
+
     </>
   )
 }

@@ -8,6 +8,7 @@ import './PropertyDetail.css'
 
 interface PropertyDetailProps {
   onBack: () => void
+  onBookVisit?: (title: string) => void // <-- Prop agregada para abrir el modal de visitas
 }
 
 type Status = 'loading' | 'error' | 'ready'
@@ -24,7 +25,7 @@ const TYPE_LABEL: Record<string, string> = {
   OFICINA: 'Oficina',
 }
 
-export function PropertyDetail({ onBack }: PropertyDetailProps) {
+export function PropertyDetail({ onBack, onBookVisit }: PropertyDetailProps) {
   const { id = '' } = useParams()
   const [property, setProperty] = useState<Property | null>(null)
   const [status, setStatus] = useState<Status>('loading')
@@ -156,6 +157,15 @@ export function PropertyDetail({ onBack }: PropertyDetailProps) {
               <a className="hpd__cta hpd__cta--primary" href="mailto:asesores@housebroker.pe">
                 Contactar asesor
               </a>
+              {onBookVisit && (
+                <button
+                  type="button"
+                  className="hpd__cta hpd__cta--ghost"
+                  onClick={() => onBookVisit(property.title)}
+                >
+                  Agendar visita
+                </button>
+              )}
               {property.link_planos && (
                 <a className="hpd__cta hpd__cta--ghost" href={property.link_planos}>
                   Ver planos
