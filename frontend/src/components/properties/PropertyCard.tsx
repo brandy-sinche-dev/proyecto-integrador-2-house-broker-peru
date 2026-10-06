@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import type { Property, TransactionMode } from '../../services/types'
 import { formatMoney } from './money'
+import { FavoriteButton } from './FavoriteButton'
 import './PropertyCard.css'
 
 interface PropertyCardProps {
@@ -37,14 +38,6 @@ function IconCheck() {
   return (
     <svg viewBox="0 0 14 14" aria-hidden="true">
       <path d="m2.5 7.2 3 3 6-6.4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function IconHeart() {
-  return (
-    <svg viewBox="0 0 20 18" aria-hidden="true">
-      <path d="M10 16.4S2.6 11.8 2.6 6.9A3.8 3.8 0 0 1 10 4.5a3.8 3.8 0 0 1 7.4 2.4c0 4.9-7.4 9.5-7.4 9.5Z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
     </svg>
   )
 }
@@ -118,15 +111,11 @@ export const PropertyCard = memo(function PropertyCard({
           )}
         </div>
 
-        <button
-          type="button"
-          className={`hpc__icon-btn ${saved ? 'is-saved' : ''}`}
-          onClick={() => onToggleSave(property.id)}
-          aria-pressed={saved}
-          aria-label={saved ? `Quitar ${property.title} de guardados` : `Guardar ${property.title}`}
-        >
-          <IconHeart />
-        </button>
+        <FavoriteButton
+          saved={saved}
+          propertyTitle={property.title}
+          onToggle={() => onToggleSave(property.id)}
+        />
 
         <span className="hpc__overlay">{typeLabel.toUpperCase()}</span>
       </div>
