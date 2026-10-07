@@ -60,6 +60,14 @@ ERROR_TYPES = {
         "https://housebroker.pe/errors/agent-assignment-required",
         "Se requiere el agente asignado",
     ),
+    "property_not_bookable": (
+        "https://housebroker.pe/errors/property-not-bookable",
+        "Propiedad no agendable",
+    ),
+    "appointment_slot_conflict": (
+        "https://housebroker.pe/errors/appointment-slot-conflict",
+        "Conflicto de horario de cita",
+    ),
     "unauthorized": (
         "https://housebroker.pe/errors/unauthorized",
         "No autenticado",
