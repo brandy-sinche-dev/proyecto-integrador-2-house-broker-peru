@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import MockAdapter from 'axios-mock-adapter'
@@ -218,21 +218,29 @@ describe('App: favoritos (HU-PROP-05)', () => {
     })
   }
 
+  function favoriteStatus() {
+    return screen.getByRole('status', { name: 'Favoritos' })
+  }
+
   it('CA-3: un usuario anónimo ve el aviso, guarda el intento y lo descarta al cerrar', async () => {
     anonymous()
     feed(properties)
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(await screen.findByRole('button', { name: 'Guardar Departamento 1' }))
+    const heart = await screen.findByRole('button', { name: 'Guardar Departamento 1' })
+    await user.click(heart)
 
     const dialog = screen.getByRole('dialog')
     expect(dialog).toHaveAccessibleName('Inicia sesión para guardar favoritos')
+    expect(within(dialog).getByRole('button', { name: 'Iniciar sesión' })).toHaveFocus()
+    expect(favoriteStatus()).toBeEmptyDOMElement()
     expect(localStorage.getItem('hb_pending_favorite')).toBe('prop-1')
 
     await user.click(screen.getByRole('button', { name: 'Ahora no' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(localStorage.getItem('hb_pending_favorite')).toBeNull()
+    expect(heart).toHaveFocus()
   })
 
   it('CA-1: con sesión marca optimistamente el corazón y persiste el cambio', async () => {
@@ -254,13 +262,19 @@ describe('App: favoritos (HU-PROP-05)', () => {
     renderApp()
 
     const heart = await screen.findByRole('button', { name: 'Guardar Departamento 1' })
+    const status = favoriteStatus()
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(status).toHaveAttribute('aria-atomic', 'true')
+    expect(status).toBeEmptyDOMElement()
     await user.click(heart)
     expect(heart).toHaveAttribute('aria-pressed', 'true')
     expect(posted).toBe(1)
+    await waitFor(() => expect(status).toHaveTextContent('Departamento 1 añadido a favoritos.'))
 
     await user.click(screen.getByRole('button', { name: 'Quitar Departamento 1 de guardados' }))
     expect(screen.getByRole('button', { name: 'Guardar Departamento 1' })).toHaveAttribute('aria-pressed', 'false')
     expect(deleted).toBe(1)
+    await waitFor(() => expect(status).toHaveTextContent('Departamento 1 quitado de favoritos.'))
   })
 
   it('CA-2: la sección Guardados se alimenta de los favoritos del servidor', async () => {
@@ -273,6 +287,44 @@ describe('App: favoritos (HU-PROP-05)', () => {
     await user.click(await screen.findByRole('button', { name: 'Guardados' }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Mis guardados' })).toBeInTheDocument()
     expect(await screen.findByRole('heading', { level: 3, name: 'Departamento 1' })).toBeInTheDocument()
+    expect(favoriteStatus()).toBeEmptyDOMElement()
+  })
+
+  it('conserva el anuncio al quitar con teclado la última tarjeta de Guardados', async () => {
+    loggedIn()
+    feed(properties)
+    favoritesPage([{ property: properties[0], added_at: '2026-01-05T00:00:00Z' }])
+    mock.onDelete('/v1/favorites/prop-1/').reply(204)
+    const user = userEvent.setup()
+    renderApp()
+
+    await screen.findByRole('button', { name: 'Quitar Departamento 1 de guardados' })
+    await user.click(screen.getByRole('button', { name: /^Guardados/ }))
+    const status = favoriteStatus()
+    screen.getByRole('button', { name: 'Quitar Departamento 1 de guardados' }).focus()
+    await user.keyboard('{Enter}')
+
+    await waitFor(() => expect(status).toHaveTextContent('Departamento 1 quitado de favoritos.'))
+    expect(screen.queryByRole('heading', { level: 3, name: 'Departamento 1' })).not.toBeInTheDocument()
+    expect(favoriteStatus()).toBe(status)
+  })
+
+  it.each([false, true])('anuncia la restauración del estado si falla la petición (guardado=%s)', async (saved) => {
+    loggedIn()
+    feed(properties)
+    favoritesPage(saved ? [{ property: properties[0], added_at: '2026-01-05T00:00:00Z' }] : [])
+    mock.onPost('/v1/favorites/').reply(500)
+    mock.onDelete('/v1/favorites/prop-1/').reply(500)
+    const user = userEvent.setup()
+    renderApp()
+
+    const label = saved ? 'Quitar Departamento 1 de guardados' : 'Guardar Departamento 1'
+    await user.click(await screen.findByRole('button', { name: label }))
+
+    await waitFor(() => expect(favoriteStatus()).toHaveTextContent(
+      'No se pudo actualizar Departamento 1. Se restauró el estado anterior de favoritos.',
+    ))
+    expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-pressed', String(saved))
   })
 
   it('aplica un favorito pendiente al iniciar sesión y limpia el intento', async () => {
@@ -291,6 +343,20 @@ describe('App: favoritos (HU-PROP-05)', () => {
     ).toHaveAttribute('aria-pressed', 'true')
     expect(mock.history.post.filter((c) => c.url === '/v1/favorites/')).toHaveLength(1)
     expect(localStorage.getItem('hb_pending_favorite')).toBeNull()
+    expect(favoriteStatus()).toHaveTextContent('Departamento 1 añadido a favoritos.')
+  })
+
+  it('anuncia cuando no se puede guardar el intento pendiente tras el login', async () => {
+    localStorage.setItem('hb_pending_favorite', 'prop-1')
+    loggedIn()
+    feed(properties)
+    favoritesPage([])
+    mock.onPost('/v1/favorites/').reply(500)
+    renderApp()
+
+    await waitFor(() => expect(favoriteStatus()).toHaveTextContent(
+      'No se pudo guardar el favorito pendiente. Inténtalo de nuevo.',
+    ))
   })
 
   it('normaliza el id numérico del backend para que la sesión sobreviva a la recarga', async () => {
