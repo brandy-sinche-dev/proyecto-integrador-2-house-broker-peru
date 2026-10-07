@@ -330,6 +330,7 @@ const fixtures: Property[] = [
 const withAvailability = fixtures.map<Property>((property) => ({
   ...property,
   status: property.is_active ? 'DISPONIBLE' : 'SUSPENDIDO',
+  is_bookable: property.is_active,
   seller: MOCK_SELLER,
 }))
 

@@ -50,7 +50,7 @@ export const replacePropertySchedules = (id: string, input: PropertySchedulesInp
  */
 const STATUS_TRANSITIONS: Record<PropertyStatus, readonly PropertyStatus[]> = {
   DISPONIBLE: ['RESERVADO', 'SUSPENDIDO'],
-  RESERVADO: ['DISPONIBLE', 'ALQUILADO', 'SUSPENDIDO'],
+  RESERVADO: ['DISPONIBLE', 'ALQUILADO', 'VENDIDO', 'SUSPENDIDO'],
   ALQUILADO: ['SUSPENDIDO'],
   VENDIDO: ['SUSPENDIDO'],
   SUSPENDIDO: ['DISPONIBLE'],
