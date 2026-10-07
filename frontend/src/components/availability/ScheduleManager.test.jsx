@@ -87,15 +87,15 @@ describe('ScheduleManager', () => {
       renderManager()
 
       for (const label of ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']) {
-        expect(screen.getByRole('checkbox', { name: label })).toBeInTheDocument()
+        expect(screen.getByRole('switch', { name: label })).toBeInTheDocument()
       }
-      expect(screen.getAllByRole('checkbox')).toHaveLength(7)
+      expect(screen.getAllByRole('switch')).toHaveLength(7)
     })
 
     it('carga las franjas que devuelve el servidor', () => {
       renderManager({ schedules: weekWith('LUNES', [['09:00', '12:00'], ['14:00', '18:00']]) })
 
-      expect(screen.getByRole('checkbox', { name: 'Lunes' })).toBeChecked()
+      expect(screen.getByRole('switch', { name: 'Lunes' })).toBeChecked()
       expect(screen.getByLabelText('Franja 1 de Lunes: hora de inicio')).toHaveValue('09:00')
       expect(screen.getByLabelText('Franja 1 de Lunes: hora de fin')).toHaveValue('12:00')
       expect(screen.getByLabelText('Franja 2 de Lunes: hora de inicio')).toHaveValue('14:00')
@@ -143,7 +143,7 @@ describe('ScheduleManager', () => {
       const user = userEvent.setup()
       renderManager()
 
-      await user.click(screen.getByRole('checkbox', { name: 'Martes' }))
+      await user.click(screen.getByRole('switch', { name: 'Martes' }))
 
       expect(screen.getByLabelText('Franja 1 de Martes: hora de inicio')).toHaveValue('')
       expect(screen.getByRole('button', { name: '+ Agregar franja' })).toBeInTheDocument()
@@ -153,7 +153,7 @@ describe('ScheduleManager', () => {
       const user = userEvent.setup()
       renderManager()
 
-      await user.click(screen.getByRole('checkbox', { name: 'Lunes' }))
+      await user.click(screen.getByRole('switch', { name: 'Lunes' }))
       await user.click(screen.getByRole('button', { name: '+ Agregar franja' }))
       expect(screen.getByLabelText('Franja 2 de Lunes: hora de inicio')).toBeInTheDocument()
 
@@ -165,8 +165,8 @@ describe('ScheduleManager', () => {
       const user = userEvent.setup()
       renderManager()
 
-      await user.click(screen.getByRole('checkbox', { name: 'Domingo' }))
-      await user.click(screen.getByRole('checkbox', { name: 'Domingo' }))
+      await user.click(screen.getByRole('switch', { name: 'Domingo' }))
+      await user.click(screen.getByRole('switch', { name: 'Domingo' }))
 
       expect(screen.queryByLabelText('Franja 1 de Domingo: hora de inicio')).not.toBeInTheDocument()
       // Los siete días vuelven a quedar sin atención, no solo el que se desmarca.
@@ -177,9 +177,9 @@ describe('ScheduleManager', () => {
       const user = userEvent.setup()
       renderManager()
 
-      await user.click(screen.getByRole('checkbox', { name: 'Lunes' }))
+      await user.click(screen.getByRole('switch', { name: 'Lunes' }))
       await user.click(screen.getByRole('button', { name: '+ Agregar franja' }))
-      await user.click(screen.getByRole('checkbox', { name: 'Sábado' }))
+      await user.click(screen.getByRole('switch', { name: 'Sábado' }))
 
       expect(screen.getByText('3 franjas en la semana.')).toBeInTheDocument()
     })
@@ -188,7 +188,7 @@ describe('ScheduleManager', () => {
       const user = userEvent.setup()
       renderManager()
 
-      await user.click(screen.getByRole('checkbox', { name: 'Viernes' }))
+      await user.click(screen.getByRole('switch', { name: 'Viernes' }))
       const add = screen.getByRole('button', { name: '+ Agregar franja' })
       for (let i = 0; i < 5; i += 1) await user.click(add)
 
@@ -202,7 +202,7 @@ describe('ScheduleManager', () => {
 
       await user.click(screen.getByRole('button', { name: 'Quitar toda la agenda' }))
 
-      expect(screen.getByRole('checkbox', { name: 'Lunes' })).not.toBeChecked()
+      expect(screen.getByRole('switch', { name: 'Lunes' })).not.toBeChecked()
       expect(screen.queryByLabelText('Franja 1 de Lunes: hora de inicio')).not.toBeInTheDocument()
     })
 
@@ -228,7 +228,7 @@ describe('ScheduleManager', () => {
       const user = userEvent.setup()
       renderManager()
 
-      await user.click(screen.getByRole('checkbox', { name: 'Lunes' }))
+      await user.click(screen.getByRole('switch', { name: 'Lunes' }))
 
       expect(screen.getByLabelText('Franja 1 de Lunes: hora de inicio')).toHaveAttribute(
         'aria-invalid',
@@ -242,7 +242,7 @@ describe('ScheduleManager', () => {
       const user = userEvent.setup()
       renderManager()
 
-      await user.click(screen.getByRole('checkbox', { name: 'Lunes' }))
+      await user.click(screen.getByRole('switch', { name: 'Lunes' }))
       setTime('Franja 1 de Lunes: hora de inicio', '18:00')
       setTime('Franja 1 de Lunes: hora de fin', '12:00')
 
@@ -255,7 +255,7 @@ describe('ScheduleManager', () => {
       const user = userEvent.setup()
       renderManager()
 
-      await user.click(screen.getByRole('checkbox', { name: 'Jueves' }))
+      await user.click(screen.getByRole('switch', { name: 'Jueves' }))
       setTime('Franja 1 de Jueves: hora de inicio', '09:00')
       setTime('Franja 1 de Jueves: hora de fin', '09:15')
 
@@ -267,7 +267,7 @@ describe('ScheduleManager', () => {
       const user = userEvent.setup()
       renderManager()
 
-      await user.click(screen.getByRole('checkbox', { name: 'Lunes' }))
+      await user.click(screen.getByRole('switch', { name: 'Lunes' }))
       setTime('Franja 1 de Lunes: hora de inicio', '09:00')
       setTime('Franja 1 de Lunes: hora de fin', '12:00')
       await user.click(screen.getByRole('button', { name: '+ Agregar franja' }))
@@ -282,7 +282,7 @@ describe('ScheduleManager', () => {
       const user = userEvent.setup()
       renderManager()
 
-      await user.click(screen.getByRole('checkbox', { name: 'Lunes' }))
+      await user.click(screen.getByRole('switch', { name: 'Lunes' }))
       setTime('Franja 1 de Lunes: hora de inicio', '09:00')
       setTime('Franja 1 de Lunes: hora de fin', '12:00')
       await user.click(screen.getByRole('button', { name: '+ Agregar franja' }))
@@ -299,10 +299,10 @@ describe('ScheduleManager', () => {
       const user = userEvent.setup()
       const { onSaved } = renderManager()
 
-      await user.click(screen.getByRole('checkbox', { name: 'Lunes' }))
+      await user.click(screen.getByRole('switch', { name: 'Lunes' }))
       setTime('Franja 1 de Lunes: hora de inicio', '09:00')
       setTime('Franja 1 de Lunes: hora de fin', '12:00')
-      await user.click(screen.getByRole('checkbox', { name: 'Sábado' }))
+      await user.click(screen.getByRole('switch', { name: 'Sábado' }))
       setTime('Franja 1 de Sábado: hora de inicio', '10:00')
       setTime('Franja 1 de Sábado: hora de fin', '13:00')
       await user.click(screen.getByRole('button', { name: 'Guardar agenda' }))
@@ -328,7 +328,7 @@ describe('ScheduleManager', () => {
       const onSaved = jest.fn()
       const { rerender } = renderManager({ onSaved })
 
-      await user.click(screen.getByRole('checkbox', { name: 'Lunes' }))
+      await user.click(screen.getByRole('switch', { name: 'Lunes' }))
       setTime('Franja 1 de Lunes: hora de inicio', '09:00')
       setTime('Franja 1 de Lunes: hora de fin', '12:00')
       await user.click(screen.getByRole('button', { name: 'Guardar agenda' }))
@@ -363,7 +363,7 @@ describe('ScheduleManager', () => {
       })
       renderManager({ onSaved })
 
-      await user.click(screen.getByRole('checkbox', { name: 'Martes' }))
+      await user.click(screen.getByRole('switch', { name: 'Martes' }))
       setTime('Franja 1 de Martes: hora de inicio', '09:00')
       setTime('Franja 1 de Martes: hora de fin', '10:00')
       await user.click(screen.getByRole('button', { name: 'Guardar agenda' }))
