@@ -9,7 +9,7 @@
 // negociable) y que los botones de guardar/visitar notifiquen
 // al componente padre.
 
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { PropertyCard } from './PropertyCard'
 
@@ -28,7 +28,7 @@ function makeProperty(overrides = {}) {
   }
 }
 
-function renderCard({ property = {}, saved = false, visit = false, ...props } = {}) {
+function renderCard({ property = {}, saved = false, visit = false, onBookVisit, ...props } = {}) {
   const onToggleSave = jest.fn()
   const onToggleVisit = jest.fn()
   render(
@@ -38,10 +38,11 @@ function renderCard({ property = {}, saved = false, visit = false, ...props } = 
       visit={visit}
       onToggleSave={onToggleSave}
       onToggleVisit={onToggleVisit}
+      onBookVisit={onBookVisit}
       {...props}
     />,
   )
-  return { onToggleSave, onToggleVisit }
+  return { onToggleSave, onToggleVisit, onBookVisit }
 }
 
 describe('PropertyCard', () => {
@@ -161,11 +162,22 @@ describe('PropertyCard', () => {
       expect(onToggleSave).toHaveBeenCalledWith('prop-1')
     })
 
-    it('alterna el agendado de visita y notifica el id', async () => {
-      const user = userEvent.setup()
-      const { onToggleVisit } = renderCard()
+    it('abre el modal de agendado al darle a "Agendar visita" sin visita previa', () => {
+      const onBookVisit = jest.fn()
+      const { onToggleVisit } = renderCard({ onBookVisit })
 
-      await user.click(screen.getByRole('button', { name: 'Agendar visita' }))
+      // `fireEvent` y no `userEvent`: la simulación de puntero de user-event
+      // deja de disparar el click de este botón de forma intermitente en el
+      // runner de CI (ver TASK-CI-02); el envío directo es determinista.
+      fireEvent.click(screen.getByRole('button', { name: 'Agendar visita' }))
+      expect(onBookVisit).toHaveBeenCalledWith('Departamento en Miraflores', 'prop-1')
+      expect(onToggleVisit).not.toHaveBeenCalled()
+    })
+
+    it('desagenda la visita cuando el inmueble ya estaba agendado', () => {
+      const { onToggleVisit } = renderCard({ visit: true })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Visita agendada' }))
 
       expect(onToggleVisit).toHaveBeenCalledWith('prop-1')
     })
