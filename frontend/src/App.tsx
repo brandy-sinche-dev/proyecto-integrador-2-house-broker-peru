@@ -5,7 +5,7 @@ import type { NavTarget, Section } from './components/Header'
 import { Footer } from './components/Footer'
 import { AssistantWidget } from './components/AssistantWidget'
 import { AppointmentModal } from './components/crm/AppointmentModal'
-import { LoginForm } from './components/auth/LoginForm'
+import { LoginModal } from './components/auth/LoginModal'
 import { RegisterForm } from './components/auth/RegisterForm'
 import { LoginPrompt } from './components/auth/LoginPrompt'
 import { useAuth } from './context/AuthContext'
@@ -73,6 +73,7 @@ function PropertyDetailRoute({
 function App() {
   const [section, setSection] = useState<Section>('inicio')
   const [assistantOpen, setAssistantOpen] = useState(false)
+  const [isLoginOpen, setIsLoginOpen] = useState(false)
   const [visits, setVisits] = useState<string[]>(() => readList('hb_visits'))
   const [favorites, setFavorites] = useState<Property[]>([])
   const favoriteIds = useMemo(() => new Set(favorites.map((p) => p.id)), [favorites])
@@ -200,11 +201,11 @@ function App() {
         savedCount={favoriteIds.size}
         visitsCount={visits.length}
         onNavigate={navigate}
+        onOpenLogin={() => setIsLoginOpen(true)}
       />
 
       <Routes>
         <Route path="/" element={home} />
-        <Route path="/login" element={<LoginForm />} />
         <Route path="/registro" element={<RegisterForm />} />
         <Route
           path="/properties/:id"
@@ -258,11 +259,13 @@ function App() {
             localStorage.removeItem('hb_pending_favorite')
           }}
           onLogin={() => {
-            navigateTo('/login')
+            setIsLoginOpen(true)
             setPendingFavorite(null)
           }}
         />
       )}
+
+      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
     </>
   )
 }
