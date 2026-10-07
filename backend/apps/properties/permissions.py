@@ -32,6 +32,33 @@ def _role_of(user) -> str | None:
     return None
 
 
+class IsAuthenticatedUser(BasePermission):
+    """Permiso de los favoritos: sesión válida, o `401`.
+
+    `IsAuthenticated` degrada `NotAuthenticated` a `403` cuando ningún
+    autenticador ofrece un desafío `WWW-Authenticate`, y en los favoritos no
+    hay grados: sin sesión el contrato responde `401 unauthorized`, porque
+    `401` y `403` son dos pantallas distintas para el cliente. Por eso se
+    replica el preámbulo de `IsPropertyAgentOrAdmin` y se lanza el `ProblemError`
+    con el `code` que el contrato documenta.
+    """
+
+    message = (
+        "Falta el encabezado 'Authorization' o la sesión no es válida."
+    )
+
+    def has_permission(self, request, view):
+        if request.user and request.user.is_authenticated:
+            return True
+        raise ProblemError(
+            code="unauthorized",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=(
+                "Falta el encabezado 'Authorization' o la sesión no es válida."
+            ),
+        )
+
+
 class IsPropertyAgentOrAdmin(BasePermission):
     """Permiso de escritura sobre un inmueble concreto.
 

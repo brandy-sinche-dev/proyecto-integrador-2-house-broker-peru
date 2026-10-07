@@ -294,6 +294,39 @@ class PropertyOwner(models.Model):
         return self.full_name
 
 
+class Favorite(models.Model):
+    """Inmueble guardado por un usuario (HU-PROP-05, `architecture.md` §2.2).
+
+    La columna de marca de tiempo es `created_at` en la base y se expone como
+    `added_at` en el API: el contrato la llama así y es lo que ordena la lista.
+    El `UniqueConstraint` sobre `(user, property)` es el `favorite_property` de
+    `indexes-and-queries.md` §2.5: evita el mismo favorito dos veces y sirve de
+    índice de lectura de la lista por usuario.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="favorites"
+    )
+    property = models.ForeignKey(
+        Property, on_delete=models.CASCADE, related_name="favorited_by"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = "favorite"
+        ordering = ("-created_at",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "property"],
+                name="favorite_user_property_unique",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id} · {self.property_id}"
+
+
 class PropertySchedule(models.Model):
     """Franja de visita recurrente de un inmueble (`data-model.md` §2.5).
 
