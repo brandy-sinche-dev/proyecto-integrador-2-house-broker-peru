@@ -26,7 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const syncUser = useCallback(
     (u: { id: string; email?: string; full_name?: string; role: SessionUser['role'] }) => {
-      persist({ id: u.id, email: u.email, full_name: u.full_name, role: u.role })
+      persist({ id: String(u.id), email: u.email, full_name: u.full_name, role: u.role })
     },
     [persist],
   )

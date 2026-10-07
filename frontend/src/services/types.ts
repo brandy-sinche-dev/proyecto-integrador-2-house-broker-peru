@@ -145,6 +145,7 @@ export interface Property {
   mantenimiento?: number
   status?: PropertyStatus
   is_bookable?: boolean
+  is_favorite?: boolean
   seller?: Seller
 }
 

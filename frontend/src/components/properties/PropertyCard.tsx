@@ -8,7 +8,7 @@ interface PropertyCardProps {
   property: Property
   saved: boolean
   visit: boolean
-  onToggleSave: (id: string) => void
+  onToggleSave: (property: Property) => void
   onToggleVisit: (id: string) => void
   onOpen?: (id: string) => void
   onBookVisit?: (title: string, id: string) => void
@@ -116,7 +116,7 @@ export const PropertyCard = memo(function PropertyCard({
         <FavoriteButton
           saved={saved}
           propertyTitle={property.title}
-          onToggle={() => onToggleSave(property.id)}
+          onToggle={() => onToggleSave(property)}
         />
 
         <span className="hpc__overlay">{typeLabel.toUpperCase()}</span>

@@ -16,7 +16,8 @@ interface PropertyListProps {
   mode: Section
   saved: string[]
   visits: string[]
-  onToggleSave: (id: string) => void
+  favoriteList?: Property[]
+  onToggleSave: (property: Property) => void
   onToggleVisit: (id: string) => void
   onNavigate: (target: NavTarget) => void
   onOpen?: (id: string) => void
@@ -88,6 +89,7 @@ export function PropertyList({
   mode,
   saved,
   visits,
+  favoriteList = [],
   onToggleSave,
   onToggleVisit,
   onNavigate,
@@ -101,12 +103,14 @@ export function PropertyList({
   const [view, setView] = useState<ViewMode>('grid3')
   const [page, setPage] = useState(1)
 
+  const source = mode === 'guardados' && favoriteList.length > 0 ? favoriteList : properties
+
   const bounds = useMemo(() => {
-    const prices = properties.map((p) => p.price)
+    const prices = source.map((p) => p.price)
     const min = prices.length ? Math.min(...prices) : 0
     const max = prices.length ? Math.max(...prices) : 0
     return { min, max: max || 1 }
-  }, [properties])
+  }, [source])
 
   const {
     filters,
@@ -168,7 +172,7 @@ export function PropertyList({
 
   const filtered = useMemo(() => {
     const q = urlQuery.trim().toLowerCase()
-    const list = properties.filter((p) => {
+    const list = source.filter((p) => {
       if (mode === 'guardados' && !saved.includes(p.id)) return false
       if (mode === 'visitas' && !visits.includes(p.id)) return false
       if (filters.operacion && p.mode !== filters.operacion) return false
@@ -192,7 +196,7 @@ export function PropertyList({
     else if (sort === 'area-desc') sorted.sort((a, b) => areaOf(b) - areaOf(a))
     else sorted.sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
     return sorted
-  }, [properties, urlQuery, sort, mode, saved, visits, filters])
+  }, [source, urlQuery, sort, mode, saved, visits, filters])
 
   const resetKey = `${mode}\u0000${urlQuery}\u0000${sort}\u0000${JSON.stringify(filters)}`
   const [prevResetKey, setPrevResetKey] = useState(resetKey)

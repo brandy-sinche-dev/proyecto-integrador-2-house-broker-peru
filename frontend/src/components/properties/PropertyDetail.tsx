@@ -4,11 +4,14 @@ import type { Property, TransactionMode } from '../../services/types'
 import { getProperty } from '../../services/properties'
 import { getErrorMessage } from '../../services/axios'
 import { formatMoney } from './money'
+import { FavoriteButton } from './FavoriteButton'
 import './PropertyDetail.css'
 
 interface PropertyDetailProps {
   onBack: () => void
   onBookVisit?: (title: string, id: string) => void
+  favorite?: boolean
+  onToggleFavorite?: (property: Property) => void
 }
 
 type Status = 'loading' | 'error' | 'ready'
@@ -25,7 +28,7 @@ const TYPE_LABEL: Record<string, string> = {
   OFICINA: 'Oficina',
 }
 
-export function PropertyDetail({ onBack, onBookVisit }: PropertyDetailProps) {
+export function PropertyDetail({ onBack, onBookVisit, favorite = false, onToggleFavorite }: PropertyDetailProps) {
   const { id = '' } = useParams()
   const [property, setProperty] = useState<Property | null>(null)
   const [status, setStatus] = useState<Status>('loading')
@@ -106,7 +109,17 @@ export function PropertyDetail({ onBack, onBookVisit }: PropertyDetailProps) {
 
           <div className="hpd__body">
             <span className="hpd__badge">{OP_LABEL[property.mode] ?? property.mode}</span>
-            <h1 className="hpd__title">{property.title}</h1>
+            <div className="hpd__title-row">
+              <h1 className="hpd__title">{property.title}</h1>
+              {onToggleFavorite && (
+                <FavoriteButton
+                  saved={favorite}
+                  propertyTitle={property.title}
+                  onToggle={() => onToggleFavorite(property)}
+                  className="hpd__fav"
+                />
+              )}
+            </div>
             <p className="hpd__price">{formatMoney(property.price, property.moneda)}</p>
             <p className="hpd__address">{property.address}</p>
 

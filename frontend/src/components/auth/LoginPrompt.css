@@ -1,0 +1,68 @@
+.lprompt {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: rgba(23, 17, 10, 0.55);
+  padding: 1rem;
+}
+
+.lprompt__dialog {
+  position: relative;
+  width: min(100%, 22rem);
+  background: #fbf9f8;
+  border-radius: 14px;
+  padding: 1.75rem 1.5rem 1.5rem;
+  box-shadow: 0 18px 48px rgba(23, 17, 10, 0.28);
+}
+
+.lprompt__close {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.75rem;
+  border: 0;
+  background: transparent;
+  font-size: 1.3rem;
+  line-height: 1;
+  color: #6b6257;
+  cursor: pointer;
+}
+
+.lprompt__dialog h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1.15rem;
+  color: #2a231b;
+}
+
+.lprompt__dialog p {
+  margin: 0 0 1.25rem;
+  font-size: 0.92rem;
+  color: #5c5449;
+}
+
+.lprompt__actions {
+  display: flex;
+  gap: 0.65rem;
+  justify-content: flex-end;
+}
+
+.lprompt__primary,
+.lprompt__ghost {
+  border: 0;
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lprompt__primary {
+  background: #765a25;
+  color: #fff;
+}
+
+.lprompt__ghost {
+  background: transparent;
+  color: #765a25;
+}
