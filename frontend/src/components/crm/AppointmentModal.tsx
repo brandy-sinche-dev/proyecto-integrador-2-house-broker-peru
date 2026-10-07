@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { DateSlotsPicker } from './DateSlotsPicker';
 import { SuccessToast } from './SuccessToast';
 
 interface AppointmentModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onConfirmed: () => void;
   propertyTitle?: string;
   isLoggedIn?: boolean;
 }
@@ -12,20 +13,13 @@ interface AppointmentModalProps {
 export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   isOpen,
   onClose,
+  onConfirmed,
   propertyTitle = "Inmueble seleccionado",
   isLoggedIn = true,
 }) => {
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      setIsSuccess(false);
-      setSelectedDate('');
-      setSelectedTime('');
-    }
-  }, [isOpen, propertyTitle]);
 
   if (!isOpen) return null;
 
@@ -45,6 +39,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     e.preventDefault();
     if (selectedDate && selectedTime) {
       setIsSuccess(true);
+      onConfirmed();
     }
   };
 
