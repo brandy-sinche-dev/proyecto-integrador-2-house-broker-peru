@@ -1,7 +1,17 @@
 from rest_framework import serializers
 
 from . import services
-from .models import Favorite, Property, PropertyImage, PropertySchedule, PropertyStatus, Weekday
+from .models import (
+    Currency,
+    Favorite,
+    Property,
+    PropertyImage,
+    PropertySchedule,
+    PropertyStatus,
+    PropertyType,
+    TransactionMode,
+    Weekday,
+)
 from .problems import ProblemError
 
 
@@ -129,6 +139,75 @@ class PropertySerializer(serializers.ModelSerializer):
 # -------------------------------------------------------------
 # Estado operativo
 # -------------------------------------------------------------
+
+
+class PropertyInputSerializer(StrictFieldsSerializer):
+    """Entrada de `POST`/`PUT /api/v1/properties` (schema `PropertyInput`).
+
+    `additionalProperties: false` del contrato lo hereda de
+    `StrictFieldsSerializer`; `source=` traduce el nombre del contrato
+    (`moneda`, `link_galeria`) al de la columna (`currency`, `exterior_url`),
+    de modo que `validated_data` queda listo para el `create`/`update` sin una
+    segunda tabla de mapeo. `price` y los áreas usan `Decimal` porque la
+    columna lo exige y DRF devuelve `Decimal` en lugar de `float`.
+    """
+
+    title = serializers.CharField(min_length=1, max_length=200)
+    price = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        min_value=services.PRICE_MIN_VALUE,
+    )
+    moneda = serializers.ChoiceField(
+        source="currency",
+        choices=[choice.value for choice in Currency],
+        default=Currency.PEN,
+    )
+    mode = serializers.ChoiceField(
+        choices=[choice.value for choice in TransactionMode]
+    )
+    address = serializers.CharField(min_length=1, max_length=300)
+    property_type = serializers.ChoiceField(
+        choices=[choice.value for choice in PropertyType]
+    )
+    area_total = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=0, required=False, allow_null=True
+    )
+    area_construida = serializers.DecimalField(
+        source="area_built",
+        max_digits=10,
+        decimal_places=2,
+        min_value=0,
+        required=False,
+        allow_null=True,
+    )
+    dormitorios = serializers.IntegerField(
+        source="bedrooms", min_value=0, required=False, allow_null=True
+    )
+    banos = serializers.IntegerField(
+        source="bathrooms", min_value=0, required=False, allow_null=True
+    )
+    estacionamientos = serializers.IntegerField(
+        source="parking_spaces", min_value=0, required=False
+    )
+    link_galeria = serializers.URLField(
+        source="exterior_url", required=False, allow_null=True
+    )
+    link_planos = serializers.URLField(
+        source="floorplan_url", required=False, allow_null=True
+    )
+    negociable = serializers.BooleanField(
+        source="is_negotiable", required=False, allow_null=True
+    )
+    destacado = serializers.BooleanField(source="is_featured", required=False)
+    mantenimiento = serializers.DecimalField(
+        source="maintenance_fee",
+        max_digits=10,
+        decimal_places=2,
+        min_value=0,
+        required=False,
+        allow_null=True,
+    )
 
 
 class PropertyStatusInputSerializer(StrictFieldsSerializer):

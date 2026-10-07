@@ -2,24 +2,57 @@ import uuid
 
 from django.db.models import BooleanField, Exists, OuterRef, Value
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
+from django.utils import timezone as dj_timezone
 from rest_framework import status as http_status
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from . import services
+from .filters import apply_catalog_filters, parse_catalog_filters
 from .models import Favorite, Property
 from .pagination import PropertyPagination
-from .permissions import IsAuthenticatedUser, IsPropertyAgentOrAdmin
+from .permissions import (
+    ROLE_ADMIN,
+    ROLE_AGENT,
+    IsAuthenticatedUser,
+    IsPropertyAgentOrAdmin,
+    _role_of,
+)
 from .problems import ProblemError, ProblemResponseMixin
 from .serializers import (
     FavoriteInputSerializer,
     FavoriteSerializer,
+    PropertyInputSerializer,
     PropertySchedulesInputSerializer,
     PropertySerializer,
     PropertyStatusInputSerializer,
     PropertyStatusResultSerializer,
     build_schedules_payload,
+)
+
+
+# Campos que `PUT` reemplaza (schema `PropertyInput`). `id`, `is_active`,
+# `created_at`, `code` y `agent` se conservan: el contrato lo dice explícito.
+WRITABLE_FIELDS = (
+    "title",
+    "price",
+    "currency",
+    "mode",
+    "address",
+    "district",
+    "property_type",
+    "area_total",
+    "area_built",
+    "bedrooms",
+    "bathrooms",
+    "parking_spaces",
+    "exterior_url",
+    "floorplan_url",
+    "is_negotiable",
+    "is_featured",
+    "maintenance_fee",
 )
 
 
@@ -48,7 +81,9 @@ class PropertyViewSet(ProblemResponseMixin, viewsets.ReadOnlyModelViewSet):
             queryset = queryset.annotate(
                 is_favorite=Value(False, output_field=BooleanField())
             )
-        return queryset
+        return apply_catalog_filters(
+            queryset, parse_catalog_filters(self.request.query_params)
+        )
 
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)
@@ -56,6 +91,76 @@ class PropertyViewSet(ProblemResponseMixin, viewsets.ReadOnlyModelViewSet):
         if paginator is not None and getattr(paginator, "page", None) is not None:
             response["X-Total-Count"] = paginator.page.paginator.count
         return response
+
+    def get_permissions(self):
+        permissions = super().get_permissions()
+        if self.action in {"create", "update", "partial_update", "destroy"}:
+            permissions = [IsPropertyAgentOrAdmin()]
+        return permissions
+
+    # -------------------------------------------------------------
+    # Alta, edición y baja (HU-PROP-01 / Registro de propiedad)
+    # -------------------------------------------------------------
+
+    def ensure_can_manage(self):
+        """Rol que puede dar de alta; editar y borrar los decide el permiso de objeto."""
+        role = _role_of(self.request.user)
+        if role not in {ROLE_AGENT, ROLE_ADMIN}:
+            raise ProblemError(
+                code="forbidden",
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="Solo un agente o un administrador puede registrar propiedades.",
+                extras={"required_roles": [ROLE_AGENT, ROLE_ADMIN]},
+            )
+
+    def create(self, request, *args, **kwargs):
+        """`POST` (schema `PropertyInput`): el servidor manda `code`, `agent`
+        y `district` (resuelto desde la dirección)."""
+        self.ensure_can_manage()
+        payload = PropertyInputSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        data = dict(payload.validated_data)
+        district = services.resolve_district(data["address"])
+        prop = Property.objects.create(
+            code=services.next_property_code(),
+            agent=request.user,
+            district=district,
+            created_by=request.user,
+            **data,
+        )
+        location = request.build_absolute_uri(f"{reverse('property-list')}/{prop.id}")
+        return Response(
+            PropertySerializer(prop, context=self.get_serializer_context()).data,
+            status=http_status.HTTP_201_CREATED,
+            headers={"Location": location},
+        )
+
+    def update(self, request, *args, **kwargs):
+        """`PUT` (schema `PropertyInput`). `id`, `is_active` y `created_at`
+        se conservan; el `district` se re-resuelve desde la nueva dirección."""
+        prop = self.get_availability_object(request)
+        payload = PropertyInputSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        data = dict(payload.validated_data)
+        prop.district = services.resolve_district(data["address"])
+        for field, value in data.items():
+            setattr(prop, field, value)
+        prop.save(update_fields=WRITABLE_FIELDS)
+        return Response(
+            PropertySerializer(prop, context=self.get_serializer_context()).data,
+            status=http_status.HTTP_200_OK,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        """`DELETE`: baja lógica, nunca borra la fila en `status` auditados."""
+        prop = self.get_availability_object(request)
+        prop.is_active = False
+        prop.deleted_at = dj_timezone.now()
+        prop.save(update_fields=["is_active", "deleted_at"])
+        return Response(
+            PropertySerializer(prop, context=self.get_serializer_context()).data,
+            status=http_status.HTTP_200_OK,
+        )
 
     # -------------------------------------------------------------
     # Disponibilidad (RF-PROP-04)

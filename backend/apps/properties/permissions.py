@@ -27,6 +27,10 @@ def _role_of(user) -> str | None:
     role = getattr(user, "role", None)
     if role:
         return role
+    profile = getattr(user, "profile", None)
+    profile_role = getattr(profile, "role", None)
+    if profile_role:
+        return profile_role
     if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
         return ROLE_ADMIN
     return None
