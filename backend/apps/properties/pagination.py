@@ -1,5 +1,28 @@
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.pagination import PageNumberPagination
+
+
+class _EmptyPageAdapter:
+    """`page` sin datos pero con un `paginator`, para un `results` vacío.
+
+    `PageNumberPagination` usa el `Page` para armar `next`/`previous` y el
+    `count`; una página fuera de rango no debe ser `404` (el contrato de
+    catálogo y de CRM la fija en `200` con `results` vacío), así que se
+    sustituye por un objeto que solo sabe decir que no hay vecinos y que
+    conserva el total del queryset para `count` y `X-Total-Count`.
+    """
+
+    def __init__(self, count):
+        self.paginator = type("_CountOnly", (), {"count": count})()
+
+    def __len__(self):
+        return 0
+
+    def has_next(self):
+        return False
+
+    def has_previous(self):
+        return False
 
 
 class PropertyPagination(PageNumberPagination):
@@ -38,4 +61,11 @@ class PropertyPagination(PageNumberPagination):
             raise ValidationError(
                 {"page": ["El parámetro 'page' debe ser un entero mayor o igual a 1."]}
             )
-        return super().paginate_queryset(queryset, request, view)
+        try:
+            return super().paginate_queryset(queryset, request, view)
+        except NotFound:
+            # El número ya pasó la validación de entero, así que el `404` de
+            # DRF aquí solo puede venir de una página fuera de rango. El
+            # contrato la fija en `200` con `results` vacío y `next` en `null`.
+            self.page = _EmptyPageAdapter(queryset.count())
+            return []

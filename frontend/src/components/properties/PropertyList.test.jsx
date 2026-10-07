@@ -128,7 +128,7 @@ describe('PropertyList (integración del catálogo)', () => {
       await screen.findByRole('heading', { level: 3, name: 'Propiedad 01' })
 
       fireEvent.click(screen.getByRole('button', { name: 'Guardar Propiedad 01' }))
-      expect(props.onToggleSave).toHaveBeenCalledWith('prop-1')
+      expect(props.onToggleSave).toHaveBeenCalledWith(expect.objectContaining({ id: 'prop-1' }))
 
       fireEvent.click(screen.getByRole('button', { name: 'Agendar visita' }))
       expect(props.onBookVisit).toHaveBeenCalledWith('Propiedad 01', 'prop-1')

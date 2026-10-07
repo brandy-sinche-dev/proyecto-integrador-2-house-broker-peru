@@ -40,8 +40,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'apps.properties',
     'apps.appointments',
+    'apps.users',
 ]
 
 MIDDLEWARE = [
@@ -93,7 +96,7 @@ DATABASES = {
 if os.environ.get('DJANGO_DB_ENGINE') == 'sqlite':
     DATABASES['default'] = {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': ':memory:',
+        'NAME': os.environ.get('SQLITE_DB', ':memory:'),
     }
 
 # CORS para el frontend de desarrollo (React en Vite)
@@ -106,11 +109,30 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'apps.properties.pagination.PropertyPagination',
     'PAGE_SIZE': 12,
     'COERCE_DECIMAL_TO_STRING': False,
-    # Los errores de dominio de disponibilidad salen en `application/problem+json`
-    # con el `code` que documenta `docs/api/openapi_spec.yaml`. El manejador
-    # delega todo lo demás en DRF, así que el catálogo no cambia de forma.
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ),
     'EXCEPTION_HANDLER': 'apps.properties.problems.problem_exception_handler',
 }
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(seconds=1800),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'sub',
+    'SIGNING_KEY': os.environ.get('DJANGO_SECRET_KEY', SECRET_KEY),
+}
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+]
 
 # URL base para componer las URLs de las imágenes de propiedades.
 PROPERTY_MEDIA_BASE_URL = os.environ.get(

@@ -1,10 +1,16 @@
-import { useCallback, useEffect, useState, lazy, Suspense } from 'react'
+import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react'
 import { Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Header } from './components/Header'
 import type { NavTarget, Section } from './components/Header'
 import { Footer } from './components/Footer'
 import { AssistantWidget } from './components/AssistantWidget'
 import { AppointmentModal } from './components/crm/AppointmentModal'
+import { LoginForm } from './components/auth/LoginForm'
+import { RegisterForm } from './components/auth/RegisterForm'
+import { LoginPrompt } from './components/auth/LoginPrompt'
+import { useAuth } from './context/AuthContext'
+import { addFavorite, getFavorites, removeFavorite } from './services/favorites'
+import type { Property } from './services/types'
 
 const PropertyList = lazy(() => import('./components/properties/PropertyList').then(m => ({ default: m.PropertyList })))
 const PropertyDetail = lazy(() => import('./components/properties/PropertyDetail').then(m => ({ default: m.PropertyDetail })))
@@ -36,31 +42,106 @@ function ListSkeleton() {
 
 function AgentAvailability() {
   const { id } = useParams<{ id: string }>()
+  const { user } = useAuth()
+  if (!user) return <div>Inicia sesión para gestionar disponibilidad.</div>
+  if (user.role !== 'AGENTE' && user.role !== 'ADMINISTRADOR') return <div>No tienes permisos para gestionar disponibilidad.</div>
   return <AvailabilityPanel propertyId={id ?? ''} />
+}
+
+function PropertyDetailRoute({
+  favoriteIds,
+  onToggleFavorite,
+  onBack,
+  onBookVisit,
+}: {
+  favoriteIds: ReadonlySet<string>
+  onToggleFavorite: (property: Property) => void
+  onBack: () => void
+  onBookVisit?: (title: string, id: string) => void
+}) {
+  const { id = '' } = useParams()
+  return (
+    <PropertyDetail
+      favorite={favoriteIds.has(id)}
+      onToggleFavorite={onToggleFavorite}
+      onBack={onBack}
+      onBookVisit={onBookVisit}
+    />
+  )
 }
 
 function App() {
   const [section, setSection] = useState<Section>('inicio')
   const [assistantOpen, setAssistantOpen] = useState(false)
-  const [saved, setSaved] = useState<string[]>(() => readList('hb_saved'))
   const [visits, setVisits] = useState<string[]>(() => readList('hb_visits'))
+  const [favorites, setFavorites] = useState<Property[]>([])
+  const favoriteIds = useMemo(() => new Set(favorites.map((p) => p.id)), [favorites])
+  const [pendingFavorite, setPendingFavorite] = useState<string | null>(() =>
+    localStorage.getItem('hb_pending_favorite'),
+  )
 
   const [selectedProperty, setSelectedProperty] = useState<{ id: string; title: string } | null>(null)
+  const { user } = useAuth()
 
   const navigateTo = useNavigate()
   const location = useLocation()
 
   useEffect(() => {
-    localStorage.setItem('hb_saved', JSON.stringify(saved))
-  }, [saved])
-
-  useEffect(() => {
     localStorage.setItem('hb_visits', JSON.stringify(visits))
   }, [visits])
 
+  useEffect(() => {
+    if (!user) {
+      setFavorites([])
+      return
+    }
+    let cancelled = false
+    getFavorites()
+      .then((list) => {
+        if (!cancelled) setFavorites(list)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (!user || !pendingFavorite) return
+    const id = pendingFavorite
+    setPendingFavorite(null)
+    localStorage.removeItem('hb_pending_favorite')
+    addFavorite(id)
+      .then((fav) =>
+        setFavorites((prev) => (prev.some((p) => p.id === id) ? prev : [...prev, fav.property])),
+      )
+      .catch(() => {})
+  }, [user, pendingFavorite])
+
   const toggleSave = useCallback(
-    (id: string) => setSaved((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])),
-    [],
+    (property: Property) => {
+      if (!user) {
+        localStorage.setItem('hb_pending_favorite', property.id)
+        setPendingFavorite(property.id)
+        return
+      }
+      const isSaved = favoriteIds.has(property.id)
+      const previous = favorites
+      setFavorites((prev) =>
+        isSaved
+          ? prev.filter((p) => p.id !== property.id)
+          : [...prev, { ...property, is_favorite: true }],
+      )
+      const request = isSaved
+        ? removeFavorite(property.id)
+        : addFavorite(property.id).then((fav) =>
+            setFavorites((prev) =>
+              prev.map((p) => (p.id === property.id ? { ...fav.property, is_favorite: true } : p)),
+            ),
+          )
+      request.catch(() => setFavorites(previous))
+    },
+    [user, favoriteIds, favorites],
   )
 
   const toggleVisit = useCallback(
@@ -99,8 +180,9 @@ function App() {
     <Suspense fallback={<ListSkeleton />}>
       <PropertyList
         mode={section}
-        saved={saved}
+        saved={[...favoriteIds]}
         visits={visits}
+        favoriteList={favorites}
         onToggleSave={toggleSave}
         onToggleVisit={toggleVisit}
         onNavigate={navigate}
@@ -115,19 +197,23 @@ function App() {
       <Header
         current={section}
         conciergeOpen={assistantOpen}
-        savedCount={saved.length}
+        savedCount={favoriteIds.size}
         visitsCount={visits.length}
         onNavigate={navigate}
       />
 
       <Routes>
         <Route path="/" element={home} />
+        <Route path="/login" element={<LoginForm />} />
+        <Route path="/registro" element={<RegisterForm />} />
         <Route
           path="/properties/:id"
           element={
             <Suspense fallback={<ListSkeleton />}>
-              <PropertyDetail 
-                onBack={() => navigateTo('/')} 
+              <PropertyDetailRoute
+                favoriteIds={favoriteIds}
+                onToggleFavorite={toggleSave}
+                onBack={() => navigateTo('/')}
                 onBookVisit={handleBookVisit}
               />
             </Suspense>
@@ -148,7 +234,7 @@ function App() {
 
       <AssistantWidget
         open={assistantOpen}
-        savedCount={saved.length}
+        savedCount={favoriteIds.size}
         visitsCount={visits.length}
         onToggle={() => setAssistantOpen((open) => !open)}
         onNavigate={navigate}
@@ -161,7 +247,20 @@ function App() {
           onClose={() => setSelectedProperty(null)}
           onConfirmed={() => confirmVisit(selectedProperty.id)}
           propertyTitle={selectedProperty.title}
-          isLoggedIn={true}
+          isLoggedIn={Boolean(user)}
+        />
+      )}
+
+      {pendingFavorite && !user && (
+        <LoginPrompt
+          onClose={() => {
+            setPendingFavorite(null)
+            localStorage.removeItem('hb_pending_favorite')
+          }}
+          onLogin={() => {
+            navigateTo('/login')
+            setPendingFavorite(null)
+          }}
         />
       )}
     </>

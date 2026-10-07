@@ -147,7 +147,7 @@ describe('PropertyCard', () => {
 
       await user.click(screen.getByRole('button', { name: 'Guardar Departamento en Miraflores' }))
 
-      expect(onToggleSave).toHaveBeenCalledWith('prop-1')
+      expect(onToggleSave).toHaveBeenCalledWith(expect.objectContaining({ id: 'prop-1' }))
     })
 
     it('refleja el estado guardado y permite quitarlo', async () => {
@@ -160,7 +160,7 @@ describe('PropertyCard', () => {
       expect(button).toHaveAttribute('aria-pressed', 'true')
 
       await user.click(button)
-      expect(onToggleSave).toHaveBeenCalledWith('prop-1')
+      expect(onToggleSave).toHaveBeenCalledWith(expect.objectContaining({ id: 'prop-1' }))
     })
 
     it('agenda una nueva visita con título e id', async () => {

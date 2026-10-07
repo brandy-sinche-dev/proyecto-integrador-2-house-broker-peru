@@ -16,14 +16,17 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import time, timedelta
+from decimal import Decimal
 
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from .filters import fold_text
 from .models import (
     SLOT_MAX_DURATION,
     SLOT_MIN_DURATION,
+    District,
     Property,
     PropertySchedule,
     PropertyStatus,
@@ -77,6 +80,62 @@ def schedule_timezone() -> str:
     que el dato y el comportamiento no puedan separarse.
     """
     return getattr(settings, "TIME_ZONE", SCHEDULES_TIMEZONE) or SCHEDULES_TIMEZONE
+
+
+# ------------------------------------------------------------------
+# Alta y actualización de propiedades (HU-PROP-01)
+# ------------------------------------------------------------------
+
+# `PropertyInput` llama `minimum: 0.0001` al `price`.
+PRICE_MIN_VALUE = Decimal("0.0001")
+
+
+def next_property_code() -> str:
+    """`PROP-00001`, `PROP-00002`, … siguiendo el mayor sufijo existente.
+
+    `code` es `unique` y lo manda el servidor: el contrato no lo expone en
+    `PropertyInput`. El sufijo se calcula sobre la columna para no depender de
+    una secuencia de base que PostgreSQL y SQLite no compartirían.
+    """
+    suffixes = Property.objects.filter(code__istartswith="PROP-").values_list(
+        "code", flat=True
+    )
+    max_sequence = 0
+    for code in suffixes:
+        suffix = code.split("-", 1)[-1]
+        if suffix.isdigit() and 1 <= len(suffix) <= 5:
+            max_sequence = max(max_sequence, int(suffix))
+    return f"PROP-{max_sequence + 1:05d}"
+
+
+def resolve_district(address: str) -> District:
+    """Distrito de una dirección, por nombre contenido en ella.
+
+    `PropertyInput` no trae el distrito (el schema no lo declara) y la `FK`
+    es obligatoria: la dirección es la única señal disponible. Se elige el
+    distrito activo cuyo nombre aparece en la dirección y, si varios, el de
+    nombre más largo (el más específico). Sin coincidencia es un `400` sobre
+    `address`, que para el frontend es "revisá la dirección".
+    """
+    needle = fold_text(address)
+    best = None
+    for district in District.objects.filter(is_active=True):
+        name = fold_text(district.name)
+        if name and name in needle:
+            if best is None or len(district.name) > len(best.name):
+                best = district
+    if best is None:
+        raise ProblemError(
+            code="invalid_query_parameter",
+            detail="No se pudo determinar el distrito de la dirección.",
+            errors=[
+                {
+                    "parameter": "address",
+                    "message": "La dirección no menciona un distrito registrado.",
+                }
+            ],
+        )
+    return best
 
 
 # -------------------------------------------------------------

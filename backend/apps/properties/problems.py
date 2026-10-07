@@ -92,6 +92,10 @@ ERROR_TYPES = {
         "https://housebroker.pe/errors/internal-server-error",
         "Error interno del servidor",
     ),
+    "invalid_filter_range": (
+        "https://housebroker.pe/errors/invalid-filter-range",
+        "Rango de precio incoherente",
+    ),
 }
 
 # `code` que el contrato le asigna a cada excepción propia de DRF. Lo que no
@@ -115,6 +119,10 @@ class ProblemError(APIException):
     `errors` es la lista de `{parameter, message}` del schema `ProblemBadRequest`
     (errors: [{parameter: days[0].slots[1], message: ...}]). `extras` son las
     extensiones opcionales del schema, como el `required_roles` del 403.
+
+    `title` sobrescribe el título por defecto del `code`: el spec usa el mismo
+    `invalid_filter_range` con "Rango de precio incoherente" en el catálogo y
+    con "Rango de fechas inválido" en CRM.
     """
 
     status_code = status.HTTP_400_BAD_REQUEST
@@ -129,8 +137,10 @@ class ProblemError(APIException):
         status_code=None,
         instance=None,
         extras=None,
+        title=None,
     ):
         self.code = code
+        self.title = title
         self.errors = errors or []
         self.instance = instance
         self.extras = extras or {}
@@ -209,6 +219,7 @@ def problem_exception_handler(exc, context):
                 exc.extras,
                 exc.instance,
                 context,
+                title=exc.title,
             ),
             exc.status_code,
         )
@@ -287,15 +298,15 @@ def _extras_of(exc: Exception) -> dict | None:
     return {"required_roles": list(REQUIRED_ROLES)}
 
 
-def _problem_body(code, status_code, detail, errors, extras, instance, context):
-    error_type, title = ERROR_TYPES.get(
+def _problem_body(code, status_code, detail, errors, extras, instance, context, title=None):
+    error_type, default_title = ERROR_TYPES.get(
         code, (f"https://housebroker.pe/errors/{code}", code)
     )
     request = context.get("request")
 
     body = {
         "type": error_type,
-        "title": title,
+        "title": title or default_title,
         "status": status_code,
         "detail": _summary(detail),
         "instance": instance or getattr(request, "path", None),

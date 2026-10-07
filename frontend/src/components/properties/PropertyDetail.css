@@ -79,6 +79,13 @@
   text-transform: uppercase;
 }
 
+.hpd__title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .hpd__title {
   margin: 4px 0 0;
   font-size: 28px;
@@ -86,6 +93,30 @@
   font-weight: 700;
   letter-spacing: -0.7px;
   color: var(--ink);
+}
+
+.hpd__fav {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  padding: 6px;
+  margin-top: 6px;
+  color: var(--brand-bronze);
+  cursor: pointer;
+}
+
+.hpd__fav svg {
+  display: block;
+  width: 24px;
+  height: 22px;
+}
+
+.hpd__fav.is-saved {
+  color: var(--brand-gold);
+}
+
+.hpd__fav.is-saved svg path {
+  fill: currentColor;
 }
 
 .hpd__price {

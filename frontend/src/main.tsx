@@ -2,7 +2,9 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import './index.css'
+import './components/auth/auth.css'
 import App from './App.tsx'
+import { AuthProvider } from './context/AuthContext'
 import { reportWebVitals } from './utils/webVitals'
 
 // Los mocks (y `axios-mock-adapter`) se cargan bajo demanda para no
@@ -15,7 +17,9 @@ if (import.meta.env.VITE_ENABLE_MOCKS === 'true') {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
 )
