@@ -12,7 +12,7 @@
 //   - estados vacío y de error con reintento,
 //   - propagación de acciones de las tarjetas a la app.
 
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useEffect, useRef } from 'react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation, useNavigationType } from 'react-router-dom'
@@ -62,6 +62,7 @@ function baseProps(overrides = {}) {
     onToggleSave: jest.fn(),
     onToggleVisit: jest.fn(),
     onNavigate: jest.fn(),
+    onBookVisit: jest.fn(),
     ...overrides,
   }
 }
@@ -120,18 +121,17 @@ describe('PropertyList (integración del catálogo)', () => {
       expect(cardTitles()).toEqual(['Propiedad 03', 'Propiedad 01'])
     })
 
-    it('propaga las acciones de guardar y agendar visita de las tarjetas', async () => {
-      const user = userEvent.setup()
+    it('propaga las acciones de guardar y abrir el modal de agendado de las tarjetas', async () => {
       mock.onGet(LIST_PATH).reply(200, paginated([makeProperty(0)]))
 
       const { props } = renderList()
       await screen.findByRole('heading', { level: 3, name: 'Propiedad 01' })
 
-      await user.click(screen.getByRole('button', { name: 'Guardar Propiedad 01' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Guardar Propiedad 01' }))
       expect(props.onToggleSave).toHaveBeenCalledWith('prop-1')
 
-      await user.click(screen.getByRole('button', { name: 'Agendar visita' }))
-      expect(props.onToggleVisit).toHaveBeenCalledWith('prop-1')
+      fireEvent.click(screen.getByRole('button', { name: 'Agendar visita' }))
+      expect(props.onBookVisit).toHaveBeenCalledWith('Propiedad 01', 'prop-1')
     })
   })
 
