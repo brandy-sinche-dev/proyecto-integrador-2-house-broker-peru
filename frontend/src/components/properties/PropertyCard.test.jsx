@@ -28,9 +28,10 @@ function makeProperty(overrides = {}) {
   }
 }
 
-function renderCard({ property = {}, saved = false, visit = false, onBookVisit, ...props } = {}) {
+function renderCard({ property = {}, saved = false, visit = false, ...props } = {}) {
   const onToggleSave = jest.fn()
   const onToggleVisit = jest.fn()
+  const onBookVisit = jest.fn()
   render(
     <PropertyCard
       property={makeProperty(property)}
@@ -162,9 +163,8 @@ describe('PropertyCard', () => {
       expect(onToggleSave).toHaveBeenCalledWith('prop-1')
     })
 
-    it('abre el modal de agendado al darle a "Agendar visita" sin visita previa', () => {
-      const onBookVisit = jest.fn()
-      const { onToggleVisit } = renderCard({ onBookVisit })
+    it('agenda una nueva visita con título e id', async () => {
+      const { onToggleVisit, onBookVisit } = renderCard()
 
       // `fireEvent` y no `userEvent`: la simulación de puntero de user-event
       // deja de disparar el click de este botón de forma intermitente en el
@@ -175,11 +175,42 @@ describe('PropertyCard', () => {
     })
 
     it('desagenda la visita cuando el inmueble ya estaba agendado', () => {
-      const { onToggleVisit } = renderCard({ visit: true })
+      const { onToggleVisit, onBookVisit } = renderCard({ visit: true })
 
       fireEvent.click(screen.getByRole('button', { name: 'Visita agendada' }))
 
       expect(onToggleVisit).toHaveBeenCalledWith('prop-1')
+      expect(onBookVisit).not.toHaveBeenCalled()
+    })
+
+    it.each([{}, { status: 'RESERVADO', is_bookable: false }])('alterna una visita existente sin crear otra (%j)', async (property) => {
+      const user = userEvent.setup()
+      const { onToggleVisit, onBookVisit } = renderCard({ visit: true, property })
+      await user.click(screen.getByRole('button', { name: 'Visita agendada' }))
+      expect(onToggleVisit).toHaveBeenCalledWith('prop-1')
+      expect(onBookVisit).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      { status: 'RESERVADO' }, { status: 'ALQUILADO' },
+      { status: 'VENDIDO' }, { status: 'SUSPENDIDO' },
+      { status: 'DISPONIBLE', is_bookable: false },
+      { status: 'DISPONIBLE', is_active: false },
+      { is_bookable: false }, { is_active: false },
+    ])('impide nuevas visitas cuando no está disponible (%j)', async (property) => {
+      const user = userEvent.setup()
+      const { onToggleVisit, onBookVisit } = renderCard({ property })
+      const button = screen.getByRole('button', { name: 'Agendar visita' })
+      expect(button).toBeDisabled()
+      await user.click(button)
+      expect(onBookVisit).not.toHaveBeenCalled()
+      expect(onToggleVisit).not.toHaveBeenCalled()
+    })
+
+    it('acepta reservas con disponibilidad explícita', async () => {
+      const { onBookVisit } = renderCard({ property: { status: 'DISPONIBLE', is_bookable: true } })
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Agendar visita' }))
+      expect(onBookVisit).toHaveBeenCalledWith('Departamento en Miraflores', 'prop-1')
     })
 
     it('muestra "Visita agendada" cuando la visita está activa', () => {

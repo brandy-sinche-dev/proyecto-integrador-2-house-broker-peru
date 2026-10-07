@@ -33,14 +33,15 @@ function makeProperty(overrides = {}) {
 
 function renderDetail(id = 'prop-1') {
   const onBack = jest.fn()
+  const onBookVisit = jest.fn()
   render(
     <MemoryRouter initialEntries={[`/properties/${id}`]}>
       <Routes>
-        <Route path="/properties/:id" element={<PropertyDetail onBack={onBack} />} />
+        <Route path="/properties/:id" element={<PropertyDetail onBack={onBack} onBookVisit={onBookVisit} />} />
       </Routes>
     </MemoryRouter>,
   )
-  return { onBack }
+  return { onBack, onBookVisit }
 }
 
 describe('PropertyDetail', () => {
@@ -97,6 +98,28 @@ describe('PropertyDetail', () => {
     expect(screen.queryByText('Baños')).not.toBeInTheDocument()
     expect(screen.queryByText('Mantenimiento')).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Ver planos' })).not.toBeInTheDocument()
+  })
+
+  it.each([{}, { status: 'DISPONIBLE', is_bookable: true }])('permite reservas disponibles y legacy (%j)', async (overrides) => {
+    mock.onGet(`${DETAIL_PATH}/prop-1`).reply(200, makeProperty(overrides))
+    const { onBookVisit } = renderDetail()
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Agendar visita' }))
+    expect(onBookVisit).toHaveBeenCalledWith('Departamento en Miraflores', 'prop-1')
+  })
+
+  it.each([
+    { status: 'RESERVADO' }, { status: 'ALQUILADO' },
+    { status: 'VENDIDO' }, { status: 'SUSPENDIDO' },
+    { status: 'DISPONIBLE', is_bookable: false },
+    { status: 'DISPONIBLE', is_active: false },
+    { is_bookable: false }, { is_active: false },
+  ])('impide reservas no disponibles (%j)', async (overrides) => {
+    mock.onGet(`${DETAIL_PATH}/prop-1`).reply(200, makeProperty(overrides))
+    const { onBookVisit } = renderDetail()
+    const button = await screen.findByRole('button', { name: 'Agendar visita' })
+    expect(button).toBeDisabled()
+    await userEvent.setup().click(button)
+    expect(onBookVisit).not.toHaveBeenCalled()
   })
 
   it('renderiza la portada con prioridad alta para el LCP', async () => {
