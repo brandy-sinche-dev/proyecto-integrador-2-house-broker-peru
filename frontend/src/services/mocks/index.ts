@@ -51,7 +51,7 @@ const seedMockSession = () => {
 
 export const setupMocks = (): MockAdapter => {
   const mock = new MockAdapter(api, { onNoMatch: 'passthrough' })
-  seedMockSession()
+  // seedMockSession() // Deshabilitado para permitir flujo de login real
 
   mock.onGet(PROPERTIES_PATH).reply((config) => getProperties(config))
   mock.onPost(PROPERTIES_PATH).reply((config) => createProperty(config))

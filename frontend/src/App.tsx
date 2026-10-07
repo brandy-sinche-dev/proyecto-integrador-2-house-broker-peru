@@ -5,6 +5,11 @@ import type { NavTarget, Section } from './components/Header'
 import { Footer } from './components/Footer'
 import { AssistantWidget } from './components/AssistantWidget'
 import { AppointmentModal } from './components/crm/AppointmentModal'
+import { AuthProvider } from './services/AuthContext'
+import { ProtectedRoute } from './services/ProtectedRoute'
+import { LoginModal } from './components/auth/Login'
+import { AdminPanel } from './components/admin/AdminPanel'
+import { AgentePanel } from './components/admin/AgentePanel'
 
 const PropertyList = lazy(() => import('./components/properties/PropertyList').then(m => ({ default: m.PropertyList })))
 const PropertyDetail = lazy(() => import('./components/properties/PropertyDetail').then(m => ({ default: m.PropertyDetail })))
@@ -46,6 +51,8 @@ function App() {
   const [visits, setVisits] = useState<string[]>(() => readList('hb_visits'))
 
   const [selectedProperty, setSelectedProperty] = useState<{ id: string; title: string } | null>(null)
+
+  const [isLoginOpen, setIsLoginOpen] = useState(false)
 
   const navigateTo = useNavigate()
   const location = useLocation()
@@ -111,16 +118,18 @@ function App() {
   )
 
   return (
-    <>
+    <AuthProvider>
       <Header
         current={section}
         conciergeOpen={assistantOpen}
         savedCount={saved.length}
         visitsCount={visits.length}
         onNavigate={navigate}
+        onOpenLogin={() => setIsLoginOpen(true)}
       />
 
       <Routes>
+        {/* Rutas Públicas */}
         <Route path="/" element={home} />
         <Route
           path="/properties/:id"
@@ -133,14 +142,24 @@ function App() {
             </Suspense>
           }
         />
-        <Route
-          path="/agente/propiedades/:id/disponibilidad"
-          element={
-            <Suspense fallback={<ListSkeleton />}>
-              <AgentAvailability />
-            </Suspense>
-          }
-        />
+        
+        {/* Rutas Protegidas por Rol */}
+        <Route element={<ProtectedRoute allowedRoles={['ADMINISTRADOR']} />}>
+          <Route path="/admin" element={<AdminPanel />} />
+        </Route>
+
+        <Route element={<ProtectedRoute allowedRoles={['AGENTE']} />}>
+          <Route path="/agente" element={<AgentePanel />} />
+          <Route
+            path="/agente/propiedades/:id/disponibilidad"
+            element={
+              <Suspense fallback={<ListSkeleton />}>
+                <AgentAvailability />
+              </Suspense>
+            }
+          />
+        </Route>
+
         <Route path="*" element={home} />
       </Routes>
 
@@ -164,9 +183,10 @@ function App() {
           isLoggedIn={true}
         />
       )}
-    </>
+
+      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
+    </AuthProvider>
   )
 }
-
 
 export default App

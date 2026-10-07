@@ -1,3 +1,5 @@
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../services/AuthContext'
 import './Header.css'
 
 export type Section = 'inicio' | 'guardados' | 'visitas'
@@ -9,16 +11,19 @@ interface HeaderProps {
   savedCount: number
   visitsCount: number
   onNavigate: (target: NavTarget) => void
+  onOpenLogin: () => void
 }
 
 const NAV: { id: NavTarget; label: string }[] = [
   { id: 'inicio', label: 'Inicio' },
   { id: 'guardados', label: 'Guardados' },
   { id: 'visitas', label: 'Visitas' },
-  { id: 'concierge', label: 'Concierge IA' },
 ]
 
-export function Header({ current, conciergeOpen, savedCount, visitsCount, onNavigate }: HeaderProps) {
+export function Header({ current, conciergeOpen, savedCount, visitsCount, onNavigate, onOpenLogin }: HeaderProps) {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
   const counts: Partial<Record<NavTarget, number>> = {
     guardados: savedCount,
     visitas: visitsCount,
@@ -28,16 +33,8 @@ export function Header({ current, conciergeOpen, savedCount, visitsCount, onNavi
     <header className="hdr">
       <div className="hdr__inner">
         <div className="hdr__left">
-          <button type="button" className="hdr__brand" onClick={() => onNavigate('inicio')}>
-            <span className="hdr__mark" aria-hidden="true">
-              <svg viewBox="0 0 20 20">
-                <path d="M10 2 2 8h1.6v8a1.4 1.4 0 0 0 1.4 1.4h3V13h4v4.4h3A1.4 1.4 0 0 0 16.4 16V8H18L10 2Z" fill="currentColor" />
-              </svg>
-            </span>
-            <span className="hdr__word">
-              <span className="hdr__name">House Broker</span>
-              <span className="hdr__country">Perú</span>
-            </span>
+          <button type="button" className="hdr__brand" onClick={() => onNavigate('inicio')} style={{ display: 'flex', alignItems: 'center' }}>
+            <img src="/logo.png" alt="House Broker Perú Logo" style={{ height: '48px', objectFit: 'contain' }} />
           </button>
 
           <nav className="hdr__nav" aria-label="Navegación principal">
@@ -64,14 +61,57 @@ export function Header({ current, conciergeOpen, savedCount, visitsCount, onNavi
           <a className="hdr__cta" href="mailto:asesores@housebroker.pe">
             Contactar asesor
           </a>
-          <div className="hdr__agent">
-            <span className="hdr__agent-avatar" aria-hidden="true">
-              <svg viewBox="0 0 20 20">
-                <path d="M10 10.5a3.6 3.6 0 1 0 0-7.2 3.6 3.6 0 0 0 0 7.2Zm0 1.6c-3.3 0-6 1.9-6 4.2v.6h12v-.6c0-2.3-2.7-4.2-6-4.2Z" fill="currentColor" />
-              </svg>
-            </span>
-            <span className="hdr__agent-label">Agente Inmobiliario</span>
-          </div>
+
+          {!user ? (
+            <button 
+              onClick={onOpenLogin}
+              style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: 'var(--brand-gold)',
+                color: 'var(--brand-bronze-deep)',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                marginLeft: '1rem',
+                transition: 'background 0.2s'
+              }}
+            >
+              Iniciar Sesión
+            </button>
+          ) : (
+            <div className="hdr__agent" style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--brand-cream)' }}>
+              <span className="hdr__agent-avatar" aria-hidden="true" style={{ background: 'var(--brand-gold)', color: 'var(--brand-bronze-deep)' }}>
+                <svg viewBox="0 0 20 20">
+                  <path d="M10 10.5a3.6 3.6 0 1 0 0-7.2 3.6 3.6 0 0 0 0 7.2Zm0 1.6c-3.3 0-6 1.9-6 4.2v.6h12v-.6c0-2.3-2.7-4.2-6-4.2Z" fill="currentColor" />
+                </svg>
+              </span>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '12px', fontWeight: 'bold' }}>{user.full_name}</span>
+                <span style={{ fontSize: '10px', color: 'var(--brand-gold-light)' }}>{user.role}</span>
+              </div>
+              <button 
+                onClick={() => {
+                  if (user.role === 'ADMINISTRADOR') navigate('/admin')
+                  else if (user.role === 'AGENTE') navigate('/agente')
+                  else navigate('/')
+                }}
+                style={{
+                  background: 'none', border: '1px solid var(--brand-cream)', color: 'var(--brand-cream)', borderRadius: '4px', padding: '2px 5px', fontSize: '10px', cursor: 'pointer', marginLeft: '5px'
+                }}
+              >
+                Panel
+              </button>
+              <button 
+                onClick={logout}
+                style={{
+                  background: 'none', border: 'none', textDecoration: 'underline', color: '#ffdea7', fontSize: '10px', cursor: 'pointer', marginLeft: '5px'
+                }}
+              >
+                Salir
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>

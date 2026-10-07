@@ -21,8 +21,8 @@ export const USER_ROLES = ['CLIENTE', 'AGENTE', 'ADMINISTRADOR'] as const
 export type UserRole = (typeof USER_ROLES)[number]
 
 export const USER_ROLE_LABELS: Record<UserRole, string> = {
-  CLIENTE: 'Cliente',
-  AGENTE: 'Agente',
+  CLIENTE: 'Cliente Público',
+  AGENTE: 'Agente Inmobiliario',
   ADMINISTRADOR: 'Administrador',
 }
 
