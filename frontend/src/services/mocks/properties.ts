@@ -1,5 +1,6 @@
 import type { AxiosHeaders, AxiosRequestConfig } from 'axios'
 import fixtures from './data/properties'
+import { accessDeniedReason, canManageAvailability, readSessionUser } from '../session'
 import {
   PROPERTY_TYPES,
   TRANSACTION_MODES,
@@ -75,6 +76,26 @@ const findByIndex = (id: string) => store.findIndex((p) => p.id === id)
 export const findProperty = (id: string): Property | undefined =>
   store.find((p) => p.id === id)
 
+/** Mismo acceso para detalle de gestión, estado y agenda del modo simulado. */
+export const managementAccessError = (id: string): [number, { message: string }] | null => {
+  const user = readSessionUser()
+  if (!user) return [401, { message: 'Inicia sesión para gestionar la disponibilidad.' }]
+  const property = findProperty(id)
+  if (!property) return [404, { message: `Propiedad con id "${id}" no encontrada.` }]
+  if (!canManageAvailability(property, user)) {
+    return [403, { message: accessDeniedReason(property, user) }]
+  }
+  return null
+}
+
+export const getManagedProperty = (config: Config, id: string): Reply => {
+  const denied = managementAccessError(id)
+  if (denied) return denied
+  const { 'x-mock-error': mockError } = getHeaders(config)
+  if (isForceError(mockError)) return replyError(Number(mockError), 'Error interno del servidor')
+  return [200, findProperty(id)!]
+}
+
 /**
  * Aplica el `PATCH .../status`. `SUSPENDIDO` es el único estado que retira el
  * inmueble del catálogo, así que también baja `is_active`, igual que hace la
@@ -87,6 +108,7 @@ export const patchPropertyStatus = (id: string, status: PropertyStatus): Propert
     ...store[index],
     status,
     is_active: status !== 'SUSPENDIDO',
+    is_bookable: status === 'DISPONIBLE',
   }
   store = store.map((p) => (p.id === id ? updated : p))
   return updated
@@ -95,14 +117,14 @@ export const patchPropertyStatus = (id: string, status: PropertyStatus): Propert
 export const getProperties = (config: Config): Reply => {
   const { 'x-mock-error': mockError } = getHeaders(config)
   if (isForceError(mockError)) return replyError(Number(mockError), 'Error interno del servidor')
-  return [200, store]
+  return [200, store.filter((property) => property.is_active)]
 }
 
 export const getProperty = (config: Config, id: string): Reply => {
   const { 'x-mock-error': mockError } = getHeaders(config)
   if (isForceError(mockError)) return replyError(Number(mockError), 'Error interno del servidor')
   const property = store.find((p) => p.id === id)
-  if (!property) return replyError(404, `Propiedad con id "${id}" no encontrada.`)
+  if (!property?.is_active) return replyError(404, `Propiedad con id "${id}" no encontrada.`)
   return [200, property]
 }
 

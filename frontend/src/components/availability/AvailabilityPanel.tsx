@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '../Button'
 import { getErrorMessage } from '../../services/axios'
-import { getProperty } from '../../services/properties'
+import { getManagedProperty } from '../../services/properties'
 import { getPropertySchedules } from '../../services/availability'
 import {
   accessDeniedReason,
@@ -76,7 +76,7 @@ export function AvailabilityPanel({ propertyId, user }: AvailabilityPanelProps) 
   )
 
   const fetchAvailability = useCallback(() => {
-    Promise.all([getProperty(propertyId), getPropertySchedules(propertyId)])
+    Promise.all([getManagedProperty(propertyId), getPropertySchedules(propertyId)])
       .then(([loadedProperty, loadedSchedules]) => {
         setProperty(loadedProperty)
         setCurrentStatus(loadedProperty.status)

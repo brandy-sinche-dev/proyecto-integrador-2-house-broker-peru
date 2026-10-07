@@ -45,8 +45,7 @@ function App() {
   const [saved, setSaved] = useState<string[]>(() => readList('hb_saved'))
   const [visits, setVisits] = useState<string[]>(() => readList('hb_visits'))
 
-  const [isBookingOpen, setIsBookingOpen] = useState(false)
-  const [selectedPropertyTitle, setSelectedPropertyTitle] = useState('Inmueble Seleccionado')
+  const [selectedProperty, setSelectedProperty] = useState<{ id: string; title: string } | null>(null)
 
   const navigateTo = useNavigate()
   const location = useLocation()
@@ -69,14 +68,13 @@ function App() {
     [],
   )
 
-  // El truco está aquí: id es opcional (id?: string)
   const handleBookVisit = useCallback((title: string, id?: string) => {
-    setSelectedPropertyTitle(title)
-    setIsBookingOpen(true)
-    if (id && !visits.includes(id)) {
-      toggleVisit(id)
-    }
-  }, [visits, toggleVisit])
+    if (id) setSelectedProperty({ id, title })
+  }, [])
+
+  const confirmVisit = (id: string) => {
+    setVisits((prev) => (prev.includes(id) ? prev : [...prev, id]))
+  }
 
   const navigate = useCallback(
     (target: NavTarget) => {
@@ -130,7 +128,7 @@ function App() {
             <Suspense fallback={<ListSkeleton />}>
               <PropertyDetail 
                 onBack={() => navigateTo('/')} 
-                onBookVisit={(title) => handleBookVisit(title)}
+                onBookVisit={handleBookVisit}
               />
             </Suspense>
           }
@@ -156,12 +154,16 @@ function App() {
         onNavigate={navigate}
       />
 
-      <AppointmentModal 
-        isOpen={isBookingOpen} 
-        onClose={() => setIsBookingOpen(false)} 
-        propertyTitle={selectedPropertyTitle}
-        isLoggedIn={true}
-      />
+      {selectedProperty && (
+        <AppointmentModal
+          key={selectedProperty.id}
+          isOpen={true}
+          onClose={() => setSelectedProperty(null)}
+          onConfirmed={() => confirmVisit(selectedProperty.id)}
+          propertyTitle={selectedProperty.title}
+          isLoggedIn={true}
+        />
+      )}
     </>
   )
 }

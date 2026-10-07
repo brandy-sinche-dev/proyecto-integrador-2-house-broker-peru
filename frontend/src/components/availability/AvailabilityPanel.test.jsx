@@ -7,13 +7,15 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
+import MockAdapter from 'axios-mock-adapter'
+import api from '../../services/axios'
 import { AvailabilityPanel } from './AvailabilityPanel'
-import { getProperty } from '../../services/properties'
+import { getManagedProperty as getProperty } from '../../services/properties'
 import { getPropertySchedules, updatePropertyStatus } from '../../services/availability'
 import { writeSessionUser, clearSessionUser, SESSION_USER_KEY } from '../../services/session'
 
 jest.mock('../../services/properties', () => ({
-  getProperty: jest.fn(),
+  getManagedProperty: jest.fn(),
 }))
 jest.mock('../../services/availability', () => {
   const actual = jest.requireActual('../../services/availability')
@@ -194,6 +196,47 @@ describe('AvailabilityPanel', () => {
   })
 
   describe('Reflejo de los cambios sobre el panel', () => {
+    it('abre un suspendido desde gestión y permite reactivarlo al agente asignado', async () => {
+      const mock = new MockAdapter(api)
+      mock.onGet(`/v1/properties/${PROPERTY_ID}`).reply(404)
+      mock.onGet(`/v1/properties/${PROPERTY_ID}/management`).reply(200,
+        property({ status: 'SUSPENDIDO', is_active: false, is_bookable: false }))
+      getProperty.mockImplementationOnce(jest.requireActual('../../services/properties').getManagedProperty)
+      updatePropertyStatus.mockResolvedValueOnce({
+        id: PROPERTY_ID, status: 'DISPONIBLE', previous_status: 'SUSPENDIDO', is_active: true,
+      })
+      try {
+        renderPanel({ id: SELLER_ID, role: 'AGENTE' })
+        expect(await screen.findByText('Calle Grimm 120 · Estado actual: Suspendido')).toBeInTheDocument()
+        expect(mock.history.get.map(({ url }) => url)).toEqual([`/v1/properties/${PROPERTY_ID}/management`])
+        const user = userEvent.setup()
+        await user.click(screen.getByRole('radio', { name: /Disponible/ }))
+        await user.click(screen.getByRole('button', { name: 'Guardar estado' }))
+        await waitFor(() => expect(updatePropertyStatus).toHaveBeenCalledWith(PROPERTY_ID, { status: 'DISPONIBLE' }))
+        expect(await screen.findByText('Calle Grimm 120 · Estado actual: Disponible')).toBeInTheDocument()
+      } finally {
+        mock.restore()
+      }
+    })
+
+    it('no monta controles si gestión deniega el suspendido al agente no asignado', async () => {
+      const mock = new MockAdapter(api)
+      mock.onGet(`/v1/properties/${PROPERTY_ID}/management`).reply(403, {
+        detail: 'Solo el agente asignado puede gestionar este inmueble.',
+      })
+      getProperty.mockImplementationOnce(jest.requireActual('../../services/properties').getManagedProperty)
+      try {
+        renderPanel({ id: 'otro-agente', role: 'AGENTE' })
+        expect(await screen.findByText('No se pudo abrir el panel')).toBeInTheDocument()
+        expect(screen.getByText('Solo el agente asignado puede gestionar este inmueble.')).toBeInTheDocument()
+        expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Guardar estado' })).not.toBeInTheDocument()
+        expect(updatePropertyStatus).not.toHaveBeenCalled()
+      } finally {
+        mock.restore()
+      }
+    })
+
     it('propaga el estado confirmado por el servidor a la cabecera y a la agenda', async () => {
       const user = userEvent.setup()
       renderPanel({ id: SELLER_ID, role: 'AGENTE' })

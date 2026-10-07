@@ -61,8 +61,8 @@ function baseProps(overrides = {}) {
     visits: [],
     onToggleSave: jest.fn(),
     onToggleVisit: jest.fn(),
-    onNavigate: jest.fn(),
     onBookVisit: jest.fn(),
+    onNavigate: jest.fn(),
     ...overrides,
   }
 }
@@ -132,6 +132,16 @@ describe('PropertyList (integración del catálogo)', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Agendar visita' }))
       expect(props.onBookVisit).toHaveBeenCalledWith('Propiedad 01', 'prop-1')
+      expect(props.onToggleVisit).not.toHaveBeenCalled()
+    })
+
+    it('propaga la acción de una visita existente sin crear una reserva', async () => {
+      mock.onGet(LIST_PATH).reply(200, paginated([makeProperty(0)]))
+      const { props } = renderList({ props: { visits: ['prop-1'] } })
+      const button = await screen.findByRole('button', { name: 'Visita agendada' })
+      fireEvent.click(button)
+      expect(props.onToggleVisit).toHaveBeenCalledWith('prop-1')
+      expect(props.onBookVisit).not.toHaveBeenCalled()
     })
   })
 

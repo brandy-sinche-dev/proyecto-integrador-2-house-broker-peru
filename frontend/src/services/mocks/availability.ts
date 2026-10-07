@@ -17,16 +17,14 @@ import {
   type ScheduleSlot,
   type Weekday,
 } from '../types'
-import { findProperty, patchPropertyStatus } from './properties'
+import { findProperty, managementAccessError, patchPropertyStatus } from './properties'
+import { readSessionUser } from '../session'
 
 type Config = AxiosRequestConfig
 
 type Reply =
   | [number, PropertyStatusResult | PropertySchedules]
   | [number, { message: string; errors?: string[] }]
-
-/** Agente que ejecuta las transiciones en el modo simulado. */
-const MOCK_ACTOR_ID = '7c4a9d21-3b6e-4f80-9a2d-5e7c1b3f8d40'
 
 /**
  * Agenda inicial de la cartera simulada. Solo algunos días tienen franjas, para
@@ -90,6 +88,8 @@ const notFound = (id: string): Reply => replyError(404, `Propiedad con id "${id}
 const statusOf = (id: string): PropertyStatus => findProperty(id)?.status ?? 'DISPONIBLE'
 
 export const patchPropertyStatusInMock = (config: Config, id: string): Reply => {
+  const denied = managementAccessError(id)
+  if (denied) return denied
   const { 'x-mock-error': mockError } = getHeaders(config)
   if (isForceError(mockError)) return replyError(Number(mockError), 'Error interno del servidor')
   if (!findProperty(id)) return notFound(id)
@@ -121,13 +121,15 @@ export const patchPropertyStatusInMock = (config: Config, id: string): Reply => 
     previous_status: previousStatus,
     is_active: body.status !== 'SUSPENDIDO',
     reason: reason === '' ? null : reason,
-    changed_by: MOCK_ACTOR_ID,
+    changed_by: readSessionUser()!.id,
     changed_at: new Date().toISOString(),
   }
   return [200, result]
 }
 
 export const getPropertySchedulesInMock = (config: Config, id: string): Reply => {
+  const denied = managementAccessError(id)
+  if (denied) return denied
   const { 'x-mock-error': mockError } = getHeaders(config)
   if (isForceError(mockError)) return replyError(Number(mockError), 'Error interno del servidor')
   if (!findProperty(id)) return notFound(id)
@@ -141,6 +143,8 @@ export const getPropertySchedulesInMock = (config: Config, id: string): Reply =>
 }
 
 export const replacePropertySchedulesInMock = (config: Config, id: string): Reply => {
+  const denied = managementAccessError(id)
+  if (denied) return denied
   const { 'x-mock-error': mockError } = getHeaders(config)
   if (isForceError(mockError)) return replyError(Number(mockError), 'Error interno del servidor')
   if (!findProperty(id)) return notFound(id)

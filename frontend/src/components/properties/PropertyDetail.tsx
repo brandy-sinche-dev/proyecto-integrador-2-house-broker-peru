@@ -8,7 +8,7 @@ import './PropertyDetail.css'
 
 interface PropertyDetailProps {
   onBack: () => void
-  onBookVisit?: (title: string) => void // <-- Prop agregada para abrir el modal de visitas
+  onBookVisit?: (title: string, id: string) => void
 }
 
 type Status = 'loading' | 'error' | 'ready'
@@ -161,7 +161,9 @@ export function PropertyDetail({ onBack, onBookVisit }: PropertyDetailProps) {
                 <button
                   type="button"
                   className="hpd__cta hpd__cta--ghost"
-                  onClick={() => onBookVisit(property.title)}
+                  disabled={(property.status != null && property.status !== 'DISPONIBLE') ||
+                    property.is_bookable === false || property.is_active === false}
+                  onClick={() => onBookVisit(property.title, property.id)}
                 >
                   Agendar visita
                 </button>

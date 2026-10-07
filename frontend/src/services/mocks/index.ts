@@ -6,6 +6,7 @@ import {
   deleteProperty,
   getProperties,
   getProperty,
+  getManagedProperty,
   updateProperty,
 } from './properties'
 import {
@@ -20,8 +21,9 @@ const PROPERTIES_PATH = '/v1/properties'
 const PROPERTY_DETAIL_PATH = /^\/v1\/properties\/[^/]+$/
 const PROPERTY_STATUS_PATH = /^\/v1\/properties\/[^/]+\/status$/
 const PROPERTY_SCHEDULES_PATH = /^\/v1\/properties\/[^/]+\/schedules$/
+const PROPERTY_MANAGEMENT_PATH = /^\/v1\/properties\/[^/]+\/management$/
 
-const idFrom = (config: { url?: string }) => (config.url ?? '').split('/').pop() ?? ''
+const idFrom = (config: { url?: string }) => (config.url ?? '').split('/')[3] ?? ''
 
 /**
  * Sesión de agente que se inyecta en el modo simulado.
@@ -54,6 +56,7 @@ export const setupMocks = (): MockAdapter => {
   mock.onGet(PROPERTIES_PATH).reply((config) => getProperties(config))
   mock.onPost(PROPERTIES_PATH).reply((config) => createProperty(config))
   mock.onGet(PROPERTY_DETAIL_PATH).reply((config) => getProperty(config, idFrom(config)))
+  mock.onGet(PROPERTY_MANAGEMENT_PATH).reply((config) => getManagedProperty(config, idFrom(config)))
   mock.onPut(PROPERTY_DETAIL_PATH).reply((config) => updateProperty(config, idFrom(config)))
   mock.onDelete(PROPERTY_DETAIL_PATH).reply((config) => deleteProperty(config, idFrom(config)))
 

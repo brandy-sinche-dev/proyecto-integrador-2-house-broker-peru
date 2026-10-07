@@ -38,7 +38,7 @@ from .problems import ProblemError
 STATUS_TRANSITIONS: dict[str, frozenset[str]] = {
     PropertyStatus.DISPONIBLE: frozenset({PropertyStatus.RESERVADO, PropertyStatus.SUSPENDIDO}),
     PropertyStatus.RESERVADO: frozenset(
-        {PropertyStatus.DISPONIBLE, PropertyStatus.ALQUILADO, PropertyStatus.SUSPENDIDO}
+        {PropertyStatus.DISPONIBLE, PropertyStatus.ALQUILADO, PropertyStatus.VENDIDO, PropertyStatus.SUSPENDIDO}
     ),
     PropertyStatus.ALQUILADO: frozenset({PropertyStatus.SUSPENDIDO}),
     PropertyStatus.VENDIDO: frozenset({PropertyStatus.SUSPENDIDO}),

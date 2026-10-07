@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Button } from '../Button'
 import { getErrorMessage } from '../../services/axios'
@@ -27,9 +27,16 @@ interface PropertyStatusSelectorProps {
  * Selector de estado operativo del inmueble (RF-PROP-04).
  *
  * Se presenta como un grupo de opciones excluyentes porque el estado es un
- * enum de un solo valor: `role="radiogroup"` con `aria-checked` es lo que
- * corresponde, y `TASK-A11Y-PROP-04` puede évolutionar a `switch` sin tocar
- * la semántica de la vista.
+ * enum de un solo valor: radios con un único tab stop y navegación por flechas.
+ *
+ * Decisión de patrón: radiogroup y NO role="switch". Un switch es un toggle
+ * binario on/off (una sola opción); aquí hay 5 estados mutuamente excluyentes
+ * (Disponible, Reservado, Alquilado, Vendido, Suspendido) y el rol correcto
+ * para elegir exactamente uno entre varios es el patrón radiogroup del
+ * WAI-ARIA Authoring Practices Guide (APG): radios con roving tabindex,
+ * flechas circulares y aria-checked. La agrupación en role="switch" solo
+ * aplicaría si cada estado se pudiera activar/desactivar de forma
+ * independiente, lo cual no es el caso.
  *
  * El estado vigente solo se cambia cuando el backend confirma el `PATCH`. Un
  * fallo devuelve el selector al estado que el servidor reconoce y muestra el
@@ -39,7 +46,9 @@ interface PropertyStatusSelectorProps {
 export function PropertyStatusSelector({ propertyId, status, onChanged }: PropertyStatusSelectorProps) {
   const groupId = useId()
   const reasonId = `${groupId}-reason`
+  const reasonIssueId = `${reasonId}-error`
   const messageId = `${groupId}-message`
+  const options = useRef<Partial<Record<PropertyStatus, HTMLButtonElement | null>>>({})
 
   const [current, setCurrent] = useState<PropertyStatus>(status)
   const [target, setTarget] = useState<PropertyStatus>(status)
@@ -65,11 +74,15 @@ export function PropertyStatusSelector({ propertyId, status, onChanged }: Proper
   }
 
   const issues = validateStatusChange(current, target, reason)
-  const statusIssue = issues.find((issue) => issue.field === 'status')?.message
+  // Sin un destino distinto no hay transición solicitada que anunciar como error.
+  const statusIssue = target !== current ? issues.find((issue) => issue.field === 'status')?.message : undefined
   const reasonIssue = issues.find((issue) => issue.field === 'reason')?.message
   const needsReason = statusRequiresReason(target)
   const dirty = target !== current || (needsReason && reason.trim() !== '')
   const message = error ?? notice
+  const enabled = PROPERTY_STATUSES.filter((value) => allowedTransitions(current).includes(value))
+  // El estado vigente puede estar deshabilitado: Tab entra al primer destino válido.
+  const tabStop = enabled.includes(target) ? target : enabled[0]
 
   const choose = (next: PropertyStatus) => {
     setTarget(next)
@@ -128,15 +141,32 @@ export function PropertyStatusSelector({ propertyId, status, onChanged }: Proper
                 key={value}
                 type="button"
                 role="radio"
+                ref={(node) => { options.current[value] = node }}
+                tabIndex={value === tabStop ? 0 : -1}
                 aria-checked={selected}
+                aria-label={PROPERTY_STATUS_LABELS[value]}
+                aria-describedby={`${groupId}-${value}-hint`}
                 disabled={!allowed}
                 className={`hstate__option ${selected ? 'hstate__option--on' : ''} ${
                   !allowed ? 'hstate__option--off' : ''
                 }`}
                 onClick={() => choose(value)}
+                onKeyDown={(event) => {
+                  if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(event.key)) return
+                  event.preventDefault()
+                  const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1
+                  const next = enabled[(enabled.indexOf(value) + step + enabled.length) % enabled.length]
+                  if (next) {
+                    choose(next)
+                    options.current[next]?.focus()
+                  }
+                }}
               >
                 <span className="hstate__option-name">{PROPERTY_STATUS_LABELS[value]}</span>
-                <span className="hstate__option-hint">{PROPERTY_STATUS_HINTS[value]}</span>
+                <span className="hstate__option-hint" id={`${groupId}-${value}-hint`}>
+                  {PROPERTY_STATUS_HINTS[value]}
+                  {value === current && <span> Estado actual.</span>}
+                </span>
                 {value === current && <span className="hstate__option-lock">Estado actual</span>}
               </button>
             )
@@ -152,7 +182,7 @@ export function PropertyStatusSelector({ propertyId, status, onChanged }: Proper
         <div className="hstate__reason">
           <label className="hstate__reason-label" htmlFor={reasonId}>
             Motivo del cambio
-            {needsReason && <span className="hstate__req">*</span>}
+            {needsReason && <span className="hstate__req" aria-hidden="true">*</span>}
           </label>
           <textarea
             id={reasonId}
@@ -162,7 +192,7 @@ export function PropertyStatusSelector({ propertyId, status, onChanged }: Proper
             required={needsReason}
             aria-required={needsReason || undefined}
             aria-invalid={reasonIssue ? true : undefined}
-            aria-describedby={reasonIssue ? messageId : undefined}
+            aria-describedby={reasonIssue ? reasonIssueId : undefined}
             placeholder={
               needsReason
                 ? 'Describe la decisión para que quede registrada en la auditoría.'
@@ -175,13 +205,13 @@ export function PropertyStatusSelector({ propertyId, status, onChanged }: Proper
             }}
           />
           {reasonIssue && (
-            <span className="hstate__issue" role="alert">
+            <span className="hstate__issue" id={reasonIssueId} role="alert">
               {reasonIssue}
             </span>
           )}
         </div>
 
-        <p className="hstate__feedback" id={messageId} role="status" aria-live="polite">
+        <p className="hstate__feedback" id={messageId} role="status" aria-live="polite" aria-atomic="true">
           {error ? <span className="hstate__feedback-error">{message}</span> : message}
         </p>
 

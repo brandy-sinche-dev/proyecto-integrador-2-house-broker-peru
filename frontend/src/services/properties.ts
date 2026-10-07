@@ -25,6 +25,9 @@ export const getProperties = async () => unwrapList(await api.get<Property[] | P
 export const getProperty = (id: string) =>
   api.get<Property>(`${RESOURCE}/${id}`).then((r) => r.data)
 
+export const getManagedProperty = (id: string) =>
+  api.get<Property>(`${RESOURCE}/${id}/management`).then((r) => r.data)
+
 export const createProperty = (input: PropertyInput) =>
   api.post<Property>(RESOURCE, input).then((r) => r.data)
 

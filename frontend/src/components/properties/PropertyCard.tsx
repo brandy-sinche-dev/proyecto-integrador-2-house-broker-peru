@@ -74,6 +74,8 @@ export const PropertyCard = memo(function PropertyCard({
   if (property.estacionamientos != null) specs.push({ key: 'coch', value: String(property.estacionamientos), label: 'COCH.' })
 
   const typeLabel = TYPE_LABEL[property.property_type] ?? property.property_type
+  const canBook = (property.status == null || property.status === 'DISPONIBLE') &&
+    property.is_bookable !== false && property.is_active !== false
 
   const primaryBadge = {
     text: OP_LABEL[property.mode] ?? property.mode,
@@ -159,6 +161,7 @@ export const PropertyCard = memo(function PropertyCard({
             type="button"
             className={`hpc__cta hpc__cta--ghost ${visit ? 'is-on' : ''}`}
             aria-pressed={visit}
+            disabled={!visit && !canBook}
             onClick={() => {
               if (visit) {
                 onToggleVisit(property.id)
