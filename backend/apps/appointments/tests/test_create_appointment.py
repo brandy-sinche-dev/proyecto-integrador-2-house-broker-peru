@@ -114,21 +114,6 @@ class AppointmentPermissionTests(AppointmentApiTestCase):
         )
         self.assertEqual(Appointment.objects.count(), 0)
 
-    def test_get_on_the_collection_is_not_part_of_this_task(self):
-        # El listado es `TASK-BACK-CRM-02` (#97): hasta entonces el router
-        # responde `405` con el sobre de error en vez de un `404` de Django.
-        self.client.force_authenticate(self.client_user)
-
-        problem = self.assertProblem(
-            self.client.get(self.url),
-            "method_not_allowed",
-            http_status.HTTP_405_METHOD_NOT_ALLOWED,
-        )
-
-        self.assertEqual(
-            problem["type"], "https://housebroker.pe/errors/method-not-allowed"
-        )
-
 
 class AppointmentCreationTests(AppointmentApiTestCase):
     def test_client_books_for_himself(self):

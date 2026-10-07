@@ -20,10 +20,17 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.properties.pagination import PropertyPagination
 from apps.properties.permissions import IsAuthenticatedUser
 from apps.properties.problems import ProblemResponseMixin
 
 from . import emails, services
+from .filters import (
+    apply_appointment_filters,
+    check_role_scope,
+    default_role,
+    parse_appointment_filters,
+)
 from .models import Appointment
 from .serializers import (
     AppointmentCreateInputSerializer,
@@ -55,18 +62,38 @@ class AvailableSlotsView(ProblemResponseMixin, APIView):
 
 
 class AppointmentViewSet(ProblemResponseMixin, viewsets.GenericViewSet):
-    """`POST /api/v1/appointments` — alta de una solicitud de visita.
+    """`POST` y `GET /api/v1/appointments` (RF-CRM-01 y RF-CRM-02).
 
-    Solo `create`: el listado y los cambios de estado son `TASK-BACK-CRM-02`
-    (#97), que extiende este mismo viewset. Con `SimpleRouter` eso también
-    fija el `405` del `GET` sobre la colección, que todavía no existe.
+    El listado (RF-CRM-02) hace de devolución al `405` de la colección: la
+    agenda que se le muestra al usuario depende de su rol, y `role` permite
+    elegir explícitamente una de las perspectivas que ese rol cubre. Los demás
+    verbos del viewset (cambios de estado, reprogamación) son #97.
     """
 
     permission_classes = [IsAuthenticatedUser]
     serializer_class = AppointmentSerializer
+    pagination_class = PropertyPagination
     queryset = Appointment.objects.select_related(
         "property__district", "client", "agent"
     )
+
+    def list(self, request, *args, **kwargs):
+        filters = parse_appointment_filters(request.query_params)
+        role = filters.role or default_role(request.user)
+        check_role_scope(default_role(request.user), role)
+
+        queryset = apply_appointment_filters(
+            self.get_queryset(), role=role, user=request.user, filters=filters
+        )
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            response = self.get_paginated_response(serializer.data)
+            if getattr(self.paginator, "page", None) is not None:
+                response["X-Total-Count"] = self.paginator.page.paginator.count
+            return response
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     def create(self, request, *args, **kwargs):
         payload = AppointmentCreateInputSerializer(data=request.data)
