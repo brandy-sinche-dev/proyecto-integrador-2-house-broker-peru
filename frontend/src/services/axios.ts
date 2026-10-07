@@ -1,5 +1,6 @@
 import axios, { type AxiosError } from 'axios'
 import type { NormalizedApiError } from './errors'
+import { getAccessToken } from './authToken'
 
 export { getErrorMessage } from './errors'
 
@@ -8,6 +9,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 })
 
 /**
@@ -15,7 +17,7 @@ const api = axios.create({
  * extra para que el backend pueda distinguir peticiones AJAX.
  */
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('hb_token')
+  const token = getAccessToken() ?? localStorage.getItem('hb_token')
   if (token) config.headers.set('Authorization', `Bearer ${token}`)
   return config
 })

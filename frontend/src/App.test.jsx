@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import MockAdapter from 'axios-mock-adapter'
 import api from './services/axios'
 import App from './App'
+import { AuthProvider } from './context/AuthContext'
 
 const properties = [1, 2].map((n) => ({
   id: `prop-${n}`,
@@ -20,7 +21,15 @@ const properties = [1, 2].map((n) => ({
 }))
 
 function renderApp(path = '/') {
-  return render(<MemoryRouter initialEntries={[path]}><App /></MemoryRouter>)
+  // Misma composición que `main.tsx`: el router envuelve al `AuthProvider`,
+  // porque el proveedor llama a `useNavigate` en su `signOut`.
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </MemoryRouter>,
+  )
 }
 
 function storedVisits() {
@@ -49,6 +58,21 @@ describe('App: confirmación simulada de visitas', () => {
   beforeEach(() => {
     localStorage.clear()
     mock = new MockAdapter(api)
+    // `AuthProvider` refresca la sesión al montar; la sesión válida es la que
+    // deja `isLoggedIn` en `true` y el modal puede mostrar "Reservar Visita".
+    mock.onPost('/v1/auth/refresh').reply(200, {
+      access: 'access-test',
+      token_type: 'Bearer',
+      expires_in: 300,
+      user: {
+        id: 'user-test',
+        email: 'cliente@test.pe',
+        full_name: 'Cliente de Pruebas',
+        role: 'CLIENTE',
+        is_active: true,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    })
     mock.onGet('/v1/properties').reply(200, { count: 2, next: null, previous: null, results: properties })
     properties.forEach((property) => {
       mock.onGet(`/v1/properties/${property.id}`).reply(200, property)

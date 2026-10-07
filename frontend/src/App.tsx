@@ -5,6 +5,9 @@ import type { NavTarget, Section } from './components/Header'
 import { Footer } from './components/Footer'
 import { AssistantWidget } from './components/AssistantWidget'
 import { AppointmentModal } from './components/crm/AppointmentModal'
+import { LoginForm } from './components/auth/LoginForm'
+import { RegisterForm } from './components/auth/RegisterForm'
+import { useAuth } from './context/AuthContext'
 
 const PropertyList = lazy(() => import('./components/properties/PropertyList').then(m => ({ default: m.PropertyList })))
 const PropertyDetail = lazy(() => import('./components/properties/PropertyDetail').then(m => ({ default: m.PropertyDetail })))
@@ -36,6 +39,9 @@ function ListSkeleton() {
 
 function AgentAvailability() {
   const { id } = useParams<{ id: string }>()
+  const { user } = useAuth()
+  if (!user) return <div>Inicia sesión para gestionar disponibilidad.</div>
+  if (user.role !== 'AGENTE' && user.role !== 'ADMINISTRADOR') return <div>No tienes permisos para gestionar disponibilidad.</div>
   return <AvailabilityPanel propertyId={id ?? ''} />
 }
 
@@ -46,6 +52,7 @@ function App() {
   const [visits, setVisits] = useState<string[]>(() => readList('hb_visits'))
 
   const [selectedProperty, setSelectedProperty] = useState<{ id: string; title: string } | null>(null)
+  const { user } = useAuth()
 
   const navigateTo = useNavigate()
   const location = useLocation()
@@ -122,6 +129,8 @@ function App() {
 
       <Routes>
         <Route path="/" element={home} />
+        <Route path="/login" element={<LoginForm />} />
+        <Route path="/registro" element={<RegisterForm />} />
         <Route
           path="/properties/:id"
           element={
@@ -161,7 +170,7 @@ function App() {
           onClose={() => setSelectedProperty(null)}
           onConfirmed={() => confirmVisit(selectedProperty.id)}
           propertyTitle={selectedProperty.title}
-          isLoggedIn={true}
+          isLoggedIn={Boolean(user)}
         />
       )}
     </>
