@@ -1,8 +1,11 @@
 from rest_framework.routers import SimpleRouter
 
-from .views import PropertyViewSet
+from .views import FavoriteViewSet, PropertyViewSet
 
 router = SimpleRouter(trailing_slash=False)
-router.register("properties", PropertyViewSet, basename="property")
+favorite_router = SimpleRouter(trailing_slash=True)
 
-urlpatterns = router.urls
+router.register("properties", PropertyViewSet, basename="property")
+favorite_router.register("favorites", FavoriteViewSet, basename="favorite")
+
+urlpatterns = router.urls + favorite_router.urls

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from . import services
-from .models import Property, PropertyImage, PropertySchedule, PropertyStatus, Weekday
+from .models import Favorite, Property, PropertyImage, PropertySchedule, PropertyStatus, Weekday
 from .problems import ProblemError
 
 
@@ -82,6 +82,7 @@ class PropertySerializer(serializers.ModelSerializer):
     # dónde viajar hasta el cliente.
     status = serializers.CharField(read_only=True)
     is_bookable = serializers.BooleanField(read_only=True)
+    is_favorite = serializers.SerializerMethodField()
 
     class Meta:
         model = Property
@@ -96,6 +97,7 @@ class PropertySerializer(serializers.ModelSerializer):
             "is_active",
             "status",
             "is_bookable",
+            "is_favorite",
             "created_at",
             "area_total",
             "area_construida",
@@ -111,6 +113,17 @@ class PropertySerializer(serializers.ModelSerializer):
             "seller",
         )
         read_only_fields = fields
+
+    def get_is_favorite(self, obj) -> bool:
+        """El corazón del catálogo: si el usuario de la petición lo guardó.
+
+        `PropertyViewSet.get_queryset` anota `is_favorite` con un `EXISTS`
+        (o `false` para anónimos), así que este método no toca la base. La rama
+        del atributo directo la usa `FavoriteSerializer`, que marca la propiedad
+        como favorita sin volver a preguntar.
+        """
+        annotated = getattr(obj, "is_favorite", None)
+        return bool(annotated) if annotated is not None else False
 
 
 # -------------------------------------------------------------
@@ -250,3 +263,48 @@ def build_schedules_payload(property_obj, slots) -> dict:
         "total_slots": total,
         "days": days,
     }
+
+
+# -------------------------------------------------------------
+# Favoritos (HU-PROP-05)
+# -------------------------------------------------------------
+
+
+class FavoriteInputSerializer(StrictFieldsSerializer):
+    """Cuerpo de `POST /api/v1/favorites/` (schema `FavoriteInput`).
+
+    Solo necesita el inmueble: la fecha de guardado la asigna el backend, porque
+    es un dato del servidor y no tiene sentido que el cliente pueda elegirlo.
+    """
+
+    property_id = serializers.UUIDField(
+        error_messages={
+            "invalid": "El identificador de propiedad no tiene un formato válido.",
+            "required": "Este campo es obligatorio.",
+        }
+    )
+
+
+class FavoriteSerializer(serializers.ModelSerializer):
+    """Un favorito tal como lo consume la vista "Mis Favoritos".
+
+    El contrato no aplana el inmueble: envuelve el `Property` y le añade
+    `added_at`, que es dato de la relación (la columna `created_at` de la tabla
+    `favorite`) y no del inmueble, para que el mismo anuncio no aparezca con
+    metadatos distintos según desde dónde se leyera.
+    """
+
+    property = serializers.SerializerMethodField()
+    added_at = serializers.DateTimeField(source="created_at", read_only=True)
+
+    class Meta:
+        model = Favorite
+        fields = ("property", "added_at")
+
+    def get_property(self, obj):
+        prop = obj.property
+        # Toda esta lista es, por definición, de favoritos del usuario de la
+        # petición, y el `is_favorite` del corazón no debe volver al ORM por
+        # cada fila: la propiedad ya vino con `select_related`.
+        prop.is_favorite = True
+        return PropertySerializer(prop, context=self.context).data

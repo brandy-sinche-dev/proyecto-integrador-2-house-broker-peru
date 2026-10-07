@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from .models import (
     District,
+    Favorite,
     Property,
     PropertyImage,
     PropertyOwner,
@@ -45,6 +46,13 @@ class PropertyImageAdmin(admin.ModelAdmin):
 class PropertyOwnerAdmin(admin.ModelAdmin):
     list_display = ("full_name", "property", "is_representative")
     search_fields = ("full_name", "document_number")
+
+
+@admin.register(Favorite)
+class FavoriteAdmin(admin.ModelAdmin):
+    list_display = ("user", "property", "created_at")
+    list_filter = ("created_at",)
+    raw_id_fields = ("user", "property")
 
 
 @admin.register(PropertySchedule)
