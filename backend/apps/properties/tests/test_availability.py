@@ -35,6 +35,54 @@ class AvailabilityApiTestCase(APITestCase):
         return self
 
 
+class PropertyManagementApiTests(AvailabilityApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self.property.status = PropertyStatus.SUSPENDIDO
+        self.property.is_active = False
+        self.property.save(update_fields=["status", "is_active"])
+        self.detail_url = f"/api/v1/properties/{self.property.id}"
+        self.management_url = f"{self.detail_url}/management"
+
+    def test_assigned_agent_can_reopen_suspended_property(self):
+        self.as_agent()
+        self.assertEqual(self.client.get(self.detail_url).status_code, 404)
+        response = self.client.get(self.management_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "SUSPENDIDO")
+        self.assertFalse(response.json()["is_active"])
+        self.assertFalse(response.json()["is_bookable"])
+        self.assertEqual(self.client.get(self.schedules_url).status_code, 200)
+        response = self.client.patch(self.status_url, {"status": "DISPONIBLE"}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["is_active"])
+        self.assertEqual(self.client.get(self.detail_url).status_code, 200)
+
+    def test_admin_can_read_suspended_management_detail(self):
+        self.client.force_authenticate(make_user("admin", role=ROLE_ADMIN))
+        self.assertEqual(self.client.get(self.management_url).status_code, 200)
+        self.assertEqual(self.client.get(self.detail_url).status_code, 404)
+
+    def test_unassigned_agent_cannot_read_or_reopen_suspended_property(self):
+        self.client.force_authenticate(make_user("otro", role=ROLE_AGENT))
+        self.assertEqual(self.client.get(self.management_url).status_code, 403)
+        self.assertEqual(self.client.get(self.schedules_url).status_code, 403)
+        response = self.client.patch(self.status_url, {"status": "DISPONIBLE"}, format="json")
+        self.assertEqual(response.status_code, 403)
+        self.property.refresh_from_db()
+        self.assertEqual(self.property.status, PropertyStatus.SUSPENDIDO)
+        self.assertFalse(self.property.is_active)
+
+    def test_anonymous_cannot_read_management_detail(self):
+        self.assertEqual(self.client.get(self.management_url).status_code, 401)
+        self.assertEqual(self.client.get(self.detail_url).status_code, 404)
+
+    def test_client_cannot_read_management_detail_even_if_assigned(self):
+        self.agent.role = ROLE_CLIENT
+        self.client.force_authenticate(self.agent)
+        self.assertEqual(self.client.get(self.management_url).status_code, 403)
+
+
 class PropertyStatusApiTests(AvailabilityApiTestCase):
     def setUp(self):
         super().setUp()
@@ -73,6 +121,27 @@ class PropertyStatusApiTests(AvailabilityApiTestCase):
         self.assertEqual(change.new_status, "RESERVADO")
         self.assertEqual(change.reason, "Reserva con dena")
         self.assertEqual(change.changed_by_id, self.agent.pk)
+
+    def test_reserved_can_be_sold_with_reason_and_remains_visible_not_bookable(self):
+        self.patch_status(status="RESERVADO", reason="Reserva firmada")
+        response = self.patch_status(status="VENDIDO")
+        self.assertEqual(response.status_code, 400)
+        self.property.refresh_from_db()
+        self.assertEqual(self.property.status, "RESERVADO")
+
+        response = self.patch_status(status="VENDIDO", reason="Venta firmada")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["previous_status"], "RESERVADO")
+        self.assertEqual(response.json()["status"], "VENDIDO")
+        change = PropertyStatusChange.objects.get(new_status="VENDIDO")
+        self.assertEqual(change.previous_status, "RESERVADO")
+        self.assertEqual(change.reason, "Venta firmada")
+        self.assertEqual(change.changed_by_id, self.agent.pk)
+        detail = self.client.get(f"/api/v1/properties/{self.property.id}")
+        self.assertEqual(detail.status_code, 200)
+        self.assertTrue(detail.json()["is_active"])
+        self.assertFalse(detail.json()["is_bookable"])
+        self.assertEqual(detail.json()["status"], "VENDIDO")
 
     def test_history_accumulates_one_row_per_transition(self):
         self.patch_status(status="RESERVADO", reason="Reserva con dena")

@@ -1492,6 +1492,44 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemInternalServerError'
 
+  /api/v1/properties/{id}/management:
+    parameters:
+      - $ref: '#/components/parameters/PropertyId'
+
+    get:
+      tags:
+        - Disponibilidad
+      operationId: getManagedProperty
+      summary: Obtener el detalle de gestión de una propiedad
+      security:
+        - bearerAuth: []
+      description: |
+        Devuelve el detalle del inmueble para el panel de disponibilidad.
+        Solo el agente asignado o un administrador pueden acceder; un cliente
+        o un agente ajeno reciben `403`, y la ausencia de sesión válida, `401`.
+
+        No filtra por `is_active`: permite cargar inmuebles `SUSPENDIDO` para
+        gestionar su disponibilidad y reactivarlos mediante `PATCH /api/v1/properties/{id}/status`.
+        El detalle público sigue devolviendo `404` mientras el inmueble esté
+        inactivo. En esta ruta, `404` indica que el inmueble no existe.
+      responses:
+        '200':
+          description: Detalle de gestión de la propiedad, incluso si está suspendida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Propiedad no encontrada
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemNotFound'
+
   /api/v1/properties/{id}/status:
     parameters:
       - $ref: '#/components/parameters/PropertyId'
@@ -1520,6 +1558,9 @@ paths:
         mediante eliminación lógica. Volver a `DISPONIBLE` lo reactiva. Es
         intencionalmente distinta de `DELETE /api/v1/properties/{id}`, que
         también desactiva pero no deja registro de la suspensión.
+
+        Desde `RESERVADO` se permite cerrar en `VENDIDO` con `reason` obligatorio;
+        el inmueble sigue visible en catálogo, pero no acepta nuevas reservas.
 
         No hay transición válida desde `VENDIDO` ni `ALQUILADO`: son estados
         terminales y un intento de revertirlos produce `409`.

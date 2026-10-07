@@ -130,7 +130,9 @@ URL y la segunda nunca recibe su método. Con dos acciones separadas, todos los
 DISPONIBLE`, y responde exactamente la pregunta del frontend: ¿puede este
 inmueble recibir una visita? El botón de reserva se oculta cuando es `false`.
 
-El endpoint de disponibilidad **no** filtra por `is_active`: un inmueble
+El panel carga el detalle mediante `GET /api/v1/properties/{id}/management`,
+protegido por `IsPropertyAgentOrAdmin` y con respuesta `Property`.
+Esta ruta y las acciones de disponibilidad **no** filtran por `is_active`: un inmueble
 suspendido tiene que seguir siendo editable, porque reactivarlo es justamente
 una de las transiciones. El `404` del catálogo público y el `200` del panel del
 agente son decisiones distintas sobre la misma fila, y por eso el action resuelve

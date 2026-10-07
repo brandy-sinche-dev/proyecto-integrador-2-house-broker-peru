@@ -86,6 +86,17 @@ class PropertyViewSet(ProblemResponseMixin, viewsets.ReadOnlyModelViewSet):
 
     @action(
         detail=True,
+        methods=["get"],
+        url_path="management",
+        permission_classes=[IsPropertyAgentOrAdmin],
+    )
+    def management(self, request, *args, **kwargs):
+        """Detalle protegido, accesible también para reactivar suspendidos."""
+        prop = self.get_availability_object(request)
+        return Response(self.get_serializer(prop).data)
+
+    @action(
+        detail=True,
         methods=["patch"],
         url_path="status",
         permission_classes=[IsPropertyAgentOrAdmin],

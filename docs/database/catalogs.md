@@ -132,10 +132,14 @@ en el servicio y queda registrada en `property_status_change`.
 | Desde \ A | `DISPONIBLE` | `RESERVADO` | `ALQUILADO` | `VENDIDO` | `SUSPENDIDO` |
 |---|:--:|:--:|:--:|:--:|:--:|
 | `DISPONIBLE` | — | Sí | No | No | Sí |
-| `RESERVADO` | Sí | — | Sí | No | Sí |
+| `RESERVADO` | Sí | — | Sí | Sí | Sí |
 | `ALQUILADO` | No | No | — | No | Sí |
 | `VENDIDO` | No | No | No | — | Sí |
 | `SUSPENDIDO` | Sí | No | No | No | — |
+
+`RESERVADO → VENDIDO` permite cerrar la venta con motivo obligatorio y registro
+de auditoría. Corrige la omisión que dejaba `VENDIDO` inalcanzable; el inmueble
+sigue visible, pero no acepta nuevas reservas (HU-PROP-04, CA1).
 
 Dos diagonales vacías por regla:
 
