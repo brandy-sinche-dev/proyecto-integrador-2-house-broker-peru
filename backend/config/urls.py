@@ -27,4 +27,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/health/', health, name='health'),
     path('api/v1/', include('apps.properties.urls')),
+    path('api/v1/', include('apps.appointments.urls')),
 ]

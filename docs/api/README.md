@@ -1037,6 +1037,14 @@ están justificados en
   con `GET /api/v1/properties/{id}` y los datos completos del cliente con la
   ficha de CRM (HU-CRM-03). Incluir el inmueble entero inflaría el listado sin
   que el frontend lo use.
+- **`client_id` y `AppointmentPersonRef.id` declaran `format: uuid`, pero la pk
+  de usuario todavía es un entero.** Mientras `TASK-BACK-SEC-01` no sustituya
+  `django.contrib.auth.User` por un modelo propio, la forma real de un id de
+  usuario es `"5"` y no un UUID. El backend acepta las dos formas en la entrada
+  (`appointments.services._client_pk`) y serializa `str(pk)` en la salida, de
+  modo que un id que no encaje con la pk del modelo termina en
+  `404 resource_not_found`, que es lo que el contrato ya documenta para un
+  usuario que no existe.
 - `Appointment` es la representación de lectura que consume `TASK-FRONT-CRM-02`;
   el modelo se crea en `TASK-ARC-CRM-01` (v1.5.0), que añade `AppointmentCreateInput`
   y el `POST` sobre la misma ruta.
@@ -1044,11 +1052,14 @@ están justificados en
   esa ruta es un recurso distinto al de `POST /api/v1/appointments` y
   documentar ambas crearía una operación duplicada que el backend no debe
   implementar por separado.
-- **Falta protección contra doble envío en el `POST`.** Un `POST` repetido con
-  el mismo cuerpo crea dos citas en `PENDING`, porque cada solicitud es una
-  reserva nueva. `TASK-BACK-CRM-01` debería resolverlo con una restricción de
-  unicidad en base de datos sobre `(agent, scheduled_at)` para estados no
-  terminales, o con una cabecera `Idempotency-Key` que el contrato aún no define.
+- **El doble envío del `POST` lo resuelve la base de datos, no una cabecera.**
+  Un `POST` repetido con el mismo cuerpo no crea dos citas en `PENDING`:
+  `TASK-BACK-CRM-01` impone el índice parcial `appointment_property_slot_unique`
+  sobre `(property, scheduled_at)` para estados no terminales, el `EXCLUDE` de
+  solapamiento sobre propiedad y agente en PostgreSQL, y el `INSERT` dentro de
+  la transacción del alta. La carrera entre dos envíos termina en
+  `409 appointment_slot_conflict` sin insertar la segunda cita. Sigue sin haber
+  cabecera `Idempotency-Key`, porque el contrato aún no la define.
 - `AvailableSlots.total_slots` es redundante con `slots.length` a propósito: el
   frontend lo usa para pintar un contador sin recorrer el arreglo, y la
   aserción detecta una respuesta truncada.

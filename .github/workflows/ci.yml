@@ -90,6 +90,8 @@ jobs:
         # SQLite en memoria a propósito: la suite no necesita un servicio de
         # PostgreSQL para correr. `settings.py` trae defaults para
         # DJANGO_SECRET_KEY y DJANGO_DEBUG, así que no hay secretos en el CI.
+        # Las dos apps con tests: `properties` (catálogo, favoritos, agenda) y
+        # `appointments` (RF-CRM-01, la reserva de visitas).
         env:
           DJANGO_DB_ENGINE: sqlite
-        run: uv run python manage.py test apps.properties
+        run: uv run python manage.py test apps.properties apps.appointments

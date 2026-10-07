@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'apps.properties',
+    'apps.appointments',
 ]
 
 MIDDLEWARE = [
@@ -162,3 +163,6 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
+
+# Remitente de los correos transaccionales de citas (RF-SEC-05).
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@housebroker.pe')
