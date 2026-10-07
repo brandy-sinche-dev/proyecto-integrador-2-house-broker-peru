@@ -10,6 +10,7 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
@@ -124,6 +125,25 @@ class RefreshView(ProblemResponseMixin, APIView):
                 "Falta el refresh token en la cookie de sesión.",
             )
         try:
+            # Decodifica sin verificar solo para leer el `jti`: simplejwt
+            # verifica la blacklist dentro de `RefreshToken.__init__` y lanza
+            # `TokenError` antes del chequeo de abajo, lo que haría responder
+            # `invalid_refresh_token` cuando el spec pide `refresh_token_reused`.
+            jti = RefreshToken(token_value, verify=False).get("jti")
+        except TokenError as exc:
+            raise _problem(
+                "invalid_refresh_token",
+                status.HTTP_401_UNAUTHORIZED,
+                "El refresh token es inválido o expiró.",
+            ) from exc
+        blacklisted = BlacklistedToken.objects.filter(token__jti=jti).exists()
+        if blacklisted:
+            raise _problem(
+                "refresh_token_reused",
+                status.HTTP_401_UNAUTHORIZED,
+                "El refresh token ya fue rotado o revocado.",
+            )
+        try:
             refresh = RefreshToken(token_value)
         except TokenError as exc:
             raise _problem(
@@ -131,15 +151,11 @@ class RefreshView(ProblemResponseMixin, APIView):
                 status.HTTP_401_UNAUTHORIZED,
                 "El refresh token es inválido o expiró.",
             ) from exc
-
-        blacklisted = BlacklistedToken.objects.filter(token__jti=refresh["jti"]).exists()
-        if blacklisted:
-            raise _problem(
-                "refresh_token_reused",
-                status.HTTP_401_UNAUTHORIZED,
-                "El refresh token ya fue rotado o revocado.",
-            )
-        user = User.objects.filter(id=refresh.get("user_id")).first()
+        # `USER_ID_CLAIM` es `sub` (settings) y simplejwt 5.5 escribe ese
+        # claim, no `user_id`: leer el nombre fijo dejaba el refresh en
+        # `account_disabled` para toda sesión.
+        user_id = refresh.get(api_settings.USER_ID_CLAIM)
+        user = User.objects.filter(id=user_id).first()
         if user is None or not user.is_active:
             raise _problem(
                 "account_disabled",
