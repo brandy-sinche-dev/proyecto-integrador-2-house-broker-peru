@@ -122,6 +122,17 @@
   gap: 8px;
 }
 
+.hslots__list[hidden] {
+  display: none;
+}
+
+.hslots__add:focus-visible,
+.hslots__remove:focus-visible,
+.hslots__time-input:focus-visible {
+  outline: 2px solid var(--brand-bronze-deep);
+  outline-offset: 2px;
+}
+
 .hslots__slot {
   display: flex;
   flex-direction: column;

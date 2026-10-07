@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react'
+import { useId, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Button } from '../Button'
 import { getErrorMessage } from '../../services/axios'
@@ -64,6 +64,8 @@ function sameSchedule(a: WeekdayScheduleInput[], b: WeekdayScheduleInput[]): boo
 export function ScheduleManager({ propertyId, schedules, status, onSaved }: ScheduleManagerProps) {
   const headingId = useId()
   const messageId = `${headingId}-message`
+  const dayControls = useRef<Partial<Record<Weekday, HTMLInputElement | null>>>({})
+  const [collapsed, setCollapsed] = useState<Partial<Record<Weekday, boolean>>>({})
 
   const [draft, setDraft] = useState<ScheduleDraft>(() => draftFromSchedules(schedules))
   const [syncedFrom, setSyncedFrom] = useState(schedules)
@@ -79,6 +81,7 @@ export function ScheduleManager({ propertyId, schedules, status, onSaved }: Sche
   if (syncedFrom !== schedules) {
     setSyncedFrom(schedules)
     setDraft(draftFromSchedules(schedules))
+    setCollapsed({})
     setError(null)
     setNotice(null)
   }
@@ -105,12 +108,14 @@ export function ScheduleManager({ propertyId, schedules, status, onSaved }: Sche
   }
 
   const addSlot = (weekday: Weekday) => {
+    setCollapsed((prev) => ({ ...prev, [weekday]: false }))
     setDraft((prev) => ({ ...prev, [weekday]: [...prev[weekday], { ...EMPTY_SLOT }] }))
     setError(null)
     setNotice(null)
   }
 
   const removeSlot = (weekday: Weekday, index: number) => {
+    dayControls.current[weekday]?.focus()
     setDraft((prev) => {
       const remaining = prev[weekday].filter((_, i) => i !== index)
       return {
@@ -123,6 +128,7 @@ export function ScheduleManager({ propertyId, schedules, status, onSaved }: Sche
   }
 
   const toggleDay = (weekday: Weekday, checked: boolean) => {
+    setCollapsed((prev) => ({ ...prev, [weekday]: false }))
     setDraft((prev) => ({ ...prev, [weekday]: checked ? [{ ...EMPTY_SLOT }] : [] }))
     setError(null)
     setNotice(null)
@@ -185,12 +191,17 @@ export function ScheduleManager({ propertyId, schedules, status, onSaved }: Sche
             const dayProblems = dayIssues(issues, weekday)
             const checkboxId = `${headingId}-${weekday}`
             const problemsId = `${checkboxId}-problems`
+            const listId = `${checkboxId}-slots`
+            const expanded = !collapsed[weekday]
             return (
               <li key={weekday} className={`hslots__day ${slots.length > 0 ? 'hslots__day--on' : ''}`}>
                 <div className="hslots__day-head">
                   <input
                     id={checkboxId}
                     type="checkbox"
+                    role="switch"
+                    ref={(node) => { dayControls.current[weekday] = node }}
+                    aria-checked={slots.length > 0}
                     className="hslots__day-check"
                     checked={slots.length > 0}
                     aria-describedby={dayProblems.length > 0 ? problemsId : undefined}
@@ -202,6 +213,17 @@ export function ScheduleManager({ propertyId, schedules, status, onSaved }: Sche
                   <span className="hslots__day-count">
                     {slots.length === 0 ? 'Sin atención' : `${slots.length} franja${slots.length === 1 ? '' : 's'}`}
                   </span>
+                  {slots.length > 0 && (
+                    <button
+                      type="button"
+                      className="hslots__add"
+                      aria-expanded={expanded}
+                      aria-controls={listId}
+                      onClick={() => setCollapsed((prev) => ({ ...prev, [weekday]: expanded }))}
+                    >
+                      Franjas de {dayLabel}
+                    </button>
+                  )}
                   {slots.length > 0 && (
                     <button
                       type="button"
@@ -223,7 +245,7 @@ export function ScheduleManager({ propertyId, schedules, status, onSaved }: Sche
                 )}
 
                 {slots.length > 0 && (
-                  <ul className="hslots__list">
+                  <ul className="hslots__list" id={listId} aria-label={`Franjas de ${dayLabel}`} hidden={!expanded}>
                     {slots.map((slot, index) => {
                       const problem = slotIssue(issues, weekday, index)
                       const startId = `${checkboxId}-s${index}`
@@ -304,7 +326,7 @@ export function ScheduleManager({ propertyId, schedules, status, onSaved }: Sche
           </p>
         ))}
 
-        <p className="hslots__feedback" id={messageId} role="status" aria-live="polite">
+        <p className="hslots__feedback" id={messageId} role="status" aria-live="polite" aria-atomic="true">
           {error ? <span className="hslots__feedback-error">{error}</span> : notice}
         </p>
 
