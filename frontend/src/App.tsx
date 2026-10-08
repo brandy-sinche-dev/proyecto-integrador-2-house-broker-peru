@@ -76,6 +76,7 @@ function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false)
   const [visits, setVisits] = useState<string[]>(() => readList('hb_visits'))
   const [favorites, setFavorites] = useState<Property[]>([])
+  const [favoriteAnnouncement, setFavoriteAnnouncement] = useState('')
   const favoriteIds = useMemo(() => new Set(favorites.map((p) => p.id)), [favorites])
   const [pendingFavorite, setPendingFavorite] = useState<string | null>(() =>
     localStorage.getItem('hb_pending_favorite'),
@@ -113,10 +114,11 @@ function App() {
     setPendingFavorite(null)
     localStorage.removeItem('hb_pending_favorite')
     addFavorite(id)
-      .then((fav) =>
-        setFavorites((prev) => (prev.some((p) => p.id === id) ? prev : [...prev, fav.property])),
-      )
-      .catch(() => {})
+      .then((fav) => {
+        setFavorites((prev) => (prev.some((p) => p.id === id) ? prev : [...prev, fav.property]))
+        setFavoriteAnnouncement(`${fav.property.title} añadido a favoritos.`)
+      })
+      .catch(() => setFavoriteAnnouncement('No se pudo guardar el favorito pendiente. Inténtalo de nuevo.'))
   }, [user, pendingFavorite])
 
   const toggleSave = useCallback(
@@ -128,6 +130,11 @@ function App() {
       }
       const isSaved = favoriteIds.has(property.id)
       const previous = favorites
+      setFavoriteAnnouncement(
+        isSaved
+          ? `Quitando ${property.title} de favoritos…`
+          : `Guardando ${property.title} en favoritos…`,
+      )
       setFavorites((prev) =>
         isSaved
           ? prev.filter((p) => p.id !== property.id)
@@ -140,7 +147,16 @@ function App() {
               prev.map((p) => (p.id === property.id ? { ...fav.property, is_favorite: true } : p)),
             ),
           )
-      request.catch(() => setFavorites(previous))
+      request
+        .then(() => setFavoriteAnnouncement(
+          isSaved
+            ? `${property.title} quitado de favoritos.`
+            : `${property.title} añadido a favoritos.`,
+        ))
+        .catch(() => {
+          setFavorites(previous)
+          setFavoriteAnnouncement(`No se pudo actualizar ${property.title}. Se restauró el estado anterior de favoritos.`)
+        })
     },
     [user, favoriteIds, favorites],
   )
@@ -203,6 +219,10 @@ function App() {
         onNavigate={navigate}
         onOpenLogin={() => setIsLoginOpen(true)}
       />
+
+      <div className="sr-only" role="status" aria-label="Favoritos" aria-live="polite" aria-atomic="true">
+        {favoriteAnnouncement}
+      </div>
 
       <Routes>
         <Route path="/" element={home} />

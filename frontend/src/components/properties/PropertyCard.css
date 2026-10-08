@@ -110,8 +110,7 @@
   place-items: center;
   border: none;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(4px);
+  background: var(--white);
   color: var(--muted-light);
   transition: color 0.15s ease, background 0.15s ease;
 }
@@ -128,7 +127,11 @@
 
 .hpc__icon-btn.is-saved {
   background: var(--white);
-  color: #ba1a1a;
+  color: var(--danger);
+}
+
+.hpc__icon-btn:focus-visible {
+  box-shadow: 0 0 0 4px var(--white);
 }
 
 .hpc__icon-btn.is-saved svg path {

@@ -112,7 +112,7 @@
 }
 
 .hpd__fav.is-saved {
-  color: var(--brand-gold);
+  color: var(--danger);
 }
 
 .hpd__fav.is-saved svg path {
