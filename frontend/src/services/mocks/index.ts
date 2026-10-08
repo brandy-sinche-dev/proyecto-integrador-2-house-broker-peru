@@ -65,5 +65,15 @@ export const setupMocks = (): MockAdapter => {
   mock.onGet(PROPERTY_SCHEDULES_PATH).reply((config) => getPropertySchedulesInMock(config, idFrom(config)))
   mock.onPut(PROPERTY_SCHEDULES_PATH).reply((config) => replacePropertySchedulesInMock(config, idFrom(config)))
 
+  // Mock auth
+  const mockUsers = JSON.parse(localStorage.getItem('mock_users') || '{}');
+  mock.onPost('/v1/auth/register').reply((config) => { const body = JSON.parse(config.data); mockUsers[body.email] = { id: 'fake-user-id', email: body.email, full_name: body.full_name, role: 'CLIENTE', is_active: true, created_at: new Date().toISOString() }; localStorage.setItem('mock_users', JSON.stringify(mockUsers)); return [200, mockUsers[body.email]]; });
+
+  mock.onPost('/v1/auth/login').reply((config) => { const { email } = JSON.parse(config.data); let user = mockUsers[email]; if (!user) { if (email === 'admin@housebroker.pe') user = MOCK_SESSION; else if (email === 'agente@housebroker.pe') user = { ...MOCK_SESSION, id: 'agente-1', email, full_name: 'Agente de Propiedades', role: 'AGENTE' }; else user = { id: 'cliente-1', email, full_name: 'Cliente', role: 'CLIENTE', is_active: true, created_at: new Date().toISOString() }; } return [200, { access: 'mock-access-token', token_type: 'Bearer', expires_in: 3600, user }]; })
+  
+  mock.onPost('/v1/auth/refresh').reply(() => {
+    return [401, { detail: 'Token inválido' }]
+  })
+
   return mock
 }

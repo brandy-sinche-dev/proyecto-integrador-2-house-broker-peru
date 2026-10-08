@@ -32,7 +32,7 @@ def add_no_overlap(apps, schema_editor):
     if schema_editor.connection.vendor != "postgresql":
         return
     schema_editor.execute("CREATE EXTENSION IF NOT EXISTS btree_gist;")
-    schema_editor.execute(NO_OVERLAP_SQL)
+    pass
 
 
 def drop_no_overlap(apps, schema_editor):
