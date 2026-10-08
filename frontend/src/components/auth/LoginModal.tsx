@@ -8,25 +8,33 @@ interface LoginModalProps {
 }
 
 export function LoginModal({ isOpen, onClose }: LoginModalProps) {
+  const [mode, setMode] = useState<'login' | 'register'>('login')
+  
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   
-  const { signIn } = useAuth()
+  const { signIn, signUp } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
   const from = location.state?.from?.pathname || '/'
 
-  // Reset form when opened
+  // Reset form when opened or when switching modes
   useEffect(() => {
     if (isOpen) {
+      setName('')
+      setPhone('')
       setEmail('')
       setPassword('')
       setError('')
       setShowPassword(false)
+      setMode('login')
     }
   }, [isOpen])
 
@@ -38,15 +46,38 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setLoading(true)
 
     try {
-      await signIn(email, password)
-      onClose()
-      // Redirigir según el rol o ir a la página de origen
-      navigate(from, { replace: true })
+      if (mode === 'login') {
+        const loggedUser = await signIn(email, password)
+        onClose()
+        if (loggedUser.role === 'ADMINISTRADOR') {
+          navigate('/admin', { replace: true })
+        } else if (loggedUser.role === 'AGENTE') {
+          navigate('/agente', { replace: true })
+        } else {
+          navigate(from, { replace: true })
+        }
+      } else {
+        // En modo registro, hacemos sign up y automáticamente sign in en la app real
+        // Aquí asumimos que tienes un signUp en AuthContext, o simplemente lo mockeamos
+        if (signUp) {
+          await signUp({ full_name: name, email, password, phone })
+        }
+        // Asumiendo que signUp loguea al usuario o te pide loguearte. Mock directo:
+        const loggedUser = await signIn(email, password)
+        onClose()
+        navigate(from, { replace: true })
+      }
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Credenciales incorrectas o error en el servidor.')
+      setError(err?.response?.data?.detail ?? (mode === 'login' ? 'Credenciales incorrectas o error en el servidor.' : 'Error al registrar la cuenta.'))
     } finally {
       setLoading(false)
     }
+  }
+
+  const toggleMode = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setMode(mode === 'login' ? 'register' : 'login')
+    setError('')
   }
 
   return (
@@ -72,9 +103,11 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           aria-label="Cerrar"
         >&times;</button>
 
-        <div style={{ textAlign: 'center', backgroundColor: 'var(--brand-bronze-deep, #4a3712)', padding: '2rem 1rem 1.5rem 1rem' }}>
+        <div style={{ textAlign: 'center', backgroundColor: 'var(--brand-bronze-deep, #562B05)', padding: '2rem 1rem 1.5rem 1rem' }}>
           <img src="/logo.png" alt="House Broker Logo" style={{ height: '60px', objectFit: 'contain', marginBottom: '0.5rem' }} />
-          <h2 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--brand-cream, #fbf9f8)', fontWeight: 600 }}>¡Bienvenido a HOUSE BROKER!</h2>
+          <h2 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--brand-cream, #fbf9f8)', fontWeight: 600 }}>
+            {mode === 'login' ? '¡Bienvenido a HOUSE BROKER!' : 'Únete a HOUSE BROKER'}
+          </h2>
         </div>
         
         <div style={{ padding: '2rem' }}>
@@ -85,10 +118,38 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           )}
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            
+            {mode === 'register' && (
+              <>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '14px', color: '#374151' }}>Nombres completos</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Juan Pérez"
+                    required
+                    style={{ width: '100%', padding: '0.875rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '14px', color: '#374151' }}>Teléfono</label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="999 888 777"
+                    required
+                    style={{ width: '100%', padding: '0.875rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </>
+            )}
+
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '14px', color: '#374151' }}>Correo electrónico / Usuario</label>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '14px', color: '#374151' }}>Correo electrónico</label>
               <input
-                type="text"
+                type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="tucorreo@email.com"
@@ -128,9 +189,11 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                   </svg>
                 </button>
               </div>
-              <div style={{ textAlign: 'right', marginTop: '0.5rem' }}>
-                <a href="#" style={{ fontSize: '12px', color: '#d97706', textDecoration: 'none', fontWeight: 500 }}>Recuperar contraseña</a>
-              </div>
+              {mode === 'login' && (
+                <div style={{ textAlign: 'right', marginTop: '0.5rem' }}>
+                  <a href="#" style={{ fontSize: '12px', color: '#d97706', textDecoration: 'none', fontWeight: 500 }}>Recuperar contraseña</a>
+                </div>
+              )}
             </div>
 
             <button 
@@ -138,34 +201,39 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               disabled={loading}
               style={{ 
                 marginTop: '0.5rem', padding: '0.875rem', 
-                backgroundColor: '#1f2937', color: 'white', 
+                backgroundColor: 'var(--brand-gold, #cfa861)', color: 'var(--brand-bronze-deep, #562B05)', 
                 border: 'none', borderRadius: '8px', 
                 cursor: loading ? 'not-allowed' : 'pointer', 
                 fontWeight: 'bold', fontSize: '15px',
                 opacity: loading ? 0.7 : 1
               }}
             >
-              {loading ? 'Ingresando...' : 'Ingresar'}
+              {loading ? (mode === 'login' ? 'Ingresando...' : 'Creando cuenta...') : (mode === 'login' ? 'Ingresar' : 'Crear cuenta')}
             </button>
             
-            <button 
-              type="button"
-              onClick={onClose}
-              style={{ 
-                padding: '0.875rem', 
-                backgroundColor: 'transparent', color: '#d97706', 
-                border: 'none', borderRadius: '8px', 
-                cursor: 'pointer', fontWeight: 600, fontSize: '14px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-              Continuar como invitado
-            </button>
+            {mode === 'login' && (
+              <button 
+                type="button"
+                onClick={onClose}
+                style={{ 
+                  padding: '0.875rem', 
+                  backgroundColor: 'transparent', color: '#d97706', 
+                  border: 'none', borderRadius: '8px', 
+                  cursor: 'pointer', fontWeight: 600, fontSize: '14px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                Continuar como invitado
+              </button>
+            )}
 
             <div style={{ textAlign: 'center', borderTop: '1px solid #e5e7eb', paddingTop: '1.5rem', marginTop: '0.5rem' }}>
               <p style={{ margin: 0, fontSize: '13px', color: '#6b7280' }}>
-                ¿No tienes una cuenta? <a href="/registro" onClick={onClose} style={{ color: '#d97706', textDecoration: 'none', fontWeight: 600 }}>Regístrate aquí</a>
+                {mode === 'login' ? '¿No tienes una cuenta? ' : '¿Ya tienes una cuenta? '}
+                <a href="#" onClick={toggleMode} style={{ color: '#d97706', textDecoration: 'none', fontWeight: 600 }}>
+                  {mode === 'login' ? 'Regístrate aquí' : 'Inicia sesión aquí'}
+                </a>
               </p>
             </div>
           </form>

@@ -1,3 +1,4 @@
+import { useSearchParams } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PropertyCard } from './PropertyCard'
 import { FilterSidebar } from './FilterSidebar'
@@ -105,12 +106,7 @@ export function PropertyList({
 
   const source = mode === 'guardados' && favoriteList.length > 0 ? favoriteList : properties
 
-  const bounds = useMemo(() => {
-    const prices = source.map((p) => p.price)
-    const min = prices.length ? Math.min(...prices) : 0
-    const max = prices.length ? Math.max(...prices) : 0
-    return { min, max: max || 1 }
-  }, [source])
+  const [searchParams] = useSearchParams(); const currentMoneda = searchParams.get('moneda') || 'PEN'; const bounds = useMemo(() => { const prices = source.filter((p) => (p.moneda || 'PEN') === currentMoneda).map((p) => p.price); const min = prices.length ? Math.min(...prices) : 0; const max = prices.length ? Math.max(...prices) : 0; return { min, max: max || 1 }; }, [source, currentMoneda])
 
   const {
     filters,
@@ -173,7 +169,8 @@ export function PropertyList({
   const filtered = useMemo(() => {
     const q = urlQuery.trim().toLowerCase()
     const list = source.filter((p) => {
-      if (mode === 'guardados' && !saved.includes(p.id)) return false
+      if ((p.moneda || 'PEN') !== currentMoneda) return false;
+        if (mode === 'guardados' && !saved.includes(p.id)) return false
       if (mode === 'visitas' && !visits.includes(p.id)) return false
       if (filters.operacion && p.mode !== filters.operacion) return false
       if (p.price < filters.priceMin || p.price > filters.priceMax) return false
@@ -276,10 +273,7 @@ export function PropertyList({
                 <span>Visitas</span>
                 <span className="hsearch__badge">{visits.length}</span>
               </button>
-              <button type="button" className="hsearch__publish" onClick={() => onNavigate('concierge')}>
-                <IconChat />
-                <span>Concierge IA</span>
-              </button>
+              
             </div>
           </form>
 

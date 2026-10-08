@@ -1,7 +1,8 @@
-import type { TransactionMode } from '../../services/types'
+import type { TransactionMode, Moneda } from '../../services/types'
 
 export interface Filters {
   operacion: TransactionMode | ''
+  moneda: Moneda | ''
   priceMin: number
   priceMax: number
   metraje: '' | 'small' | 'mid' | 'large'
@@ -13,6 +14,7 @@ export interface Filters {
 
 export const emptyFilters = (min: number, max: number): Filters => ({
   operacion: '',
+  moneda: '',
   priceMin: min,
   priceMax: max,
   metraje: '',

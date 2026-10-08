@@ -6,11 +6,11 @@ import { emptyFilters } from './filters'
 export function useFilterParams(bounds: { min: number; max: number }) {
   const [searchParams, setSearchParams] = useSearchParams()
 
-  // 1. Leer parámetros de la URL y mapearlos al objeto Filters
   const filters = useMemo<Filters>(() => {
     const defaultState = emptyFilters(bounds.min, bounds.max)
 
     const operacion = searchParams.get('operacion') as Filters['operacion']
+    const moneda = searchParams.get('moneda') as Filters['moneda']
     const priceMin = searchParams.get('priceMin')
     const priceMax = searchParams.get('priceMax')
     const metraje = searchParams.get('metraje') as Filters['metraje']
@@ -18,6 +18,7 @@ export function useFilterParams(bounds: { min: number; max: number }) {
 
     return {
       operacion: operacion === 'VENTA' || operacion === 'ALQUILER' ? operacion : defaultState.operacion,
+      moneda: moneda === 'PEN' || moneda === 'USD' ? moneda : defaultState.moneda,
       priceMin: priceMin !== null && !isNaN(Number(priceMin)) ? Number(priceMin) : bounds.min,
       priceMax: priceMax !== null && !isNaN(Number(priceMax)) ? Number(priceMax) : bounds.max,
       metraje: metraje && ['small', 'mid', 'large'].includes(metraje) ? metraje : defaultState.metraje,
@@ -30,26 +31,32 @@ export function useFilterParams(bounds: { min: number; max: number }) {
 
   const query = useMemo(() => searchParams.get('q') ?? '', [searchParams])
 
-  // 2. Aplicar nuevos filtros escribiéndolos en la URL
   const applyFilters = useCallback(
     (newFilters: Filters) => {
-      // Se parte de los parámetros actuales y no de uno vacío porque la búsqueda
-      // por texto también vive en la URL (`?q=`): al aplicar un filtro hay que
-      // conservarla. Por eso cada filtro vuelve a su valor por defecto con
-      // `delete` en vez de simplemente no escribirse.
       const params = new URLSearchParams(searchParams)
+      
+      const prevMoneda = searchParams.get('moneda') || 'PEN'
+      const nextMoneda = newFilters.moneda || 'PEN'
+      const monedaChanged = prevMoneda !== nextMoneda
 
       if (newFilters.operacion) params.set('operacion', newFilters.operacion)
       else params.delete('operacion')
 
-      // Guardar precios en URL si son diferentes a los bounds actuales
-      if (newFilters.priceMin > bounds.min) params.set('priceMin', String(newFilters.priceMin))
-      else params.delete('priceMin')
-      // Guardar priceMax si se especificó un límite superior válido
-      if (bounds.max > 1 && newFilters.priceMax < bounds.max) {
-        params.set('priceMax', String(newFilters.priceMax))
-      } else {
+      if (newFilters.moneda) params.set('moneda', newFilters.moneda)
+      else params.delete('moneda')
+
+      if (monedaChanged) {
+        params.delete('priceMin')
         params.delete('priceMax')
+      } else {
+        if (newFilters.priceMin > bounds.min) params.set('priceMin', String(newFilters.priceMin))
+        else params.delete('priceMin')
+        
+        if (bounds.max > 1 && newFilters.priceMax < bounds.max) {
+          params.set('priceMax', String(newFilters.priceMax))
+        } else {
+          params.delete('priceMax')
+        }
       }
 
       if (newFilters.metraje) params.set('metraje', newFilters.metraje)
@@ -68,8 +75,6 @@ export function useFilterParams(bounds: { min: number; max: number }) {
     [bounds.min, bounds.max, searchParams, setSearchParams]
   )
 
-  // La búsqueda por texto se escribe con su propia función porque el input la
-  // publica con debounce (TASK-WPO-PROP-03) y no con cada pulsación.
   const setQuery = useCallback(
     (q: string) => {
       const params = new URLSearchParams(searchParams)
@@ -80,7 +85,6 @@ export function useFilterParams(bounds: { min: number; max: number }) {
     [searchParams, setSearchParams]
   )
 
-  // 3. Limpiar filtros y la URL a su estado inicial
   const clearFilters = useCallback(() => {
     setSearchParams(new URLSearchParams(), { replace: true })
   }, [setSearchParams])

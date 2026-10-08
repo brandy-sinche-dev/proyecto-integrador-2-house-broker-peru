@@ -6,7 +6,7 @@ import { clearSessionUser, writeSessionUser, type SessionUser } from '../service
 interface AuthContextValue {
   user: SessionUser | null
   loading: boolean
-  signIn: (email: string, password: string) => Promise<void>
+  signIn: (email: string, password: string) => Promise<any>
   signUp: (input: { email: string; password: string; full_name: string; phone?: string }) => Promise<void>
   signOut: () => void
 }
@@ -41,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = useCallback(async (email: string, password: string) => {
     const data = await login(email, password)
     syncUser(data.user)
+    return data.user
   }, [syncUser])
 
   const signUp = useCallback(async (input: { email: string; password: string; full_name: string; phone?: string }) => {

@@ -5,9 +5,13 @@ import type { NavTarget, Section } from './components/Header'
 import { Footer } from './components/Footer'
 import { AssistantWidget } from './components/AssistantWidget'
 import { AppointmentModal } from './components/crm/AppointmentModal'
-import { LoginModal } from './components/auth/LoginModal'
+
 import { RegisterForm } from './components/auth/RegisterForm'
 import { LoginPrompt } from './components/auth/LoginPrompt'
+import { LoginModal } from './components/auth/LoginModal'
+import { AdminPanel } from './components/admin/AdminPanel'
+import { AgentePanel } from './components/admin/AgentePanel'
+import { ProtectedRoute } from './services/ProtectedRoute'
 import { useAuth } from './context/AuthContext'
 import { addFavorite, getFavorites, removeFavorite } from './services/favorites'
 import type { Property } from './services/types'
@@ -69,6 +73,8 @@ function PropertyDetailRoute({
     />
   )
 }
+
+import { Home } from './components/Home'
 
 function App() {
   const [section, setSection] = useState<Section>('inicio')
@@ -176,14 +182,14 @@ function App() {
 
   const navigate = useCallback(
     (target: NavTarget) => {
-      if (target === 'concierge') {
-        setAssistantOpen(true)
+      if ((target === 'guardados' || target === 'visitas') && !user) {
+        setIsLoginOpen(true)
         return
       }
       setSection(target)
       if (location.pathname !== '/') navigateTo('/')
     },
-    [location.pathname, navigateTo],
+    [location.pathname, navigateTo, user],
   )
 
   const openProperty = useCallback(
@@ -193,10 +199,12 @@ function App() {
     [navigateTo],
   )
 
-  const home = (
+  const home = section === 'inicio' ? (
+    <Home onNavigate={navigate} />
+  ) : (
     <Suspense fallback={<ListSkeleton />}>
       <PropertyList
-        mode={section}
+        mode={section === 'propiedades' ? 'inicio' : section} // Reutilizamos 'inicio' del backend/modo anterior
         saved={[...favoriteIds]}
         visits={visits}
         favoriteList={favorites}
@@ -209,16 +217,20 @@ function App() {
     </Suspense>
   )
 
+  const isAdminOrAgentRoute = location.pathname.startsWith('/admin') || location.pathname.startsWith('/agente')
+
   return (
     <>
-      <Header
-        current={section}
-        conciergeOpen={assistantOpen}
-        savedCount={favoriteIds.size}
-        visitsCount={visits.length}
-        onNavigate={navigate}
-        onOpenLogin={() => setIsLoginOpen(true)}
-      />
+      {!isAdminOrAgentRoute && (
+        <Header
+          current={section}
+          conciergeOpen={assistantOpen}
+          savedCount={favoriteIds.size}
+          visitsCount={visits.length}
+          onNavigate={navigate}
+          onOpenLogin={() => setIsLoginOpen(true)}
+        />
+      )}
 
       <div className="sr-only" role="status" aria-label="Favoritos" aria-live="polite" aria-atomic="true">
         {favoriteAnnouncement}
@@ -227,6 +239,16 @@ function App() {
       <Routes>
         <Route path="/" element={home} />
         <Route path="/registro" element={<RegisterForm />} />
+
+        {/* Rutas Protegidas por Rol */}
+        <Route element={<ProtectedRoute allowedRoles={['ADMINISTRADOR']} />}>
+          <Route path="/admin/*" element={<AdminPanel />} />
+        </Route>
+
+        <Route element={<ProtectedRoute allowedRoles={['AGENTE']} />}>
+          <Route path="/agente/*" element={<AgentePanel />} />
+        </Route>
+        
         <Route
           path="/properties/:id"
           element={
@@ -251,15 +273,9 @@ function App() {
         <Route path="*" element={home} />
       </Routes>
 
-      <Footer />
+      {!isAdminOrAgentRoute && <Footer />}
 
-      <AssistantWidget
-        open={assistantOpen}
-        savedCount={favoriteIds.size}
-        visitsCount={visits.length}
-        onToggle={() => setAssistantOpen((open) => !open)}
-        onNavigate={navigate}
-      />
+      
 
       {selectedProperty && (
         <AppointmentModal
@@ -289,6 +305,5 @@ function App() {
     </>
   )
 }
-
 
 export default App
