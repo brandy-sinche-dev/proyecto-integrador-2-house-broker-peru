@@ -120,6 +120,7 @@ describe('FilterSidebar (panel de filtros)', () => {
       expect(onApply).toHaveBeenCalledTimes(1)
       expect(onApply).toHaveBeenCalledWith({
         operacion: 'VENTA',
+        moneda: '',
         priceMin: 0,
         priceMax: 1000000,
         metraje: 'large',

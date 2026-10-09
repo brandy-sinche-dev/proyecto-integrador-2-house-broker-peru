@@ -86,10 +86,11 @@ function clearFilters(view) {
 
 const empty = () => emptyFilters(BOUNDS.min, BOUNDS.max)
 
-// Filtros completos con los 8 campos activados: sirve para los casos de
+// Filtros completos con los 9 campos activados: sirve para los casos de
 // combinación total y de round-trip.
 const ALL_FILTERS = {
   operacion: 'ALQUILER',
+  moneda: 'PEN',
   priceMin: 250000,
   priceMax: 300000,
   metraje: 'mid',
@@ -100,7 +101,7 @@ const ALL_FILTERS = {
 }
 
 const ALL_FILTERS_QUERY =
-  '?operacion=ALQUILER&priceMin=250000&priceMax=300000&metraje=mid&habitaciones=3&negociable=true&destacado=true&cochera=true'
+  '?operacion=ALQUILER&moneda=PEN&priceMin=250000&priceMax=300000&metraje=mid&habitaciones=3&negociable=true&destacado=true&cochera=true'
 
 describe('useFilterParams (combinación de filtros y URL parsing)', () => {
   describe('Generación de la query string tras aplicar filtros', () => {
@@ -126,6 +127,31 @@ describe('useFilterParams (combinación de filtros y URL parsing)', () => {
       applyFilters(view, { ...view.result.current.filters, operacion: '' })
 
       expect(view.search()).toBe('')
+    })
+
+    it.each(['PEN', 'USD'])('serializa la moneda %s', (moneda) => {
+      const view = renderHookInUrl()
+
+      applyFilters(view, { ...empty(), moneda })
+
+      expect(view.search()).toBe(`?moneda=${moneda}`)
+    })
+
+    it('omite la moneda cuando se deselecciona', () => {
+      const view = renderHookInUrl('/?moneda=USD')
+
+      applyFilters(view, { ...view.result.current.filters, moneda: '' })
+
+      expect(view.search()).toBe('')
+    })
+
+    it('reinicia el rango de precio cuando cambia la moneda', () => {
+      const view = renderHookInUrl('/?moneda=USD&priceMin=200000&priceMax=300000')
+
+      applyFilters(view, { ...view.result.current.filters, moneda: 'PEN' })
+
+      // Cambiar de divisa invalida el rango anterior: no debe viajar a la URL.
+      expect(view.search()).toBe('?moneda=PEN')
     })
 
     it('escribe priceMin solo cuando supera el mínimo del catálogo', () => {
@@ -203,7 +229,7 @@ describe('useFilterParams (combinación de filtros y URL parsing)', () => {
       },
     )
 
-    it('combina los ocho filtros en el orden en que los declara el hook', () => {
+    it('combina los nueve filtros en el orden en que los declara el hook', () => {
       const view = renderHookInUrl()
 
       applyFilters(view, ALL_FILTERS)
@@ -277,6 +303,7 @@ describe('useFilterParams (combinación de filtros y URL parsing)', () => {
 
     it.each([
       ['operacion', 'ALQUILER'],
+      ['moneda', 'PEN'],
       ['priceMin', 250000],
       ['priceMax', 300000],
       ['metraje', 'mid'],
@@ -482,6 +509,7 @@ describe('useFilterParams (combinación de filtros y URL parsing)', () => {
         { cochera: false },
         { priceMin: BOUNDS.min, priceMax: BOUNDS.max },
         { operacion: '' },
+        { moneda: '' },
       ]
 
       removals.forEach((patch) => {

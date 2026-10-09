@@ -37,8 +37,18 @@ function storedVisits() {
   return JSON.parse(localStorage.getItem('hb_visits'))
 }
 
+// La app abre en la landing (`Home`); el catálogo es la sección
+// "Propiedades" del header, así que las pruebas de catálogo deben navegar
+// hasta ella antes de interactuar con las tarjetas.
+async function goToCatalog(user) {
+  await user.click(await screen.findByRole('button', { name: 'Propiedades' }))
+}
+
 async function openBooking(user, source, title = properties[0].title) {
   if (source === 'catálogo') {
+    if (!within(document.body).queryByRole('heading', { name: title })) {
+      await goToCatalog(user)
+    }
     const heading = await screen.findByRole('heading', { name: title })
     await user.click(within(heading.closest('article')).getByRole('button', { name: 'Agendar visita' }))
   } else {
@@ -228,6 +238,7 @@ describe('App: favoritos (HU-PROP-05)', () => {
     const user = userEvent.setup()
     renderApp()
 
+    await goToCatalog(user)
     const heart = await screen.findByRole('button', { name: 'Guardar Departamento 1' })
     await user.click(heart)
 
@@ -261,6 +272,7 @@ describe('App: favoritos (HU-PROP-05)', () => {
     const user = userEvent.setup()
     renderApp()
 
+    await goToCatalog(user)
     const heart = await screen.findByRole('button', { name: 'Guardar Departamento 1' })
     const status = favoriteStatus()
     expect(status).toHaveAttribute('aria-live', 'polite')
@@ -298,6 +310,7 @@ describe('App: favoritos (HU-PROP-05)', () => {
     const user = userEvent.setup()
     renderApp()
 
+    await goToCatalog(user)
     await screen.findByRole('button', { name: 'Quitar Departamento 1 de guardados' })
     await user.click(screen.getByRole('button', { name: /^Guardados/ }))
     const status = favoriteStatus()
@@ -318,6 +331,7 @@ describe('App: favoritos (HU-PROP-05)', () => {
     const user = userEvent.setup()
     renderApp()
 
+    await goToCatalog(user)
     const label = saved ? 'Quitar Departamento 1 de guardados' : 'Guardar Departamento 1'
     await user.click(await screen.findByRole('button', { name: label }))
 
@@ -336,7 +350,9 @@ describe('App: favoritos (HU-PROP-05)', () => {
       property: { ...properties[0], is_favorite: true },
       added_at: '2026-01-05T00:00:00Z',
     })
+    const user = userEvent.setup()
     renderApp()
+    await goToCatalog(user)
 
     expect(
       await screen.findByRole('button', { name: 'Quitar Departamento 1 de guardados' }),
@@ -368,7 +384,9 @@ describe('App: favoritos (HU-PROP-05)', () => {
     })
     feed(properties)
 
+    const user = userEvent.setup()
     renderApp()
+    await goToCatalog(user)
     await screen.findByRole('heading', { level: 1, name: 'Propiedades en Perú' })
 
     const stored = localStorage.getItem('hb_user')

@@ -3,18 +3,63 @@ services:
     image: postgres:16-alpine
     container_name: housebroker-db
     environment:
-      POSTGRES_DB: housebroker
-      POSTGRES_USER: housebroker
-      POSTGRES_PASSWORD: housebroker
+      POSTGRES_DB: ${POSTGRES_DB:-housebroker}
+      POSTGRES_USER: ${POSTGRES_USER:-housebroker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-housebroker}
     ports:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U housebroker -d housebroker"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-housebroker} -d ${POSTGRES_DB:-housebroker}"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  backend:
+    build:
+      context: ../backend
+    container_name: housebroker-backend
+    command: >
+      sh -c "python manage.py migrate &&
+             (python manage.py seed_demo || true) &&
+             exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60"
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-true}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-secret-change-me}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0,backend}
+      POSTGRES_DB: ${POSTGRES_DB:-housebroker}
+      POSTGRES_USER: ${POSTGRES_USER:-housebroker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-housebroker}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health/', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ../frontend
+      target: prod
+      args:
+        VITE_API_URL: /api
+        VITE_ENABLE_MOCKS: "false"
+    container_name: housebroker-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   postgres_data:

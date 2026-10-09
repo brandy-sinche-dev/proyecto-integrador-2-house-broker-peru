@@ -585,11 +585,7 @@ export function AdminPanel() {
       {/* Main */}
       <main className="panel-main">
         <div style={{ flex: 1 }}>
-          {activeTab === 'ajustes' ? (
-            <Active adminProfile={adminProfile} setAdminProfile={setAdminProfile} />
-          ) : (
-            <Active />
-          )}
+          <Active adminProfile={adminProfile} setAdminProfile={setAdminProfile} />
         </div>
         <footer style={{ marginTop: '3rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb', textAlign: 'center', color: '#9ca3af', fontSize: '0.78rem' }}>
           © {new Date().getFullYear()} House Broker Perú &nbsp;·&nbsp; Panel de Administración

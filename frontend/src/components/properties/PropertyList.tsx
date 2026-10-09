@@ -35,6 +35,7 @@ const SEARCH_DEBOUNCE_MS = 300
 
 const TITLES: Record<Section, string> = {
   inicio: 'Propiedades en Perú',
+  propiedades: 'Propiedades en Perú',
   guardados: 'Mis guardados',
   visitas: 'Mis visitas',
 }
@@ -74,14 +75,6 @@ function IconCalendar() {
   return (
     <svg viewBox="0 0 18 18" aria-hidden="true">
       <path d="M2.5 4.5h13v11h-13zM2.5 8h13M6 2.5V6M12 2.5V6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function IconChat() {
-  return (
-    <svg viewBox="0 0 22 22" aria-hidden="true">
-      <path d="M3 3h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-4 3.5V15H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
     </svg>
   )
 }

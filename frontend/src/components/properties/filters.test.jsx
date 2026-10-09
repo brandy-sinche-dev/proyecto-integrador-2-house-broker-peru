@@ -6,7 +6,7 @@
 // `emptyFilters` es la fábrica que construye el estado "sin filtros"
 // del panel. Es el valor contra el que el resto de la suite de
 // filtros compara (URL vacía, reset, omisión de parámetros), así que
-// se fija su contrato completo: los 8 campos, los tipos, la propagación
+// se fija su contrato completo: los 9 campos, los tipos, la propagación
 // de los bounds del catálogo y que cada llamada devuelva un objeto
 // nuevo (si devolviera una referencia compartida, dos montar del hook
 // se contaminarían entre sí).
@@ -16,12 +16,13 @@ import { emptyFilters } from './filters'
 const CATALOG_BOUNDS = { min: 100000, max: 500000 }
 
 describe('emptyFilters (estado inicial de los filtros)', () => {
-  it('devuelve los 8 campos del contrato de filtros', () => {
+  it('devuelve los 9 campos del contrato de filtros', () => {
     expect(Object.keys(emptyFilters(CATALOG_BOUNDS.min, CATALOG_BOUNDS.max)).sort()).toEqual([
       'cochera',
       'destacado',
       'habitaciones',
       'metraje',
+      'moneda',
       'negociable',
       'operacion',
       'priceMax',
@@ -29,9 +30,10 @@ describe('emptyFilters (estado inicial de los filtros)', () => {
     ])
   })
 
-  it('deja la modalidad, el metraje y las habitaciones sin seleccionar', () => {
+  it('deja la modalidad, la moneda, el metraje y las habitaciones sin seleccionar', () => {
     expect(emptyFilters(CATALOG_BOUNDS.min, CATALOG_BOUNDS.max)).toMatchObject({
       operacion: '',
+      moneda: '',
       metraje: '',
       habitaciones: null,
     })
@@ -64,6 +66,7 @@ describe('emptyFilters (estado inicial de los filtros)', () => {
     expect(typeof filters.destacado).toBe('boolean')
     expect(typeof filters.cochera).toBe('boolean')
     expect(typeof filters.operacion).toBe('string')
+    expect(typeof filters.moneda).toBe('string')
     expect(typeof filters.metraje).toBe('string')
   })
 
@@ -83,6 +86,7 @@ describe('emptyFilters (estado inicial de los filtros)', () => {
 
     expect(aplicado).toEqual({
       operacion: 'VENTA',
+      moneda: '',
       priceMin: 100000,
       priceMax: 500000,
       metraje: '',

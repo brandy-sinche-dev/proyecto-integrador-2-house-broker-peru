@@ -200,6 +200,8 @@ describe('FilterSidebar (accesibilidad)', () => {
       'Limpiar todos los filtros',
       'Venta',
       'Alquiler',
+      'Soles',
+      'Dólares',
       'Precio mínimo',
       'Precio máximo',
       'Hasta 80 m²',

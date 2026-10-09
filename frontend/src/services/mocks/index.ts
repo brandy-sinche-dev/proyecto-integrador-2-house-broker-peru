@@ -16,6 +16,18 @@ import {
 } from './availability'
 import { MOCK_SELLER } from './data/properties'
 
+// Usuario administrador simulado: es la sesión que devuelve el login mock
+// para `admin@housebroker.pe`. `TASK-FRONT-SEC-01` aún no existe, así que el
+// modo simulado resuelve la sesión en el cliente.
+const MOCK_SESSION = {
+  id: MOCK_SELLER.id,
+  email: 'admin@housebroker.pe',
+  full_name: 'Administrador HouseBroker',
+  role: 'ADMINISTRADOR',
+  is_active: true,
+  created_at: new Date().toISOString(),
+}
+
 // Rutas del contrato definido en TASK-ARC-PROP-01 (openapi_spec.yaml)
 const PROPERTIES_PATH = '/v1/properties'
 const PROPERTY_DETAIL_PATH = /^\/v1\/properties\/[^/]+$/

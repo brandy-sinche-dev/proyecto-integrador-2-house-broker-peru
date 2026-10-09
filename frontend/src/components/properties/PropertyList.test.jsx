@@ -598,7 +598,7 @@ describe('PropertyList (integración del catálogo)', () => {
   })
 
   describe('Navegación', () => {
-    it('navega a visitas y al concierge desde la barra de búsqueda', async () => {
+    it('navega a visitas desde la barra de búsqueda', async () => {
       const user = userEvent.setup()
       mock.onGet(LIST_PATH).reply(200, paginated(manyProperties(1)))
 
@@ -607,9 +607,6 @@ describe('PropertyList (integración del catálogo)', () => {
 
       await user.click(screen.getByRole('button', { name: /Visitas/ }))
       expect(props.onNavigate).toHaveBeenCalledWith('visitas')
-
-      await user.click(screen.getByRole('button', { name: /Concierge IA/ }))
-      expect(props.onNavigate).toHaveBeenCalledWith('concierge')
     })
   })
 

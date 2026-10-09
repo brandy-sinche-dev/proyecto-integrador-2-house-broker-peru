@@ -101,7 +101,7 @@ export function Header({ current, conciergeOpen, savedCount, visitsCount, onNavi
                   </svg>
                 </span>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 'bold' }}>{user.full_name.split(' ')[0]}</span>
+                  <span style={{ fontSize: '12px', fontWeight: 'bold' }}>{user.full_name?.split(' ')[0]}</span>
                   <span style={{ fontSize: '10px', color: 'var(--brand-gold-light)' }}>{user.role}</span>
                 </div>
               </div>
@@ -216,7 +216,7 @@ export function Header({ current, conciergeOpen, savedCount, visitsCount, onNavi
                     </svg>
                   </span>
                   <div>
-                    <div style={{ fontWeight: 'bold' }}>{user.full_name.split(' ')[0]}</div>
+                    <div style={{ fontWeight: 'bold' }}>{user.full_name?.split(' ')[0]}</div>
                     <div style={{ fontSize: '12px', color: '#6b7280' }}>{user.role}</div>
                   </div>
                 </div>

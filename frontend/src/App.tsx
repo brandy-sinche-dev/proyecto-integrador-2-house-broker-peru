@@ -3,7 +3,6 @@ import { Route, Routes, useLocation, useNavigate, useParams } from 'react-router
 import { Header } from './components/Header'
 import type { NavTarget, Section } from './components/Header'
 import { Footer } from './components/Footer'
-import { AssistantWidget } from './components/AssistantWidget'
 import { AppointmentModal } from './components/crm/AppointmentModal'
 
 import { RegisterForm } from './components/auth/RegisterForm'
@@ -182,6 +181,10 @@ function App() {
 
   const navigate = useCallback(
     (target: NavTarget) => {
+      if (target === 'concierge') {
+        setAssistantOpen(true)
+        return
+      }
       if ((target === 'guardados' || target === 'visitas') && !user) {
         setIsLoginOpen(true)
         return

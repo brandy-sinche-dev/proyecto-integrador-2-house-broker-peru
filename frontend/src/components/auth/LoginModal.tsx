@@ -63,7 +63,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           await signUp({ full_name: name, email, password, phone })
         }
         // Asumiendo que signUp loguea al usuario o te pide loguearte. Mock directo:
-        const loggedUser = await signIn(email, password)
+        await signIn(email, password)
         onClose()
         navigate(from, { replace: true })
       }

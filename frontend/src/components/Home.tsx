@@ -1,4 +1,3 @@
-import React from 'react';
 import type { NavTarget } from './Header';
 
 export function Home({ onNavigate }: { onNavigate: (target: NavTarget) => void }) {
