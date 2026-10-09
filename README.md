@@ -24,7 +24,7 @@ Plataforma web que conecta a agentes, compradores e inquilinos (Lima Metropolita
 | Capa | Tecnología |
 |---|---|
 | Frontend | React 19 + TypeScript + Vite |
-| Backend | Python 3.12+, Django 5.1+, Django REST Framework |
+| Backend | Python 3.12+, Django 6.1+, Django REST Framework |
 | Base de datos | PostgreSQL 16 |
 | Tiempo real | Django Channels + WebSockets + Redis |
 | IA | Gemini (patrón Adapter intercambiable) |
@@ -121,7 +121,7 @@ Métricas y artefactos ejecutados: Sprint Planning (goal, DoR, DoD), Daily Scrum
 ├── backend/          # API y lógica del servidor (Django + DRF + PostgreSQL)
 ├── frontend/         # Interfaz de usuario (React + TypeScript + Vite)
 ├── docs/             # Documentación: requerimientos, arquitectura, UX/UI, scrum, git workflow, SLI/SLO
-├── infra/            # Infraestructura y Docker Compose (PostgreSQL)
+├── infra/            # Docker Compose (PostgreSQL + backend Django + frontend Nginx)
 ├── Laboratorios/     # Laboratorios de clase (por integrante)
 ├── Secciones/        # Evidencia de las sesiones de clase
 └── skills/           # Documentos internos de gestión (NO versionado — en .gitignore)
@@ -131,7 +131,33 @@ Métricas y artefactos ejecutados: Sprint Planning (goal, DoR, DoD), Daily Scrum
 
 ---
 
-## 4. Laboratorios y Secciones
+## 4. Ejecución con Docker
+
+Levanta el stack completo (**PostgreSQL + backend Django + frontend React servido por Nginx**) con un solo comando:
+
+```bash
+docker compose -f infra/docker-compose.yml up -d --build
+```
+
+| Servicio | URL | Descripción |
+|---|---|---|
+| Frontend | http://localhost:8080 | React (build de Vite) servido por Nginx, con proxy `/api` → backend |
+| Backend | http://localhost:8000/api | API Django REST Framework ejecutada con gunicorn |
+| PostgreSQL | localhost:5433 | Base de datos (DB/usuario/clave por defecto `housebroker`) |
+
+Al iniciar, el backend aplica migraciones y ejecuta `seed_demo` (datos de demostración idempotentes: propiedades, distritos, agendas y usuarios). Los valores sensibles se pueden sobrescribir con variables de entorno (`POSTGRES_*`, `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, `CORS_ALLOWED_ORIGINS`).
+
+Para detener y limpiar el stack:
+
+```bash
+docker compose -f infra/docker-compose.yml down
+```
+
+> **Mostrar en el repo:** `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf`, `infra/docker-compose.yml`, `backend/apps/properties/management/commands/seed_demo.py`.
+
+---
+
+## 5. Laboratorios y Secciones
 
 - **Laboratorios/**: prácticas asignadas por el profesor; cada laboratorio contiene su documentación y evidencias por integrante (Laboratorio 01: propuesta ágil y backlog; 02: entorno y prototipo; 03: riesgos e incremento frontend; 04: SLI/SLO y optimización).
 - **Secciones/**: materiales y resultados de las sesiones de clase impartidas por el profesor.
