@@ -74,9 +74,11 @@ function PropertyDetailRoute({
 }
 
 import { Home } from './components/Home'
+import { AssistantWidget } from './components/AssistantWidget'
 
 function App() {
   const [section, setSection] = useState<Section>('inicio')
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false)
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [isLoginOpen, setIsLoginOpen] = useState(false)
   const [visits, setVisits] = useState<string[]>(() => readList('hb_visits'))
@@ -304,7 +306,13 @@ function App() {
         />
       )}
 
-      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
+      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />\n      <AssistantWidget
+        open={isAssistantOpen}
+        savedCount={favoriteIds.size}
+        visitsCount={visits.length}
+        onToggle={() => setIsAssistantOpen(!isAssistantOpen)}
+        onNavigate={navigate}
+      />
     </>
   )
 }

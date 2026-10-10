@@ -99,7 +99,7 @@ export function PropertyList({
 
   const source = mode === 'guardados' && favoriteList.length > 0 ? favoriteList : properties
 
-  const [searchParams] = useSearchParams(); const currentMoneda = searchParams.get('moneda') || 'PEN'; const bounds = useMemo(() => { const prices = source.filter((p) => (p.moneda || 'PEN') === currentMoneda).map((p) => p.price); const min = prices.length ? Math.min(...prices) : 0; const max = prices.length ? Math.max(...prices) : 0; return { min, max: max || 1 }; }, [source, currentMoneda])
+  const [searchParams] = useSearchParams(); const currentMoneda = searchParams.get('moneda') || 'PEN'; console.log(currentMoneda); const bounds = { min: 0, max: 1000000 }
 
   const {
     filters,

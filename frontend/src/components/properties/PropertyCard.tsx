@@ -1,4 +1,5 @@
-import { memo } from 'react'
+import { memo, useState } from 'react'
+import { ImageGalleryModal } from './ImageGalleryModal'
 import type { Property, TransactionMode } from '../../services/types'
 import { formatMoney } from './money'
 import { FavoriteButton } from './FavoriteButton'
@@ -67,12 +68,14 @@ export const PropertyCard = memo(function PropertyCard({
   onOpen,
   onBookVisit,
 }: PropertyCardProps) {
+  const [galleryOpen, setGalleryOpen] = useState(false);
   const specs: { key: string; value: string; label: string }[] = []
   if (property.dormitorios != null) specs.push({ key: 'dorm', value: String(property.dormitorios), label: 'DORM.' })
   if (property.banos != null) specs.push({ key: 'banos', value: String(property.banos), label: 'BAÑOS' })
   if (property.area_total != null) specs.push({ key: 'area', value: String(property.area_total), label: 'M²' })
   if (property.estacionamientos != null) specs.push({ key: 'coch', value: String(property.estacionamientos), label: 'COCH.' })
 
+  const allImages = property.images?.map(img => img.url) || (property.images?.[0]?.url ? [property.images[0].url] : []);
   const typeLabel = TYPE_LABEL[property.property_type] ?? property.property_type
   const canBook = (property.status == null || property.status === 'DISPONIBLE') &&
     property.is_bookable !== false && property.is_active !== false
@@ -180,6 +183,7 @@ export const PropertyCard = memo(function PropertyCard({
         </div>
 
       </div>
+      {galleryOpen && <ImageGalleryModal images={allImages} onClose={() => setGalleryOpen(false)} />}
     </article>
 
   )

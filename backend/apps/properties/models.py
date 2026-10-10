@@ -262,6 +262,8 @@ class PropertyImage(models.Model):
         ]
 
     def get_url(self):
+        if self.storage_key.startswith("http") or self.storage_key.startswith("/"):
+            return self.storage_key
         base = getattr(settings, "PROPERTY_MEDIA_BASE_URL", "").rstrip("/")
         return f"{base}/{self.storage_key.lstrip('/')}"
 

@@ -17,6 +17,32 @@ const now = new Date().toISOString()
 
 const fixtures: Property[] = [
   {
+    id: 'b2c1f5a0-1a2b-4c3d-9e0f-999999999999',
+    title: 'Departamento 1 dormitorio vista Panamericana Sur',
+    price: 2000.0,
+    moneda: 'PEN',
+    mode: 'ALQUILER',
+    address: 'Jr. Cristobal de Peralta, Surco',
+    property_type: 'DEPARTAMENTO',
+    area_total: 65,
+    area_construida: 65,
+    dormitorios: 1,
+    banos: 2,
+    estacionamientos: 1,
+    negociable: false,
+    destacado: true,
+    is_active: true,
+    created_at: now,
+    images: [
+      { url: '/properties/surco/departamentosurco5.jpg', es_principal: true },
+      { url: '/properties/surco/departamentosurco1.jpg' },
+      { url: '/properties/surco/departamentosurco2.jpg' },
+      { url: '/properties/surco/departamentosurco3.jpg' },
+      { url: '/properties/surco/departamentosurco4.jpg' },
+    ],
+  },
+
+  {
     id: 'b2c1f5a0-1a2b-4c3d-9e0f-111111111111',
     title: 'Departamento amoblado en Miraflores',
     price: 150000.0,
@@ -55,7 +81,7 @@ const fixtures: Property[] = [
   {
     id: 'b2c1f5a0-1a2b-4c3d-9e0f-333333333333',
     title: 'Oficina corporativa en San Isidro',
-    price: 480000.0,
+    price: 4720,
     moneda: 'USD',
     mode: 'ALQUILER',
     address: 'Av. Canaval y Moreyra 320, San Isidro',
@@ -98,7 +124,7 @@ const fixtures: Property[] = [
   {
     id: 'b2c1f5a0-1a2b-4c3d-9e0f-666666666666',
     title: 'Casa multifamiliar en Los Olivos',
-    price: 280000.0,
+    price: 2290,
     moneda: 'PEN',
     mode: 'ALQUILER',
     address: 'Av. Universitaria 1450, Los Olivos',
@@ -158,7 +184,7 @@ const fixtures: Property[] = [
   {
     id: 'b2c1f5a0-1a2b-4c3d-9e0f-bbbbbbbbbbbb',
     title: 'Suite de oficina en el Centro de Lima',
-    price: 190000.0,
+    price: 4590,
     moneda: 'PEN',
     mode: 'ALQUILER',
     address: 'Jr. de la Unión 400, Cercado de Lima',
@@ -202,7 +228,7 @@ const fixtures: Property[] = [
   {
     id: 'b2c1f5a0-1a2b-4c3d-9e0f-ffffffffffff',
     title: 'Oficina de coworking en Miraflores',
-    price: 220000.0,
+    price: 4630,
     moneda: 'PEN',
     mode: 'ALQUILER',
     address: 'Calle Las Begonias 430, Miraflores',
@@ -224,7 +250,7 @@ const fixtures: Property[] = [
   {
     id: 'c3d2a6b1-2b3c-5d4e-0f11-123456789002',
     title: 'Departamento para estudiante en Lince',
-    price: 98000.0,
+    price: 4130,
     moneda: 'PEN',
     mode: 'ALQUILER',
     address: 'Av. Petit Thouars 2385, Lince',
@@ -246,7 +272,7 @@ const fixtures: Property[] = [
   {
     id: 'c3d2a6b1-2b3c-5d4e-0f11-123456789004',
     title: 'Consultorio médico en Jesús María',
-    price: 175000.0,
+    price: 2850,
     moneda: 'PEN',
     mode: 'ALQUILER',
     address: 'Av. Brasil 1050, Jesús María',
@@ -268,7 +294,7 @@ const fixtures: Property[] = [
   {
     id: 'c3d2a6b1-2b3c-5d4e-0f11-123456789006',
     title: 'Departamento tipo estudio en Los Olivos',
-    price: 72000.0,
+    price: 3680,
     moneda: 'PEN',
     mode: 'ALQUILER',
     address: 'Av. Angélica Gamarra 800, Los Olivos',
@@ -290,7 +316,7 @@ const fixtures: Property[] = [
   {
     id: 'c3d2a6b1-2b3c-5d4e-0f11-123456789008',
     title: 'Oficina administrativa en Magdalena',
-    price: 310000.0,
+    price: 2430,
     moneda: 'PEN',
     mode: 'ALQUILER',
     address: 'Jr. Salaverry 580, Magdalena del Mar',
@@ -312,7 +338,7 @@ const fixtures: Property[] = [
   {
     id: 'c3d2a6b1-2b3c-5d4e-0f11-123456789010',
     title: 'Departamento con pool en Surquillo',
-    price: 340000.0,
+    price: 4710,
     moneda: 'PEN',
     mode: 'ALQUILER',
     address: 'Av. Angamos Este 2410, Surquillo',

@@ -38,6 +38,9 @@ export function useFilterParams(bounds: { min: number; max: number }) {
       const prevMoneda = searchParams.get('moneda') || 'PEN'
       const nextMoneda = newFilters.moneda || 'PEN'
       const monedaChanged = prevMoneda !== nextMoneda
+      const prevOp = searchParams.get('operacion') || ''
+      const nextOp = newFilters.operacion || ''
+      const opChanged = prevOp !== nextOp
 
       if (newFilters.operacion) params.set('operacion', newFilters.operacion)
       else params.delete('operacion')
@@ -45,7 +48,7 @@ export function useFilterParams(bounds: { min: number; max: number }) {
       if (newFilters.moneda) params.set('moneda', newFilters.moneda)
       else params.delete('moneda')
 
-      if (monedaChanged) {
+      if (monedaChanged || opChanged) {
         params.delete('priceMin')
         params.delete('priceMax')
       } else {
