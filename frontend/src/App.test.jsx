@@ -57,10 +57,10 @@ async function openBooking(user, source, title = properties[0].title) {
   expect(screen.getByRole('heading', { name: 'Reservar Visita' })).toBeInTheDocument()
 }
 
-async function selectSlot(user) {
-  // El selector actual no asocia su etiqueta al input de fecha.
-  fireEvent.change(document.querySelector('input[type="date"]'), { target: { value: '2026-12-10' } })
-  await user.click(screen.getByRole('button', { name: '09:00 AM' }))
+async function selectSlot(user, date = '2026-12-10') {
+  fireEvent.change(document.querySelector('input[type="date"]'), { target: { value: date } })
+  // Los horarios se consultan al elegir la fecha, así que aparecen de forma asíncrona.
+  await user.click(await screen.findByRole('button', { name: '09:00 AM' }))
 }
 
 describe('App: confirmación simulada de visitas', () => {
@@ -87,6 +87,35 @@ describe('App: confirmación simulada de visitas', () => {
     mock.onGet('/v1/properties').reply(200, { count: 2, next: null, previous: null, results: properties })
     properties.forEach((property) => {
       mock.onGet(`/v1/properties/${property.id}`).reply(200, property)
+    })
+
+    // El modal consulta la disponibilidad de la fecha elegida y confirma la
+    // cita contra la API; ambas respuestas se simulan aquí.
+    mock.onGet(/\/v1\/properties\/[^/]+\/available-slots/).reply((config) => {
+      const date = config.params?.date ?? '2026-12-10'
+      return [200, {
+        property_id: 'prop-1',
+        date,
+        timezone: 'America/Lima',
+        total_slots: 4,
+        slots: [
+          { start_at: `${date}T14:00:00Z`, end_at: `${date}T15:00:00Z`, duration_minutes: 60 },
+          { start_at: `${date}T16:00:00Z`, end_at: `${date}T17:00:00Z`, duration_minutes: 60 },
+          { start_at: `${date}T19:00:00Z`, end_at: `${date}T20:00:00Z`, duration_minutes: 60 },
+          { start_at: `${date}T21:00:00Z`, end_at: `${date}T22:00:00Z`, duration_minutes: 60 },
+        ],
+      }]
+    })
+    mock.onPost('/v1/appointments').reply(201, {
+      id: 'appointment-test',
+      status: 'PENDING',
+      scheduled_at: '2026-12-10T14:00:00Z',
+      duration_minutes: 60,
+      property: { id: 'prop-1', title: properties[0].title, district: null, address: properties[0].address },
+      client: { id: 'user-test', full_name: 'Cliente de Pruebas', email: 'cliente@test.pe', phone: null },
+      agent: { id: 'agente-1', full_name: 'Agente', email: 'agente@test.pe', phone: null },
+      created_at: '2026-12-01T10:00:00Z',
+      updated_at: '2026-12-01T10:00:00Z',
     })
   })
 
@@ -124,8 +153,8 @@ describe('App: confirmación simulada de visitas', () => {
     await user.click(screen.getByRole('button', { name: 'Confirmar Reserva' }))
 
     expect(screen.getByRole('heading', { name: /Visita Agendada con Éxito/ })).toBeInTheDocument()
-    expect(storedVisits()).toEqual(['otra-propiedad', 'prop-1'])
-    await user.click(screen.getByRole('button', { name: 'Aceptar' }))
+    await waitFor(() => expect(storedVisits()).toEqual(['otra-propiedad', 'prop-1']))
+    await user.click(await screen.findByRole('button', { name: 'Aceptar' }))
     expect(storedVisits()).toEqual(['otra-propiedad', 'prop-1'])
     if (source === 'catálogo') {
       expect(screen.getByRole('button', { name: 'Visita agendada' })).toBeInTheDocument()
@@ -142,8 +171,8 @@ describe('App: confirmación simulada de visitas', () => {
       expect(screen.getByRole('button', { name: 'Confirmar Reserva' })).toBeDisabled()
       await selectSlot(user)
       await user.click(screen.getByRole('button', { name: 'Confirmar Reserva' }))
-      await user.click(screen.getByRole('button', { name: 'Aceptar' }))
-      expect(storedVisits()).toEqual(['prop-1'])
+      await user.click(await screen.findByRole('button', { name: 'Aceptar' }))
+      await waitFor(() => expect(storedVisits()).toEqual(['prop-1']))
     }
   })
 
@@ -154,7 +183,7 @@ describe('App: confirmación simulada de visitas', () => {
     await selectSlot(user)
     if (action === 'confirmar') {
       await user.click(screen.getByRole('button', { name: 'Confirmar Reserva' }))
-      await user.click(screen.getByRole('button', { name: 'Aceptar' }))
+      await user.click(await screen.findByRole('button', { name: 'Aceptar' }))
     } else {
       await user.click(screen.getByRole('button', { name: 'X' }))
     }
@@ -166,9 +195,11 @@ describe('App: confirmación simulada de visitas', () => {
     expect(document.querySelector('input[type="date"]')).toHaveValue('')
     fireEvent.change(document.querySelector('input[type="date"]'), { target: { value: '2026-12-11' } })
     expect(screen.getByRole('button', { name: 'Confirmar Reserva' })).toBeDisabled()
-    await user.click(screen.getByRole('button', { name: '11:00 AM' }))
+    await user.click(await screen.findByRole('button', { name: '11:00 AM' }))
     await user.click(screen.getByRole('button', { name: 'Confirmar Reserva' }))
-    expect(storedVisits()).toEqual(action === 'confirmar' ? ['prop-1', 'prop-2'] : ['prop-2'])
+    await waitFor(() =>
+      expect(storedVisits()).toEqual(action === 'confirmar' ? ['prop-1', 'prop-2'] : ['prop-2']),
+    )
   })
 })
 
