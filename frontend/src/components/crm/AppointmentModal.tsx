@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { DateSlotsPicker, type SlotOption } from './DateSlotsPicker';
 import { SuccessToast } from './SuccessToast';
 import { createAppointment, formatSlotTime, getAvailableSlots } from '../../services/appointments';
@@ -136,6 +136,45 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     };
   }, [isOpen, isLoggedIn, propertyId, selectedDate]);
 
+  const handleDateChange = useCallback((date: string) => {
+    setSelectedDate(date);
+    setSelectedTime('');
+    setSlots([]);
+    setFetchError(null);
+    setSubmitError(null);
+  }, []);
+
+  const handleTimeChange = useCallback((time: string) => {
+    setSelectedTime(time);
+    setSubmitError(null);
+  }, []);
+
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!selectedDate || !selectedTime || isSubmitting) return;
+
+      if (!propertyId) {
+        setSubmitError('No se pudo identificar el inmueble para agendar la visita.');
+        return;
+      }
+
+      setIsSubmitting(true);
+      setSubmitError(null);
+
+      try {
+        await createAppointment({ property_id: propertyId, scheduled_at: selectedTime });
+        setIsSuccess(true);
+        onConfirmed();
+      } catch (error) {
+        setSubmitError(getErrorMessage(error, submitErrorMessage));
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [isSubmitting, onConfirmed, propertyId, selectedDate, selectedTime],
+  );
+
   if (!isOpen) return null;
 
   if (!isLoggedIn) {
@@ -153,42 +192,6 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
       </DialogFrame>
     );
   }
-
-  const handleDateChange = (date: string) => {
-    setSelectedDate(date);
-    setSelectedTime('');
-    setSlots([]);
-    setFetchError(null);
-    setSubmitError(null);
-  };
-
-  const handleTimeChange = (time: string) => {
-    setSelectedTime(time);
-    setSubmitError(null);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedDate || !selectedTime || isSubmitting) return;
-
-    if (!propertyId) {
-      setSubmitError('No se pudo identificar el inmueble para agendar la visita.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setSubmitError(null);
-
-    try {
-      await createAppointment({ property_id: propertyId, scheduled_at: selectedTime });
-      setIsSuccess(true);
-      onConfirmed();
-    } catch (error) {
-      setSubmitError(getErrorMessage(error, submitErrorMessage));
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   return (
     <DialogFrame

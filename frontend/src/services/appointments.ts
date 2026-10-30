@@ -22,13 +22,21 @@ export const getAvailableSlots = (propertyId: string, date: string) =>
 export const createAppointment = (input: AppointmentCreateInput) =>
   api.post<Appointment>('/v1/appointments', input).then((response) => response.data)
 
-const slotTimeFormatter = (timeZone: string) =>
-  new Intl.DateTimeFormat('en-US', {
+const slotTimeFormatters = new Map<string, Intl.DateTimeFormat>()
+
+const slotTimeFormatter = (timeZone: string) => {
+  const cached = slotTimeFormatters.get(timeZone)
+  if (cached) return cached
+
+  const formatter = new Intl.DateTimeFormat('en-US', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,
     timeZone,
   })
+  slotTimeFormatters.set(timeZone, formatter)
+  return formatter
+}
 
 /**
  * `'2026-12-10T14:00:00Z'` -> `'09:00 AM'` en la zona del inmueble. Se usa el

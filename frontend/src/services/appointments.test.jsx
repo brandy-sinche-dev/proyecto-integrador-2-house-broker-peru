@@ -120,5 +120,22 @@ describe('services/appointments', () => {
     it('respeta la zona horaria indicada', () => {
       expect(formatSlotTime('2026-12-10T14:00:00Z', 'UTC')).toBe('02:00 PM')
     })
+
+    it('reutiliza el formateador de cada zona horaria', () => {
+      const timeZone = 'America/Argentina/Cordoba'
+      const spy = jest.spyOn(Intl, 'DateTimeFormat')
+
+      try {
+        formatSlotTime('2026-12-10T14:00:00Z', timeZone)
+        formatSlotTime('2026-12-10T15:00:00Z', timeZone)
+
+        const createdForZone = spy.mock.calls.filter(
+          ([, options]) => options?.timeZone === timeZone,
+        )
+        expect(createdForZone).toHaveLength(1)
+      } finally {
+        spy.mockRestore()
+      }
+    })
   })
 })

@@ -1,0 +1,39 @@
+/* Placeholder de carga del grid de horarios (TASK-WPO-CRM-01). */
+.slots-skeleton {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.slots-skeleton__item {
+  width: 84px;
+  height: 36px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #efeded 25%, #f7f6f5 37%, #efeded 63%);
+  background-size: 400% 100%;
+  animation: slots-shimmer 1.4s ease infinite;
+}
+
+.slots-skeleton__item:nth-child(2n) {
+  width: 96px;
+}
+
+.slots-option:focus-visible {
+  outline: 2px solid #007bff;
+  outline-offset: 2px;
+}
+
+@keyframes slots-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slots-skeleton__item {
+    animation: none;
+  }
+}
