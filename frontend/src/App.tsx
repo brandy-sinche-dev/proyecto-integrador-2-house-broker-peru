@@ -1,5 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import { Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
+import {
+  QueryClient,
+  QueryClientProvider,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { Header } from './components/Header'
 import type { NavTarget, Section } from './components/Header'
 import { Footer } from './components/Footer'
@@ -20,6 +27,26 @@ const PropertyDetail = lazy(() => import('./components/properties/PropertyDetail
 const AvailabilityPanel = lazy(() =>
   import('./components/availability/AvailabilityPanel').then(m => ({ default: m.AvailabilityPanel })),
 )
+
+const FAVORITES_KEY = ['favorites'] as const
+type FavoriteEntry = Awaited<ReturnType<typeof addFavorite>>
+interface ToggleFavoriteVariables {
+  property: Property
+  isSaved: boolean
+}
+interface ToggleFavoriteContext {
+  previous: Property[]
+}
+
+// Sin reintentos ni timers de recolección: las mutaciones de favoritos son
+// idempotentes por intención y las pruebas no deben quedar con handles abiertos.
+const createQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, refetchOnWindowFocus: false, gcTime: Infinity },
+      mutations: { retry: false, gcTime: Infinity },
+    },
+  })
 
 const readList = (key: string): string[] => {
   try {
@@ -76,21 +103,105 @@ function PropertyDetailRoute({
 import { Home } from './components/Home'
 import { AssistantWidget } from './components/AssistantWidget'
 
-function App() {
+function AppContent() {
   const [section, setSection] = useState<Section>('inicio')
   const [isAssistantOpen, setIsAssistantOpen] = useState(false)
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [isLoginOpen, setIsLoginOpen] = useState(false)
   const [visits, setVisits] = useState<string[]>(() => readList('hb_visits'))
-  const [favorites, setFavorites] = useState<Property[]>([])
   const [favoriteAnnouncement, setFavoriteAnnouncement] = useState('')
-  const favoriteIds = useMemo(() => new Set(favorites.map((p) => p.id)), [favorites])
   const [pendingFavorite, setPendingFavorite] = useState<string | null>(() =>
     localStorage.getItem('hb_pending_favorite'),
   )
 
   const [selectedProperty, setSelectedProperty] = useState<{ id: string; title: string } | null>(null)
   const { user } = useAuth()
+  const queryClient = useQueryClient()
+  const inFlightFavorites = useRef(new Set<string>())
+
+  const favoritesQuery = useQuery({
+    queryKey: FAVORITES_KEY,
+    queryFn: getFavorites,
+    enabled: Boolean(user),
+  })
+  const favorites = useMemo(
+    () => (user ? favoritesQuery.data ?? [] : []),
+    [user, favoritesQuery.data],
+  )
+  const favoriteIds = useMemo(() => new Set(favorites.map((p) => p.id)), [favorites])
+
+  const toggleFavorite = useMutation<
+    FavoriteEntry | null,
+    Error,
+    ToggleFavoriteVariables,
+    ToggleFavoriteContext
+  >({
+    mutationFn: async ({ property, isSaved }) => {
+      if (isSaved) {
+        await removeFavorite(property.id)
+        return null
+      }
+      return addFavorite(property.id)
+    },
+    onMutate: async ({ property, isSaved }) => {
+      await queryClient.cancelQueries({ queryKey: FAVORITES_KEY })
+      const previous = queryClient.getQueryData<Property[]>(FAVORITES_KEY) ?? []
+      queryClient.setQueryData<Property[]>(FAVORITES_KEY, (current = []) =>
+        isSaved
+          ? current.filter((p) => p.id !== property.id)
+          : [...current, { ...property, is_favorite: true }],
+      )
+      setFavoriteAnnouncement(
+        isSaved
+          ? `Quitando ${property.title} de favoritos…`
+          : `Guardando ${property.title} en favoritos…`,
+      )
+      return { previous }
+    },
+    onError: (_error, { property }, context) => {
+      const previousItem = context?.previous.find((p) => p.id === property.id)
+      queryClient.setQueryData<Property[]>(FAVORITES_KEY, (current = []) => {
+        const others = current.filter((p) => p.id !== property.id)
+        return previousItem ? [...others, previousItem] : others
+      })
+      setFavoriteAnnouncement(
+        `No se pudo actualizar ${property.title}. Se restauró el estado anterior de favoritos.`,
+      )
+    },
+    onSuccess: (entry, { property, isSaved }) => {
+      if (!isSaved && entry) {
+        queryClient.setQueryData<Property[]>(FAVORITES_KEY, (current = []) =>
+          current.map((p) =>
+            p.id === property.id ? { ...entry.property, is_favorite: true } : p,
+          ),
+        )
+      }
+      setFavoriteAnnouncement(
+        isSaved
+          ? `${property.title} quitado de favoritos.`
+          : `${property.title} añadido a favoritos.`,
+      )
+    },
+    onSettled: (_entry, _error, { property }) => {
+      inFlightFavorites.current.delete(property.id)
+    },
+  })
+  const { mutate: mutateFavorite } = toggleFavorite
+
+  const addPendingFavorite = useMutation({
+    mutationFn: (propertyId: string) => addFavorite(propertyId),
+    onSuccess: (entry) => {
+      queryClient.setQueryData<Property[]>(FAVORITES_KEY, (current = []) =>
+        current.some((p) => p.id === entry.property.id)
+          ? current
+          : [...current, { ...entry.property, is_favorite: true }],
+      )
+      setFavoriteAnnouncement(`${entry.property.title} añadido a favoritos.`)
+    },
+    onError: () =>
+      setFavoriteAnnouncement('No se pudo guardar el favorito pendiente. Inténtalo de nuevo.'),
+  })
+  const { mutate: mutatePendingFavorite } = addPendingFavorite
 
   const navigateTo = useNavigate()
   const location = useLocation()
@@ -100,33 +211,12 @@ function App() {
   }, [visits])
 
   useEffect(() => {
-    if (!user) {
-      setFavorites([])
-      return
-    }
-    let cancelled = false
-    getFavorites()
-      .then((list) => {
-        if (!cancelled) setFavorites(list)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [user])
-
-  useEffect(() => {
     if (!user || !pendingFavorite) return
     const id = pendingFavorite
     setPendingFavorite(null)
     localStorage.removeItem('hb_pending_favorite')
-    addFavorite(id)
-      .then((fav) => {
-        setFavorites((prev) => (prev.some((p) => p.id === id) ? prev : [...prev, fav.property]))
-        setFavoriteAnnouncement(`${fav.property.title} añadido a favoritos.`)
-      })
-      .catch(() => setFavoriteAnnouncement('No se pudo guardar el favorito pendiente. Inténtalo de nuevo.'))
-  }, [user, pendingFavorite])
+    mutatePendingFavorite(id)
+  }, [user, pendingFavorite, mutatePendingFavorite])
 
   const toggleSave = useCallback(
     (property: Property) => {
@@ -135,37 +225,12 @@ function App() {
         setPendingFavorite(property.id)
         return
       }
-      const isSaved = favoriteIds.has(property.id)
-      const previous = favorites
-      setFavoriteAnnouncement(
-        isSaved
-          ? `Quitando ${property.title} de favoritos…`
-          : `Guardando ${property.title} en favoritos…`,
-      )
-      setFavorites((prev) =>
-        isSaved
-          ? prev.filter((p) => p.id !== property.id)
-          : [...prev, { ...property, is_favorite: true }],
-      )
-      const request = isSaved
-        ? removeFavorite(property.id)
-        : addFavorite(property.id).then((fav) =>
-            setFavorites((prev) =>
-              prev.map((p) => (p.id === property.id ? { ...fav.property, is_favorite: true } : p)),
-            ),
-          )
-      request
-        .then(() => setFavoriteAnnouncement(
-          isSaved
-            ? `${property.title} quitado de favoritos.`
-            : `${property.title} añadido a favoritos.`,
-        ))
-        .catch(() => {
-          setFavorites(previous)
-          setFavoriteAnnouncement(`No se pudo actualizar ${property.title}. Se restauró el estado anterior de favoritos.`)
-        })
+      // Protección contra dobles clics: una petición por inmueble a la vez.
+      if (inFlightFavorites.current.has(property.id)) return
+      inFlightFavorites.current.add(property.id)
+      mutateFavorite({ property, isSaved: favoriteIds.has(property.id) })
     },
-    [user, favoriteIds, favorites],
+    [user, favoriteIds, mutateFavorite],
   )
 
   const toggleVisit = useCallback(
@@ -314,6 +379,16 @@ function App() {
         onNavigate={navigate}
       />
     </>
+  )
+}
+
+function App() {
+  const [queryClient] = useState(createQueryClient)
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppContent />
+    </QueryClientProvider>
   )
 }
 
