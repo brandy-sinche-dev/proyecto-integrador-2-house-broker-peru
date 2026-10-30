@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import { DateSlotsPicker, type SlotOption } from './DateSlotsPicker';
 import { SuccessToast } from './SuccessToast';
 import { createAppointment, formatSlotTime, getAvailableSlots } from '../../services/appointments';
@@ -13,8 +13,80 @@ interface AppointmentModalProps {
   isLoggedIn?: boolean;
 }
 
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 const fetchErrorMessage = 'No se pudieron cargar los horarios. Inténtalo de nuevo.';
 const submitErrorMessage = 'No se pudo confirmar la reserva. Inténtalo de nuevo.';
+
+interface DialogFrameProps {
+  labelledBy: string;
+  describedBy: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}
+
+/**
+ * Envoltorio accesible del modal: atrapa el foco dentro del diálogo, cierra
+ * con Escape o con un clic en el fondo y devuelve el foco al disparador al
+ * desmontarse. Se comparte entre la vista de reserva y la de "inicia sesión".
+ */
+const DialogFrame: React.FC<DialogFrameProps> = ({ labelledBy, describedBy, onClose, children }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const trigger = document.activeElement;
+    const dialog = dialogRef.current;
+    const preferred = dialog?.querySelector<HTMLElement>('#appointment-date');
+    const first = dialog?.querySelector<HTMLElement>(FOCUSABLE);
+    (preferred ?? first)?.focus();
+
+    return () => {
+      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();
+    };
+  }, []);
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+
+    const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(FOCUSABLE));
+    if (focusable.length === 0) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
+  return (
+    <div style={overlayStyle} role="presentation" onClick={onClose}>
+      <div
+        ref={dialogRef}
+        style={modalStyle}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={labelledBy}
+        aria-describedby={describedBy}
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={handleKeyDown}
+      >
+        {children}
+      </div>
+    </div>
+  );
+};
 
 export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   isOpen,
@@ -68,13 +140,17 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
   if (!isLoggedIn) {
     return (
-      <div style={overlayStyle}>
-        <div style={modalStyle}>
-          <h3>Inicia sesión requerida</h3>
-          <p>Debes iniciar sesión para agendar una visita a este inmueble.</p>
-          <button onClick={onClose}>Cerrar</button>
-        </div>
-      </div>
+      <DialogFrame
+        labelledBy="appointment-login-title"
+        describedBy="appointment-login-desc"
+        onClose={onClose}
+      >
+        <h3 id="appointment-login-title">Inicia sesión requerida</h3>
+        <p id="appointment-login-desc">
+          Debes iniciar sesión para agendar una visita a este inmueble.
+        </p>
+        <button type="button" onClick={onClose}>Cerrar</button>
+      </DialogFrame>
     );
   }
 
@@ -115,42 +191,47 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   };
 
   return (
-    <div style={overlayStyle}>
-      <div style={modalStyle} role="dialog" aria-modal="true" aria-labelledby="appointment-title">
-        <button onClick={onClose} style={{ float: 'right' }}>X</button>
+    <DialogFrame
+      labelledBy="appointment-title"
+      describedBy="appointment-property"
+      onClose={onClose}
+    >
+      <button type="button" onClick={onClose} style={{ float: 'right' }} aria-label="Cerrar">
+        <span aria-hidden="true">X</span>
+      </button>
 
-        {isSuccess ? (
-          <SuccessToast date={selectedDate} time={formatSlotTime(selectedTime)} onClose={onClose} />
-        ) : (
-          <form onSubmit={handleSubmit}>
-            <h2 id="appointment-title">Reservar Visita</h2>
-            <p><strong>{propertyTitle}</strong></p>
+      {isSuccess ? (
+        <SuccessToast date={selectedDate} time={formatSlotTime(selectedTime)} onClose={onClose} />
+      ) : (
+        <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
+          <h2 id="appointment-title">Reservar Visita</h2>
+          <p id="appointment-property"><strong>{propertyTitle}</strong></p>
 
-            <DateSlotsPicker
-              selectedDate={selectedDate}
-              setSelectedDate={handleDateChange}
-              selectedTime={selectedTime}
-              setSelectedTime={handleTimeChange}
-              slots={slots}
-              isLoading={isLoading}
-              error={fetchError}
-            />
+          <DateSlotsPicker
+            selectedDate={selectedDate}
+            setSelectedDate={handleDateChange}
+            selectedTime={selectedTime}
+            setSelectedTime={handleTimeChange}
+            slots={slots}
+            isLoading={isLoading}
+            error={fetchError}
+          />
 
-            {submitError && (
-              <p role="alert" style={errorStyle}>{submitError}</p>
-            )}
+          {submitError && (
+            <p role="status" aria-live="polite" style={errorStyle}>{submitError}</p>
+          )}
 
-            <button
-              type="submit"
-              disabled={!selectedDate || !selectedTime || isSubmitting}
-              style={{ marginTop: '16px', padding: '10px 20px', width: '100%' }}
-            >
-              {isSubmitting ? 'Confirmando…' : 'Confirmar Reserva'}
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
+          <button
+            type="submit"
+            disabled={!selectedDate || !selectedTime || isSubmitting}
+            aria-busy={isSubmitting}
+            style={{ marginTop: '16px', padding: '10px 20px', width: '100%' }}
+          >
+            {isSubmitting ? 'Confirmando…' : 'Confirmar Reserva'}
+          </button>
+        </form>
+      )}
+    </DialogFrame>
   );
 };
 

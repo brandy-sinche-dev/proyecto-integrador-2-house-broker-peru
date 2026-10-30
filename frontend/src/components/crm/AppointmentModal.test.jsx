@@ -1,6 +1,7 @@
 // =============================================================
 // Pruebas de integración del flujo de reserva de visitas
 // TASK-TEST-CRM-01: selección de horario, confirmación y errores
+// TASK-A11Y-CRM-01: diálogo, opciones y anuncios aria-live
 // =============================================================
 //
 // El modal se monta con los endpoints de disponibilidad y de citas
@@ -97,8 +98,8 @@ describe('AppointmentModal', () => {
     expect(screen.getByRole('button', { name: 'Confirmar Reserva' })).toBeDisabled()
     await chooseDate()
 
-    expect(await screen.findByRole('button', { name: '09:00 AM' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '11:00 AM' })).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: '09:00 AM' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: '11:00 AM' })).toBeInTheDocument()
     expect(mock.history.get).toHaveLength(1)
     expect(mock.history.get[0].params).toEqual({ date: '2026-12-10' })
     expect(screen.getByRole('button', { name: 'Confirmar Reserva' })).toBeDisabled()
@@ -113,9 +114,10 @@ describe('AppointmentModal', () => {
 
     await chooseDate()
 
-    const occupied = await screen.findByRole('button', { name: '09:00 AM · Ocupado' })
+    const occupied = await screen.findByRole('option', { name: '09:00 AM, horario ocupado' })
     expect(occupied).toBeDisabled()
-    expect(screen.getByRole('button', { name: '11:00 AM' })).toBeEnabled()
+    expect(occupied).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('option', { name: '11:00 AM' })).toBeEnabled()
   })
 
   it('muestra un aviso cuando la fecha no tiene horarios libres', async () => {
@@ -133,7 +135,7 @@ describe('AppointmentModal', () => {
 
     await chooseDate()
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
+    expect(await screen.findByRole('status')).toHaveTextContent(
       'No se pudo identificar el inmueble para agendar la visita.',
     )
     expect(mock.history.get).toHaveLength(0)
@@ -152,15 +154,15 @@ describe('AppointmentModal', () => {
     const { rerender } = render(<AppointmentModal {...props} />)
 
     await chooseDate()
-    await user.click(await screen.findByRole('button', { name: '09:00 AM' }))
+    await user.click(await screen.findByRole('option', { name: '09:00 AM' }))
     rerender(<AppointmentModal {...props} propertyId={undefined} />)
     await user.click(screen.getByRole('button', { name: 'Confirmar Reserva' }))
 
     expect(mock.history.post).toHaveLength(0)
     expect(props.onConfirmed).not.toHaveBeenCalled()
-    const alerts = await screen.findAllByRole('alert')
+    const statuses = await screen.findAllByRole('status')
     expect(
-      alerts.some((alert) => alert.textContent?.includes('No se pudo identificar el inmueble')),
+      statuses.some((status) => status.textContent?.includes('No se pudo identificar el inmueble')),
     ).toBe(true)
   })
 
@@ -170,11 +172,12 @@ describe('AppointmentModal', () => {
 
     await chooseDate()
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('La agenda no está disponible.')
-    expect(screen.queryByRole('button', { name: '09:00 AM' })).not.toBeInTheDocument()
+    const status = await screen.findByText('La agenda no está disponible.')
+    expect(status).toHaveAttribute('role', 'status')
+    expect(screen.queryByRole('option', { name: '09:00 AM' })).not.toBeInTheDocument()
   })
 
-  it('confirma la reserva, envía el horario elegido y muestra el éxito', async () => {
+  it('confirma la reserva, envía el horario elegido y anuncia el éxito', async () => {
     const user = userEvent.setup()
     let sentBody
     mock.onGet(AVAILABLE_SLOTS_PATH).reply(200, availability())
@@ -185,13 +188,14 @@ describe('AppointmentModal', () => {
     const props = renderModal()
 
     await chooseDate()
-    await user.click(await screen.findByRole('button', { name: '09:00 AM' }))
+    await user.click(await screen.findByRole('option', { name: '09:00 AM' }))
 
     const confirm = screen.getByRole('button', { name: 'Confirmar Reserva' })
     expect(confirm).toBeEnabled()
     await user.click(confirm)
 
     expect(await screen.findByRole('heading', { name: /Visita Agendada con Éxito/ })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite')
     expect(screen.getByText('2026-12-10')).toBeInTheDocument()
     expect(screen.getByText('09:00 AM')).toBeInTheDocument()
     expect(sentBody).toEqual({
@@ -204,7 +208,7 @@ describe('AppointmentModal', () => {
     expect(props.onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('muestra el conflicto del servidor si el horario se ocupó al confirmar', async () => {
+  it('anuncia con aria-live polite el conflicto del servidor al confirmar', async () => {
     const user = userEvent.setup()
     mock.onGet(AVAILABLE_SLOTS_PATH).reply(200, availability())
     mock.onPost(APPOINTMENTS_PATH).reply(409, {
@@ -213,12 +217,12 @@ describe('AppointmentModal', () => {
     const props = renderModal()
 
     await chooseDate()
-    await user.click(await screen.findByRole('button', { name: '09:00 AM' }))
+    await user.click(await screen.findByRole('option', { name: '09:00 AM' }))
     await user.click(screen.getByRole('button', { name: 'Confirmar Reserva' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'El horario seleccionado ya fue reservado por otro cliente.',
-    )
+    const status = await screen.findByText('El horario seleccionado ya fue reservado por otro cliente.')
+    expect(status).toHaveAttribute('role', 'status')
+    expect(status).toHaveAttribute('aria-live', 'polite')
     expect(screen.queryByRole('heading', { name: /Visita Agendada con Éxito/ })).not.toBeInTheDocument()
     expect(props.onConfirmed).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Confirmar Reserva' })).toBeEnabled()
@@ -233,13 +237,13 @@ describe('AppointmentModal', () => {
     renderModal()
 
     await chooseDate('2026-12-10')
-    await user.click(await screen.findByRole('button', { name: '09:00 AM' }))
+    await user.click(await screen.findByRole('option', { name: '09:00 AM' }))
     expect(screen.getByRole('button', { name: 'Confirmar Reserva' })).toBeEnabled()
 
     await chooseDate('2026-12-11')
 
     expect(screen.getByRole('button', { name: 'Confirmar Reserva' })).toBeDisabled()
-    expect(await screen.findByRole('button', { name: '11:00 AM' })).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: '11:00 AM' })).toBeInTheDocument()
     await waitFor(() => expect(mock.history.get).toHaveLength(2))
     expect(mock.history.get[1].params).toEqual({ date: '2026-12-11' })
   })

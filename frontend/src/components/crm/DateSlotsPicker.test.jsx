@@ -1,6 +1,7 @@
-// =============================================================
+﻿// =============================================================
 // Pruebas unitarias del selector de fecha y horarios
 // TASK-TEST-CRM-01: estados de carga/error y horarios ocupados
+// TASK-A11Y-CRM-01: semántica de listbox y anuncios aria-live
 // =============================================================
 
 import { fireEvent, render, screen } from '@testing-library/react'
@@ -31,6 +32,7 @@ describe('DateSlotsPicker', () => {
     const input = screen.getByLabelText(/Selecciona una fecha/)
 
     expect(input).toHaveValue('2026-12-10')
+    expect(input).toHaveAttribute('aria-required', 'true')
     fireEvent.change(input, { target: { value: '2026-12-11' } })
     expect(props.setSelectedDate).toHaveBeenCalledWith('2026-12-11')
   })
@@ -43,24 +45,26 @@ describe('DateSlotsPicker', () => {
   it('pide una fecha antes de listar horarios', () => {
     renderPicker({ selectedDate: '', slots: [] })
     expect(screen.getByText('Selecciona una fecha para ver los horarios disponibles.')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /AM/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option')).not.toBeInTheDocument()
   })
 
-  it('muestra el estado de carga y oculta los horarios mientras consulta', () => {
+  it('anuncia el estado de carga y oculta los horarios mientras consulta', () => {
     renderPicker({ isLoading: true })
     expect(screen.getByRole('status')).toHaveTextContent('Cargando horarios…')
-    expect(screen.queryByRole('button', { name: '09:00 AM' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option')).not.toBeInTheDocument()
   })
 
-  it('muestra el error de carga con rol de alerta', () => {
+  it('anuncia el error de carga con aria-live polite', () => {
     renderPicker({ error: 'No se pudieron cargar los horarios.', slots: [] })
-    expect(screen.getByRole('alert')).toHaveTextContent('No se pudieron cargar los horarios.')
-    expect(screen.queryByRole('button', { name: '09:00 AM' })).not.toBeInTheDocument()
+    const status = screen.getByRole('status')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(status).toHaveTextContent('No se pudieron cargar los horarios.')
+    expect(screen.queryByRole('option')).not.toBeInTheDocument()
   })
 
   it('avisa cuando la fecha no tiene horarios libres', () => {
     renderPicker({ slots: [] })
-    expect(screen.getByText('No hay horarios disponibles para esta fecha.')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('No hay horarios disponibles para esta fecha.')
   })
 
   it('asume una lista vacía cuando no recibe horarios', () => {
@@ -72,20 +76,25 @@ describe('DateSlotsPicker', () => {
         setSelectedTime={jest.fn()}
       />,
     )
-    expect(screen.getByText('No hay horarios disponibles para esta fecha.')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('No hay horarios disponibles para esta fecha.')
   })
 
-  it('pinta los horarios libres en la zona de Lima y permite elegirlos', async () => {
+  it('expone las franjas como opciones de un listbox con nombre accesible', async () => {
     const user = userEvent.setup()
     const props = renderPicker()
 
-    const first = screen.getByRole('button', { name: '09:00 AM' })
+    const listbox = screen.getByRole('listbox', { name: 'Horarios disponibles para el 2026-12-10' })
+    expect(listbox).toHaveAttribute('aria-required', 'true')
+    expect(screen.getByRole('status')).toHaveTextContent('2 horarios disponibles')
+
+    const first = screen.getByRole('option', { name: '09:00 AM' })
     expect(first).toBeEnabled()
-    expect(first).toHaveAttribute('aria-pressed', 'false')
+    expect(first).toHaveAttribute('aria-selected', 'false')
+    expect(first).toHaveAttribute('tabindex', '0')
 
     await user.click(first)
     expect(props.setSelectedTime).toHaveBeenCalledWith('2026-12-10T14:00:00Z')
-    expect(screen.getByRole('button', { name: '11:00 AM' })).toBeEnabled()
+    expect(screen.getByRole('option', { name: '11:00 AM' })).toBeEnabled()
   })
 
   it('deshabilita un horario previamente ocupado y no lo deja seleccionar', async () => {
@@ -97,21 +106,40 @@ describe('DateSlotsPicker', () => {
       ],
     })
 
-    const occupied = screen.getByRole('button', { name: '09:00 AM · Ocupado' })
+    const occupied = screen.getByRole('option', { name: '09:00 AM, horario ocupado' })
     expect(occupied).toBeDisabled()
     expect(occupied).toHaveAttribute('aria-disabled', 'true')
+    expect(occupied).toHaveAttribute('aria-selected', 'false')
     expect(occupied).toHaveAttribute('title', 'Horario ocupado')
 
     await user.click(occupied)
     expect(props.setSelectedTime).not.toHaveBeenCalled()
 
-    await user.click(screen.getByRole('button', { name: '11:00 AM' }))
+    await user.click(screen.getByRole('option', { name: '11:00 AM' }))
     expect(props.setSelectedTime).toHaveBeenCalledWith('2026-12-10T16:00:00Z')
   })
 
-  it('marca con aria-pressed el horario seleccionado', () => {
+  it('marca con aria-selected el horario seleccionado', () => {
     renderPicker({ selectedTime: '2026-12-10T16:00:00Z' })
-    expect(screen.getByRole('button', { name: '11:00 AM' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: '09:00 AM' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('option', { name: '11:00 AM' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('option', { name: '09:00 AM' })).toHaveAttribute('aria-selected', 'false')
+  })
+
+  it('permite recorrer las franjas con las flechas y Home/End', async () => {
+    const user = userEvent.setup()
+    renderPicker()
+
+    const first = screen.getByRole('option', { name: '09:00 AM' })
+    const second = screen.getByRole('option', { name: '11:00 AM' })
+    first.focus()
+
+    await user.keyboard('{ArrowRight}')
+    expect(second).toHaveFocus()
+    await user.keyboard('{ArrowLeft}')
+    expect(first).toHaveFocus()
+    await user.keyboard('{End}')
+    expect(second).toHaveFocus()
+    await user.keyboard('{Home}')
+    expect(first).toHaveFocus()
   })
 })
