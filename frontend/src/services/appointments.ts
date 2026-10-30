@@ -10,7 +10,15 @@
 // `409` y el modal lo muestra como error de reserva.
 
 import api from './axios'
-import type { Appointment, AppointmentCreateInput, AvailableSlots } from './types'
+import type {
+  Appointment,
+  AppointmentCreateInput,
+  AppointmentStatus,
+  AppointmentStatusInput,
+  AppointmentStatusResult,
+  AvailableSlots,
+  PaginatedAppointments,
+} from './types'
 
 const resource = (id: string) => `/v1/properties/${id}`
 
@@ -21,6 +29,15 @@ export const getAvailableSlots = (propertyId: string, date: string) =>
 
 export const createAppointment = (input: AppointmentCreateInput) =>
   api.post<Appointment>('/v1/appointments', input).then((response) => response.data)
+
+export const listAppointments = (params: {
+  page: number
+  limit: number
+  status?: AppointmentStatus
+}) => api.get<PaginatedAppointments>('/v1/appointments', { params }).then((response) => response.data)
+
+export const updateAppointmentStatus = (id: string, input: AppointmentStatusInput) =>
+  api.patch<AppointmentStatusResult>(`/v1/appointments/${id}/status`, input).then((response) => response.data)
 
 const slotTimeFormatters = new Map<string, Intl.DateTimeFormat>()
 

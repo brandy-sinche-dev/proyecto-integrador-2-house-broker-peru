@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import { AppointmentListTable } from '../crm/AppointmentListTable'
 import { Icon } from './icons'
 
 // ── Paleta de marca ────────────────────────────────────────────────────────
@@ -270,44 +271,7 @@ function GestionPropiedades() {
 }
 
 function GestionCitas() {
-  const [citas, setCitas] = useState(CITAS_MOCK)
-  const LABELS: Record<string, string> = { CONFIRMED: 'Confirmada', PENDING: 'Pendiente', CANCELLED: 'Cancelada', COMPLETED: 'Completada', RESCHEDULED: 'Reprogramada', NO_SHOW: 'No asistió' }
-  const acciones: Record<string, { label: string; next: string; danger?: boolean }[]> = {
-    PENDING:   [{ label: 'Confirmar', next: 'CONFIRMED' }, { label: 'Cancelar', next: 'CANCELLED', danger: true }],
-    CONFIRMED: [{ label: 'Completada', next: 'COMPLETED' }, { label: 'Cancelar', next: 'CANCELLED', danger: true }],
-    CANCELLED: [], COMPLETED: [], NO_SHOW: [], RESCHEDULED: [],
-  }
-  return (
-    <div>
-      <SectionTitle>{Icon.calendar} Gestión de Citas</SectionTitle>
-      {citas.map(c => (
-        <Card key={c.id}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                <Badge text={LABELS[c.estado] ?? c.estado} s={SCITA[c.estado] ?? { color: '#000', bg: '#eee' }} />
-                <span style={{ fontSize: '0.72rem', color: '#d1d5db', fontFamily: 'monospace' }}>{c.id}</span>
-                <span style={{ fontSize: '0.72rem', background: '#f3f4f6', color: '#6b7280', padding: '2px 6px', borderRadius: '4px' }}>{c.origen}</span>
-              </div>
-              <p style={{ margin: 0, fontWeight: 700, fontSize: '0.95rem' }}>{c.propiedad}</p>
-              <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#6b7280' }}>
-                Cliente: {c.cliente} &nbsp;·&nbsp; Agente: {c.agente} &nbsp;·&nbsp; {c.fecha}
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              {(acciones[c.estado] ?? []).map(a => (
-                <button key={a.label}
-                  onClick={() => setCitas(p => p.map(x => x.id === c.id ? { ...x, estado: a.next } : x))}
-                  style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '0.4rem 0.85rem', borderRadius: '6px', border: `1px solid ${a.danger ? '#ef4444' : C.bronze}`, background: 'white', color: a.danger ? '#ef4444' : C.bronze, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 }}>
-                  {a.danger ? Icon.x : Icon.check} {a.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </Card>
-      ))}
-    </div>
-  )
+  return <AppointmentListTable />
 }
 
 function GestionClientes() {
