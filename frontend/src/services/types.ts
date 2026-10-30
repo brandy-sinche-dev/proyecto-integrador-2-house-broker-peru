@@ -149,6 +149,69 @@ export interface Property {
   seller?: Seller
 }
 
+/** Estado de una cita de visita (tag `Citas` del contrato). */
+export const APPOINTMENT_STATUSES = [
+  'PENDING',
+  'CONFIRMED',
+  'RESCHEDULED',
+  'COMPLETED',
+  'CANCELLED',
+  'NO_SHOW',
+] as const
+
+export type AppointmentStatus = (typeof APPOINTMENT_STATUSES)[number]
+
+/**
+ * Horario libre concreto para una fecha, ya materializado en UTC. El
+ * `start_at` es exactamente el valor que se envía como `scheduled_at`.
+ */
+export interface AvailableSlot {
+  start_at: string
+  end_at: string
+  duration_minutes: number
+}
+
+export interface AvailableSlots {
+  property_id: string
+  date: string
+  timezone: string
+  total_slots: number
+  slots: AvailableSlot[]
+}
+
+export interface AppointmentCreateInput {
+  property_id: string
+  scheduled_at: string
+  client_id?: string
+}
+
+export interface AppointmentPropertyRef {
+  id: string
+  title: string
+  district?: string | null
+  address: string
+}
+
+export interface AppointmentPersonRef {
+  id: string
+  full_name: string
+  email?: string | null
+  phone?: string | null
+}
+
+export interface Appointment {
+  id: string
+  status: AppointmentStatus
+  scheduled_at: string
+  duration_minutes: number
+  reason?: string | null
+  property: AppointmentPropertyRef
+  client: AppointmentPersonRef
+  agent: AppointmentPersonRef
+  created_at: string
+  updated_at: string
+}
+
 export interface PropertyInput {
   title: string
   price: number

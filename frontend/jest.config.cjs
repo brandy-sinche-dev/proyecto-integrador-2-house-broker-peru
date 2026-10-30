@@ -26,10 +26,14 @@ module.exports = {
     'src/hooks/useDebounce.ts',
     'src/services/properties.ts',
     'src/services/availability.ts',
+    'src/services/appointments.ts',
     'src/services/session.ts',
     'src/components/availability/AvailabilityPanel.tsx',
     'src/components/availability/PropertyStatusSelector.tsx',
     'src/components/availability/ScheduleManager.tsx',
+    'src/components/crm/DateSlotsPicker.tsx',
+    'src/components/crm/AppointmentModal.tsx',
+    'src/components/crm/SuccessToast.tsx',
   ],
   coverageThreshold: {
     global: {

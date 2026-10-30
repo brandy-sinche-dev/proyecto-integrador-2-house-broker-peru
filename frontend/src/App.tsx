@@ -288,6 +288,7 @@ function App() {
           isOpen={true}
           onClose={() => setSelectedProperty(null)}
           onConfirmed={() => confirmVisit(selectedProperty.id)}
+          propertyId={selectedProperty.id}
           propertyTitle={selectedProperty.title}
           isLoggedIn={Boolean(user)}
         />
