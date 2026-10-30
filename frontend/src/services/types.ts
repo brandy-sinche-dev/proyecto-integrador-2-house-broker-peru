@@ -212,6 +212,30 @@ export interface Appointment {
   updated_at: string
 }
 
+export interface PaginatedAppointments {
+  count: number
+  next: string | null
+  previous: string | null
+  results: Appointment[]
+}
+
+export interface AppointmentStatusInput {
+  status: Exclude<AppointmentStatus, 'PENDING'>
+  reason?: string
+  scheduled_at?: string
+}
+
+export interface AppointmentStatusResult {
+  id: string
+  status: AppointmentStatus
+  previous_status: AppointmentStatus
+  scheduled_at: string
+  previous_scheduled_at: string
+  reason?: string | null
+  changed_by: string
+  changed_at: string
+}
+
 export interface PropertyInput {
   title: string
   price: number

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import { AppointmentListTable } from '../crm/AppointmentListTable'
 import { Icon } from './icons'
 
 const C = {
@@ -119,56 +120,7 @@ function Dashboard() {
 }
 
 function Cronograma() {
-  const [vista, setVista] = useState<'Día'|'Semana'|'Mes'>('Semana')
-  const [estados, setEstados] = useState<Record<string, string>>(Object.fromEntries(CITAS_MOCK.map(c => [c.id, c.estado])))
-  const LABELS: Record<string, string> = { CONFIRMED: 'Confirmada', PENDING: 'Pendiente', CANCELLED: 'Cancelada', COMPLETED: 'Completada' }
-  const acciones: Record<string, { label: string; next: string; danger?: boolean }[]> = {
-    PENDING:   [{ label: 'Confirmar', next: 'CONFIRMED' }, { label: 'Cancelar', next: 'CANCELLED', danger: true }],
-    CONFIRMED: [{ label: 'Completada', next: 'COMPLETED' }, { label: 'Cancelar', next: 'CANCELLED', danger: true }],
-    CANCELLED: [], COMPLETED: [],
-  }
-
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: `2px solid ${C.gold}`, paddingBottom: '0.5rem' }}>
-        <h2 style={{ margin: 0, color: C.bronze, fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          {Icon.calendar} Mi Cronograma — Citas
-        </h2>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {(['Día', 'Semana', 'Mes'] as const).map(v => (
-            <button key={v} onClick={() => setVista(v)} style={{ padding: '0.35rem 0.9rem', borderRadius: '6px', border: 'none', cursor: 'pointer', background: vista === v ? C.bronze : '#e5e7eb', color: vista === v ? 'white' : '#374151', fontWeight: vista === v ? 700 : 400, fontSize: '0.82rem' }}>{v}</button>
-          ))}
-        </div>
-      </div>
-
-      {CITAS_MOCK.map(c => (
-        <Card key={c.id}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <div style={{ background: C.bg, borderRadius: '8px', padding: '0.4rem 0.75rem', textAlign: 'center', minWidth: '72px' }}>
-                <p style={{ margin: 0, fontSize: '0.72rem', color: '#6b7280' }}>{c.fecha}</p>
-                <p style={{ margin: 0, fontWeight: 700, color: C.bronze, fontSize: '0.85rem' }}>{c.hora}</p>
-              </div>
-              <div>
-                <p style={{ margin: 0, fontWeight: 700, fontSize: '0.95rem' }}>{c.propiedad}</p>
-                <p style={{ margin: '3px 0 0', fontSize: '0.82rem', color: '#6b7280' }}>{c.cliente} · {c.telefono}</p>
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <Badge text={LABELS[estados[c.id]] ?? estados[c.id]} s={SCITA[estados[c.id]] ?? { color: '#000', bg: '#eee' }} />
-              {(acciones[estados[c.id]] ?? []).map(a => (
-                <button key={a.label}
-                  onClick={() => setEstados(p => ({ ...p, [c.id]: a.next }))}
-                  style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '0.35rem 0.75rem', borderRadius: '6px', border: `1px solid ${a.danger ? '#ef4444' : C.bronze}`, background: 'white', color: a.danger ? '#ef4444' : C.bronze, cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700 }}>
-                  {a.danger ? Icon.x : Icon.check} {a.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </Card>
-      ))}
-    </div>
-  )
+  return <AppointmentListTable />
 }
 
 function MisPropiedades() {
