@@ -1,6 +1,8 @@
 import { useState } from 'react'
+import { useMatch, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { AppointmentListTable } from '../crm/AppointmentListTable'
+import { ClientDirectory, ClientProfileView } from '../crm/ClientProfileView'
 import { Icon } from './icons'
 
 const C = {
@@ -25,13 +27,6 @@ const PROPIEDADES_MOCK = [
   { id: 'P004', nombre: 'Pent. Surco – Av. El Polo',        estado: 'SUSPENDIDO', citas: 0, precio: '$420,000' },
 ]
 
-const CLIENTES_MOCK = [
-  { id: 'CL001', nombre: 'Carlos Pérez', telefono: '+51 987 654 321', email: 'cperez@gmail.com', interes: 'Miraflores', presupuesto: '$250K–$300K', estado: 'Activo' },
-  { id: 'CL002', nombre: 'María Ríos',   telefono: '+51 976 543 210', email: 'mrios@gmail.com',  interes: 'San Isidro', presupuesto: '$600K+',      estado: 'Activo' },
-  { id: 'CL003', nombre: 'José Mamani',  telefono: '+51 965 432 109', email: 'jmamani@gmail.com',interes: 'Barranco',   presupuesto: '$180K–$200K', estado: 'Seguimiento' },
-  { id: 'CL004', nombre: 'Ana Torres',   telefono: '+51 954 321 098', email: 'atorres@gmail.com',interes: 'Surco',       presupuesto: '$400K–$450K', estado: 'Frío' },
-]
-
 // ── Estado badges ──────────────────────────────────────────────────────────
 const SCITA: Record<string, { color: string; bg: string }> = {
   CONFIRMED:   { color: '#166534', bg: '#dcfce7' },
@@ -45,12 +40,6 @@ const SPROP: Record<string, { color: string; bg: string }> = {
   VENDIDO:    { color: '#6b21a8', bg: '#f3e8ff' },
   SUSPENDIDO: { color: '#991b1b', bg: '#fee2e2' },
 }
-const SCLI: Record<string, { color: string; bg: string }> = {
-  Activo:      { color: '#166534', bg: '#dcfce7' },
-  Seguimiento: { color: '#854d0e', bg: '#fef9c3' },
-  Frío:        { color: '#6b7280', bg: '#f3f4f6' },
-}
-
 // ── Micro-componentes ──────────────────────────────────────────────────────
 function Badge({ text, s }: { text: string; s: { color: string; bg: string } }) {
   return <span style={{ background: s.bg, color: s.color, padding: '3px 10px', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap' }}>{text}</span>
@@ -68,19 +57,12 @@ function SectionTitle({ iconEl, children }: { iconEl: React.ReactNode; children:
   )
 }
 
-function Th({ children }: { children: React.ReactNode }) {
-  return <th scope="col" style={{ padding: '0.7rem 1rem', textAlign: 'left', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', background: C.bronze, color: C.cream }}>{children}</th>
-}
-
-function Td({ children, bold }: { children: React.ReactNode; bold?: boolean }) {
-  return <td style={{ padding: '0.8rem 1rem', fontSize: '0.87rem', fontWeight: bold ? 700 : 400, color: bold ? C.bronze : '#374151', verticalAlign: 'middle' }}>{children}</td>
-}
-
 // ── Secciones ──────────────────────────────────────────────────────────────
 function Dashboard() {
   const hoy = CITAS_MOCK.filter(c => c.fecha === 'Hoy')
   const confirmadas = CITAS_MOCK.filter(c => c.estado === 'CONFIRMED').length
   const pendientes  = CITAS_MOCK.filter(c => c.estado === 'PENDING').length
+  const clientesConCitas = new Set(CITAS_MOCK.map(c => c.cliente)).size
 
   const StatCard = ({ label, value, sub }: { label: string; value: string | number; sub: string }) => (
     <div style={{ background: 'white', borderRadius: '12px', padding: '1.25rem 1.5rem', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', borderLeft: `4px solid ${C.gold}` }}>
@@ -97,7 +79,7 @@ function Dashboard() {
         <StatCard label="Citas hoy"        value={hoy.length}             sub={`${confirmadas} confirmadas`} />
         <StatCard label="Pendientes"        value={pendientes}             sub="requieren acción" />
         <StatCard label="Mis propiedades"   value={PROPIEDADES_MOCK.length} sub={`${PROPIEDADES_MOCK.filter(p => p.estado === 'DISPONIBLE').length} disponibles`} />
-        <StatCard label="Clientes activos"  value={CLIENTES_MOCK.filter(c => c.estado === 'Activo').length} sub={`de ${CLIENTES_MOCK.length} en cartera`} />
+        <StatCard label="Clientes con citas" value={clientesConCitas} sub="según la agenda mostrada" />
       </div>
 
       <Card>
@@ -152,32 +134,7 @@ function MisPropiedades() {
 }
 
 function Clientes() {
-  return (
-    <div>
-      <SectionTitle iconEl={Icon.clients}>Interés de Clientes</SectionTitle>
-      <Card>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr>{['Cliente', 'Contacto', 'Zona de Interés', 'Presupuesto', 'Estado'].map(h => <Th key={h}>{h}</Th>)}</tr></thead>
-            <tbody>
-              {CLIENTES_MOCK.map((cl, i) => (
-                <tr key={cl.id} style={{ background: i % 2 === 0 ? 'white' : '#faf9f7' }}>
-                  <Td bold>{cl.nombre}</Td>
-                  <Td>
-                    <div>{cl.telefono}</div>
-                    <div style={{ fontSize: '0.78rem', color: '#9ca3af' }}>{cl.email}</div>
-                  </Td>
-                  <Td>{cl.interes}</Td>
-                  <Td bold>{cl.presupuesto}</Td>
-                  <Td><Badge text={cl.estado} s={SCLI[cl.estado] ?? { color: '#000', bg: '#eee' }} /></Td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-    </div>
-  )
+  return <ClientDirectory />
 }
 
 // ── Menú ───────────────────────────────────────────────────────────────────
@@ -191,8 +148,11 @@ const MENU = [
 // ── Panel ──────────────────────────────────────────────────────────────────
 export function AgentePanel() {
   const { user, signOut } = useAuth()
+  const navigate = useNavigate()
+  const clientProfileMatch = useMatch('/agente/clientes/:clientId')
   const [activeTab, setActiveTab] = useState('dashboard')
   const Active = MENU.find(m => m.id === activeTab)?.comp ?? Dashboard
+  const selectedTab = clientProfileMatch ? 'clientes' : activeTab
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: C.bg, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -209,9 +169,13 @@ export function AgentePanel() {
 
         <nav style={{ flex: 1, padding: '0.75rem 0' }}>
           {MENU.map(item => {
-            const active = activeTab === item.id
+            const active = selectedTab === item.id
             return (
-              <button key={item.id} onClick={() => setActiveTab(item.id)} style={{
+              <button key={item.id} onClick={() => {
+                setActiveTab(item.id)
+                if (item.id === 'clientes') navigate('/agente/clientes')
+                else if (clientProfileMatch) navigate('/agente')
+              }} style={{
                 width: '100%', textAlign: 'left', padding: '0.8rem 1.25rem',
                 display: 'flex', alignItems: 'center', gap: '0.75rem',
                 background: active ? C.gold : 'transparent', border: 'none',
@@ -238,7 +202,11 @@ export function AgentePanel() {
 
       {/* Main */}
       <main style={{ flex: 1, padding: '2rem', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <div style={{ flex: 1 }}><Active /></div>
+        <div style={{ flex: 1 }}>
+          {clientProfileMatch
+            ? <ClientProfileView clientId={clientProfileMatch.params.clientId ?? ''} />
+            : <Active />}
+        </div>
         <footer style={{ marginTop: '3rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb', textAlign: 'center', color: '#9ca3af', fontSize: '0.78rem' }}>
           © {new Date().getFullYear()} House Broker Perú &nbsp;·&nbsp; Panel de Agente
         </footer>

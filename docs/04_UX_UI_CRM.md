@@ -47,6 +47,12 @@ Diseñado para la gestión del flujo de conversión de clientes desde el panel d
   - *`Hablar con un agente`*
 - **Transición Transparente:** Indicadores visuales claros al momento de transferir la conversación a un agente humano en la misma ventana ("*Un agente se comunicará contigo en breve...*").
 
+### 2.5. Alcance de la ficha de cliente en el frontend
+- El panel del agente muestra clientes únicamente a partir de las citas que la API autoriza para el agente autenticado (`GET /api/v1/appointments?role=AGENTE`).
+- La ficha usa los datos de contacto y referencias de propiedades incluidas en esas citas; las propiedades se identifican como asociadas a citas, no como vistas, guardadas o recomendadas.
+- Preferencias de búsqueda, historial de consultas/interacciones, notas comerciales, contraofertas, perfil CRM por cliente y favoritos de otro usuario no están disponibles en los endpoints documentados. La interfaz los identifica como no disponibles y no presenta datos simulados como reales.
+- El acceso frontend está restringido al rol `AGENTE`; la API sigue siendo responsable de autorizar las citas devueltas.
+
 ---
 
 ## 3. Criterios de Aceptación UI/UX
