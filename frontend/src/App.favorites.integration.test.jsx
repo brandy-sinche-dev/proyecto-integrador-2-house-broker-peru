@@ -165,6 +165,45 @@ describe('App: favoritos con MSW (TASK-TEST-PROP-05)', () => {
     expect(await screen.findByRole('heading', { level: 3, name: 'Departamento 1' })).toBeInTheDocument()
   })
 
+  it('actualiza el corazón al instante y descarta clics repetidos mientras guarda', async () => {
+    let posts = 0
+    let releasePost
+    const postGate = new Promise((resolve) => {
+      releasePost = resolve
+    })
+    server.use(
+      loggedIn(),
+      catalog(),
+      favorites([]),
+      http.post(`${API}/v1/favorites/`, async () => {
+        posts += 1
+        await postGate
+        return HttpResponse.json(
+          { property: { ...properties[0], is_favorite: true }, added_at: '2026-01-05T00:00:00Z' },
+          { status: 201 },
+        )
+      }),
+    )
+    const user = userEvent.setup()
+    renderApp()
+
+    await goToCatalog(user)
+    const heart = await screen.findByRole('button', { name: 'Guardar Departamento 1' })
+
+    await user.click(heart)
+    await user.click(heart)
+    await user.click(heart)
+
+    expect(heart).toHaveAttribute('aria-pressed', 'true')
+    expect(posts).toBe(1)
+
+    releasePost()
+    await waitFor(() =>
+      expect(favoriteStatus()).toHaveTextContent('Departamento 1 añadido a favoritos.'),
+    )
+    expect(heart).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('restaura el estado y anuncia el error cuando el guardado falla', async () => {
     server.use(
       loggedIn(),
