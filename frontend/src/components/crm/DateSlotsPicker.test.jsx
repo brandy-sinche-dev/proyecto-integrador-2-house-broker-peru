@@ -6,7 +6,13 @@
 
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { formatSlotTime } from '../../services/appointments'
 import { DateSlotsPicker } from './DateSlotsPicker'
+
+jest.mock('../../services/appointments', () => {
+  const actual = jest.requireActual('../../services/appointments')
+  return { ...actual, formatSlotTime: jest.fn(actual.formatSlotTime) }
+})
 
 const slots = [
   { start_at: '2026-12-10T14:00:00Z', end_at: '2026-12-10T15:00:00Z', duration_minutes: 60 },
@@ -48,10 +54,35 @@ describe('DateSlotsPicker', () => {
     expect(screen.queryByRole('option')).not.toBeInTheDocument()
   })
 
-  it('anuncia el estado de carga y oculta los horarios mientras consulta', () => {
+  it('muestra esqueletos accesibles y oculta los horarios mientras consulta', () => {
     renderPicker({ isLoading: true })
-    expect(screen.getByRole('status')).toHaveTextContent('Cargando horarios…')
+
+    const status = screen.getByRole('status')
+    expect(status).toHaveAttribute('aria-busy', 'true')
+    expect(status).toHaveTextContent('Cargando horarios…')
+
+    const skeleton = screen.getByTestId('slots-skeleton')
+    expect(skeleton).toHaveAttribute('aria-hidden', 'true')
+    expect(skeleton.children).toHaveLength(4)
     expect(screen.queryByRole('option')).not.toBeInTheDocument()
+  })
+
+  it('reutiliza las etiquetas formateadas mientras los horarios no cambien', () => {
+    const props = {
+      selectedDate: '2026-12-10',
+      setSelectedDate: jest.fn(),
+      selectedTime: '',
+      setSelectedTime: jest.fn(),
+      slots,
+    }
+    const { rerender } = render(<DateSlotsPicker {...props} />)
+    formatSlotTime.mockClear()
+
+    rerender(<DateSlotsPicker {...props} />)
+    expect(formatSlotTime).not.toHaveBeenCalled()
+
+    rerender(<DateSlotsPicker {...props} slots={[...slots]} />)
+    expect(formatSlotTime).toHaveBeenCalledTimes(2)
   })
 
   it('anuncia el error de carga con aria-live polite', () => {

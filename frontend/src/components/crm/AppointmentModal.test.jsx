@@ -9,7 +9,7 @@
 // mismo camino que la aplicación: consulta de horarios, selección, envío y
 // representación del éxito o del error devuelto por el servidor.
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import MockAdapter from 'axios-mock-adapter'
 import api from '../../services/axios'
@@ -103,6 +103,28 @@ describe('AppointmentModal', () => {
     expect(mock.history.get).toHaveLength(1)
     expect(mock.history.get[0].params).toEqual({ date: '2026-12-10' })
     expect(screen.getByRole('button', { name: 'Confirmar Reserva' })).toBeDisabled()
+  })
+
+  it('mantiene la UI interactiva con esqueletos mientras llega la disponibilidad', async () => {
+    let resolveAvailability
+    const pendingAvailability = new Promise((resolve) => { resolveAvailability = resolve })
+    mock.onGet(AVAILABLE_SLOTS_PATH).reply(() => pendingAvailability)
+    renderModal()
+
+    await chooseDate()
+
+    const date = screen.getByLabelText(/Selecciona una fecha/)
+    expect(date).toHaveValue('2026-12-10')
+    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByTestId('slots-skeleton')).toBeInTheDocument()
+    expect(screen.queryByRole('option')).not.toBeInTheDocument()
+
+    await act(async () => {
+      resolveAvailability([200, availability()])
+    })
+
+    expect(await screen.findByRole('option', { name: '09:00 AM' })).toBeInTheDocument()
+    expect(screen.queryByTestId('slots-skeleton')).not.toBeInTheDocument()
   })
 
   it('deshabilita los horarios que ya están ocupados', async () => {
