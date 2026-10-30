@@ -60,7 +60,7 @@ async function openBooking(user, source, title = properties[0].title) {
 async function selectSlot(user, date = '2026-12-10') {
   fireEvent.change(document.querySelector('input[type="date"]'), { target: { value: date } })
   // Los horarios se consultan al elegir la fecha, así que aparecen de forma asíncrona.
-  await user.click(await screen.findByRole('button', { name: '09:00 AM' }))
+  await user.click(await screen.findByRole('option', { name: '09:00 AM' }))
 }
 
 describe('App: confirmación simulada de visitas', () => {
@@ -133,7 +133,7 @@ describe('App: confirmación simulada de visitas', () => {
     expect(storedVisits()).toEqual(['otra-propiedad'])
     expect(screen.getByRole('button', { name: 'Confirmar Reserva' })).toBeDisabled()
     await selectSlot(user)
-    await user.click(screen.getByRole('button', { name: 'X' }))
+    await user.click(screen.getByRole('button', { name: 'Cerrar' }))
 
     expect(screen.queryByRole('heading', { name: 'Reservar Visita' })).not.toBeInTheDocument()
     expect(storedVisits()).toEqual(['otra-propiedad'])
@@ -185,7 +185,7 @@ describe('App: confirmación simulada de visitas', () => {
       await user.click(screen.getByRole('button', { name: 'Confirmar Reserva' }))
       await user.click(await screen.findByRole('button', { name: 'Aceptar' }))
     } else {
-      await user.click(screen.getByRole('button', { name: 'X' }))
+      await user.click(screen.getByRole('button', { name: 'Cerrar' }))
     }
 
     await openBooking(user, 'catálogo', properties[1].title)
@@ -195,7 +195,7 @@ describe('App: confirmación simulada de visitas', () => {
     expect(document.querySelector('input[type="date"]')).toHaveValue('')
     fireEvent.change(document.querySelector('input[type="date"]'), { target: { value: '2026-12-11' } })
     expect(screen.getByRole('button', { name: 'Confirmar Reserva' })).toBeDisabled()
-    await user.click(await screen.findByRole('button', { name: '11:00 AM' }))
+    await user.click(await screen.findByRole('option', { name: '11:00 AM' }))
     await user.click(screen.getByRole('button', { name: 'Confirmar Reserva' }))
     await waitFor(() =>
       expect(storedVisits()).toEqual(action === 'confirmar' ? ['prop-1', 'prop-2'] : ['prop-2']),
