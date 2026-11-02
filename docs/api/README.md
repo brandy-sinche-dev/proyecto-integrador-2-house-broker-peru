@@ -2,9 +2,9 @@
 
 Contratos REST del backend (Django REST Framework) bajo especificación **OpenAPI 3.0**.
 
-> **Tarea actual:** [TASK-ARC-PROP-05] Especificación OpenAPI 3.0 para la
-> gestión de propiedades favoritas —
-> [issue #104](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/104) (HU-PROP-05).
+> **Tarea actual:** [TASK-ARC-CRM-03] Especificación OpenAPI 3.0 para la ficha
+> e historial del cliente —
+> [issue #145](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/145) (HU-CRM-03).
 
 ## Archivo único de contrato
 
@@ -24,6 +24,7 @@ que al cierre (Sprint 7) exista un solo `.yml` con la API completa.
 | 1.6.0 | Sprint 3 | `TASK-ARC-SEC-01` | [#69](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/69) | `bearerAuth` + `refreshCookie`, y `register` / `login` / `refresh` (HU-SEC-01) |
 | 1.7.0 | Sprint 3 | `TASK-ARC-SEC-02` | [#76](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/76) | Recuperación de contraseña: `password-reset` y `password-reset-confirm` (HU-SEC-02) |
 | 1.8.0 | Sprint 4 | `TASK-ARC-PROP-05` | [#104](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/104) | Favoritos por usuario: `GET`/`POST /favorites/` y `DELETE /favorites/{property_id}/` (HU-PROP-05) |
+| 1.9.0 | Sprint 5 | `TASK-ARC-CRM-03` | [#145](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/145) | Ficha (`GET /clients/{id}/profile`) e historial (`GET /clients/{id}/history`) del cliente (HU-CRM-03) |
 
 Al crecer el documento, extrae las secciones a `components/schemas` y referencia
 con `$ref`. No dupliques esquemas entre operaciones.
@@ -57,6 +58,8 @@ el schema en el mismo commit.
 | GET | `/api/v1/appointments` | `listAppointments` — agenda paginada y filtrada | 4 |
 | POST | `/api/v1/appointments` | `createAppointment` — solicitud de visita | 4 |
 | PATCH | `/api/v1/appointments/{id}/status` | `updateAppointmentStatus` — estado de cita | 4 |
+| GET | `/api/v1/clients/{id}/profile` | `getClientProfile` — ficha consolidada | 5 |
+| GET | `/api/v1/clients/{id}/history` | `getClientHistory` — línea de tiempo paginada | 5 |
 
 ## Catálogo paginado (HU-PROP-02)
 
@@ -962,6 +965,93 @@ El enunciado de la tarea pide `400` para el horario ocupado. El contrato usa
 El `400` sigue cubriendo lo que sí es entrada inválida: formato de fecha,
 horario fuera de franja, propiedad no agendable.
 
+## Ficha e historial del cliente (HU-CRM-03)
+
+`TASK-ARC-CRM-03` especifica la ficha y el historial consolidado del cliente
+para el CRM. Ambos endpoints exigen `Authorization: Bearer <jwt>` y se
+incorporan al archivo acumulado `openapi_spec.yaml`, no a un `crm-v1.yaml`
+aparte: la convención del proyecto es un único contrato para todo el proyecto.
+
+| Método | Ruta | Operación |
+|---|---|---|
+| GET | `/api/v1/clients/{id}/profile` | `getClientProfile` |
+| GET | `/api/v1/clients/{id}/history` | `getClientHistory` |
+
+### La ficha consolidada
+
+`ClientProfile` reúne cuatro fuentes:
+
+| Bloque | Campos | Origen |
+|---|---|---|
+| Cuenta | `id`, `full_name`, `email`, `phone`, `is_active`, `created_at`, `updated_at` | `user` |
+| Perfil CRM | `budget_min`, `budget_max`, `budget_currency`, `preferred_district`, `preferences`, `interest_level` | `client_profile` |
+| Resumen | `summary` con conteos de citas e inmuebles, `last_appointment_at`, `next_appointment_at` | agregados de `appointment` |
+| Inmuebles | `associated_properties[]` con `appointments_count` y fechas de visita | `appointment.property` |
+
+`document_type` y `document_number` **no se exponen**: son PII de identidad y
+ningún requisito de la historia los pide. Las notas internas del cliente
+(`client_profile.notes`) quedan reservadas para `TASK-ARC-CRM-04`.
+
+Los campos que dependen de `client_profile` son anulables. Un cliente recién
+registrado puede no tener presupuesto ni preferencias captadas; el frontend debe
+mostrar "no disponible" en lugar de asumir valores por defecto.
+
+### La línea de tiempo
+
+`GET /api/v1/clients/{id}/history` devuelve `PaginatedClientHistory`, con la
+misma forma de paginación que la agenda. Cada `ClientHistoryEntry` es un hecho:
+
+| `type` | Origen | Cuándo aparece |
+|---|---|---|
+| `APPOINTMENT` | `appointment.created_at` | Al solicitar la visita; `status` es `PENDING` |
+| `STATUS_CHANGE` | `appointment_status_change.changed_at` | Por cada transición aceptada |
+
+Los campos de la entrada (`status`, `scheduled_at`, `previous_status`,
+`previous_scheduled_at`, `reason`, `changed_by`) describen el hecho **en el
+momento en que ocurrió**. El objeto `appointment` incluido es el estado vigente
+al consultar; el frontend usa `appointment.id` para enlazar al detalle
+actualizado y los campos del evento para pintar la línea de tiempo.
+
+`previous_status` y `changed_by` se declaran como `type` + `nullable`, no como
+`$ref` + `nullable`: en OpenAPI 3.0 `nullable` no se puede combinar con un
+`$ref`/`allOf` que no declare `type`, y Spectral rechaza el ejemplo.
+
+### Filtros y orden
+
+| Parámetro | Tipo | Campo | Semántica |
+|---|---|---|---|
+| `type` | array de `ClientHistoryType` | `type` | OR entre valores repetidos |
+| `dateFrom` / `dateTo` | date | `occurred_at` | extremos **inclusivos**, en `America/Lima` |
+| `page` / `limit` | int32 | — | reutiliza `Page` y `Limit` del catálogo |
+
+El orden es `occurred_at` descendente, con desempate por `id` descendente. El
+desempate es necesario porque dos transiciones pueden compartir timestamp y una
+paginación inestable repetiría u omitiría entradas.
+
+### Permisos y visibilidad
+
+| Rol | Ficha e historial |
+|---|---|
+| `AGENTE` | Solo clientes con al menos una cita asignada a su cuenta |
+| `ADMINISTRADOR` | Cualquier cliente |
+| `CLIENTE` | Sin acceso a la ficha CRM (`403`) |
+
+Un identificador inexistente, un usuario que no es `CLIENTE` o un cliente sin
+citas con el agente autenticado responden `404 resource_not_found`. Los tres
+casos se responden igual a propósito: distinguirlos permitiría enumerar cuentas
+y descubrir qué clientes tiene asignados otro agente. El `403` se reserva para
+el rol `CLIENTE`, donde el problema es el rol y no la existencia del recurso.
+
+### Matriz de errores
+
+| Código | Esquema | Cuándo |
+|---|---|---|
+| `400` | `ProblemBadRequest` | `type` fuera del enum, paginación inválida o `dateFrom` > `dateTo` |
+| `401` | `ProblemUnauthorized` | Token ausente, vencido o con firma inválida |
+| `403` | `ProblemForbidden` | El rol `CLIENTE` intenta consultar la ficha CRM |
+| `404` | `ProblemNotFound` | Cliente inexistente, no es `CLIENTE` o no está asignado al agente |
+| `500` | `ProblemInternalServerError` | Error no controlado |
+
 ## Validación con Spectral
 
 El ruleset `.spectral.yaml` (en esta carpeta) extiende `spectral:oas` y sube a
@@ -979,11 +1069,12 @@ Validación estructural complementaria:
 npx @apidevtools/swagger-cli validate docs/api/openapi_spec.yaml
 ```
 
-Estado actual (v1.8.0): `swagger-cli` reports *"is valid"* y Spectral
+Estado actual (v1.9.0): `swagger-cli` reports *"is valid"* y Spectral
 `* 4 problems (0 errors, 4 warnings, 0 infos, 0 hints)*`. Los cuatro warnings
 son `path-keys-no-trailing-slash` de las rutas de recuperación y de favoritos, y
 están justificados en
-[Desviación conocida de Spectral](#desviación-conocida-de-spectral).
+[Desviación conocida de Spectral](#desviación-conocida-de-spectral). Las rutas
+nuevas de `clients` no llevan barra final, así que no añaden warnings.
 
 ## Notas para la implementación
 
@@ -1120,3 +1211,27 @@ están justificados en
   `CLIENTE`, `AGENTE` y `ADMINISTRADOR` en el JWT. Si al implementar se
   cambia el nombre de algún rol, hay que actualizar `UserRole`, que es la única
   fuente de verdad de esa lista en todo el spec.
+- La v1.9.0 **no crea un archivo de contrato por tarea.** El enunciado de
+  `TASK-ARC-CRM-03` menciona `/docs/architecture/openapi/crm-v1.yaml`, pero la
+  convención vigente del proyecto es un único `docs/api/openapi_spec.yaml`
+  acumulado, con la tabla de versiones de este README. La ficha y el historial se
+  añadieron ahí para no fragmentar el contrato.
+- `ClientProfile` y `ClientHistoryEntry` declaran `id` con `format: uuid`, igual
+  que `AppointmentPersonRef`. Mientras la pk de usuario siga siendo entera, el
+  backend debe serializarla como texto, exactamente como ya hace el módulo de
+  citas; un id que no encaje termina en `404 resource_not_found`.
+- `ClientHistoryEntry` repite `status` y `scheduled_at` aunque `appointment` ya
+  los incluya. No es redundancia accidental: el objeto `appointment` es el estado
+  vigente, mientras que los campos del evento conservan el valor que tenía al
+  ocurrir. Sin ellos, una cita reprogramada dos veces mostraría el horario final
+  en todas las entradas de la línea de tiempo.
+- `ClientProfileSummary` no promete que sus conteos sumen
+  `appointments_total`: `appointments_upcoming` es un corte por fecha sobre
+  estados no terminales, y el resto son estados terminales. Documentarlo evita
+  que `TASK-TEST-CRM-03` escriba una aserción de suma que la regla de negocio no
+  garantiza.
+- `associated_properties` sale de las citas, no de favoritos ni de
+  recomendaciones IA. Un inmueble que el cliente solo miró en el catálogo no
+  aparece: el contrato no debe presentar como "interés" algo que la API no puede
+  sustentar. Las recomendaciones previas de la IA llegarán con el módulo
+  `assistant` y su propio contrato.
