@@ -91,8 +91,9 @@ jobs:
         # PostgreSQL para correr. `settings.py` trae defaults para
         # DJANGO_SECRET_KEY y DJANGO_DEBUG, así que no hay secretos en el CI.
         # Las apps con tests: `properties` (catálogo, favoritos, agenda),
-        # `appointments` (RF-CRM-01, la reserva de visitas) y `users`
-        # (registro, login y refresh con simplejwt).
+        # `appointments` (RF-CRM-01, la reserva de visitas), `users`
+        # (registro, login y refresh con simplejwt) y `clients` (ficha e
+        # historial CRM del cliente, HU-CRM-03).
         env:
           DJANGO_DB_ENGINE: sqlite
-        run: uv run python manage.py test apps.properties apps.appointments apps.users
+        run: uv run python manage.py test apps.properties apps.appointments apps.users apps.clients

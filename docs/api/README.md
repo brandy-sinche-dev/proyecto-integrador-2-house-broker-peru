@@ -25,6 +25,7 @@ que al cierre (Sprint 7) exista un solo `.yml` con la API completa.
 | 1.7.0 | Sprint 3 | `TASK-ARC-SEC-02` | [#76](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/76) | Recuperación de contraseña: `password-reset` y `password-reset-confirm` (HU-SEC-02) |
 | 1.8.0 | Sprint 4 | `TASK-ARC-PROP-05` | [#104](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/104) | Favoritos por usuario: `GET`/`POST /favorites/` y `DELETE /favorites/{property_id}/` (HU-PROP-05) |
 | 1.9.0 | Sprint 5 | `TASK-ARC-CRM-03` | [#145](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/145) | Ficha (`GET /clients/{id}/profile`) e historial (`GET /clients/{id}/history`) del cliente (HU-CRM-03) |
+| 1.10.0 | Sprint 5 | `TASK-BACK-CRM-03` | [#148](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/148) | `favorite_properties_total` en `ClientProfileSummary`, para que la ficha informe los inmuebles favoritos junto a los asociados a citas (HU-CRM-03) |
 
 Al crecer el documento, extrae las secciones a `components/schemas` y referencia
 con `$ref`. No dupliques esquemas entre operaciones.
@@ -985,7 +986,7 @@ aparte: la convención del proyecto es un único contrato para todo el proyecto.
 |---|---|---|
 | Cuenta | `id`, `full_name`, `email`, `phone`, `is_active`, `created_at`, `updated_at` | `user` |
 | Perfil CRM | `budget_min`, `budget_max`, `budget_currency`, `preferred_district`, `preferences`, `interest_level` | `client_profile` |
-| Resumen | `summary` con conteos de citas e inmuebles, `last_appointment_at`, `next_appointment_at` | agregados de `appointment` |
+| Resumen | `summary` con conteos de citas, inmuebles asociados y favoritos (`favorite_properties_total`), `last_appointment_at`, `next_appointment_at` | agregados de `appointment` y de `favorite` |
 | Inmuebles | `associated_properties[]` con `appointments_count` y fechas de visita | `appointment.property` |
 
 `document_type` y `document_number` **no se exponen**: son PII de identidad y
@@ -1069,7 +1070,7 @@ Validación estructural complementaria:
 npx @apidevtools/swagger-cli validate docs/api/openapi_spec.yaml
 ```
 
-Estado actual (v1.9.0): `swagger-cli` reports *"is valid"* y Spectral
+Estado actual (v1.10.0): `swagger-cli` reports *"is valid"* y Spectral
 `* 4 problems (0 errors, 4 warnings, 0 infos, 0 hints)*`. Los cuatro warnings
 son `path-keys-no-trailing-slash` de las rutas de recuperación y de favoritos, y
 están justificados en

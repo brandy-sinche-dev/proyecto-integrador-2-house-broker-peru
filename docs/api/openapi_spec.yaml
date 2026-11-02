@@ -47,7 +47,7 @@ info:
       el `sub` del access token y los endpoints no aceptan ningún parámetro de
       usuario. Agregar y quitar son idempotentes, para que un doble clic o un
       reintento no se traduzcan en un error.
-  version: 1.9.0
+  version: 1.10.0
   contact:
     name: Equipo HouseBroker Perú
     url: https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru
@@ -2794,6 +2794,7 @@ paths:
                   appointments_cancelled: 1
                   appointments_no_show: 0
                   properties_total: 4
+                  favorite_properties_total: 2
                   last_appointment_at: '2026-09-28T16:00:00Z'
                   next_appointment_at: '2026-10-08T15:00:00Z'
                 associated_properties:
@@ -4877,6 +4878,7 @@ components:
         - appointments_cancelled
         - appointments_no_show
         - properties_total
+        - favorite_properties_total
         - last_appointment_at
         - next_appointment_at
       properties:
@@ -4916,6 +4918,12 @@ components:
           minimum: 0
           description: Inmuebles distintos asociados a las citas del cliente.
           example: 4
+        favorite_properties_total:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Inmuebles que el cliente marcó como favoritos.
+          example: 2
         last_appointment_at:
           type: string
           format: date-time
