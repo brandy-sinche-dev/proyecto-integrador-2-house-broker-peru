@@ -22,6 +22,7 @@ info:
     | Sprint 4 | `TASK-ARC-CRM-01` | Disponibilidad por fecha y creación de citas (HU-CRM-01) |
     | Sprint 4 | `TASK-ARC-CRM-02` | Agenda de citas filtrada por rol y estados de cita (HU-CRM-02) |
     | Sprint 4 | `TASK-ARC-PROP-05` | Gestión de propiedades favoritas por usuario (HU-PROP-05) |
+    | Sprint 5 | `TASK-ARC-CRM-03` | Ficha e historial consolidado del cliente (HU-CRM-03) |
 
     ### Convenciones
     - Todos los endpoints están bajo el prefijo `/api/v1`.
@@ -46,7 +47,7 @@ info:
       el `sub` del access token y los endpoints no aceptan ningún parámetro de
       usuario. Agregar y quitar son idempotentes, para que un doble clic o un
       reintento no se traduzcan en un error.
-  version: 1.8.0
+  version: 1.9.0
   contact:
     name: Equipo HouseBroker Perú
     url: https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru
@@ -89,6 +90,13 @@ tags:
       reprogramar, cancelar, completar o registrar la inasistencia). La reserva
       y el cambio de estado exigen sesión; solo el Agente asignado o un
       Administrador modifican el estado de una cita.
+  - name: Clientes
+    description: |
+      Ficha e historial consolidado del cliente para el CRM. Solo accesible
+      para Agentes que atienden al menos una cita del cliente y para
+      Administradores. El perfil expone datos de contacto, preferencias y
+      resumen de actividad; el historial pagina las citas y sus cambios de
+      estado como una línea de tiempo.
 
 security:
   - bearerAuth: []
@@ -2700,6 +2708,372 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/clients/{id}/profile:
+    parameters:
+      - $ref: '#/components/parameters/ClientId'
+    get:
+      tags:
+        - Clientes
+      operationId: getClientProfile
+      summary: Consultar la ficha consolidada de un cliente
+      description: |
+        Devuelve la ficha CRM del cliente para el panel del agente (RF-CRM-03).
+        Consolida la cuenta de usuario, el perfil CRM (`client_profile`), las
+        preferencias captadas y un resumen de su actividad en la plataforma.
+
+        ### Alcance según el rol
+
+        | Rol | Acceso |
+        |---|---|
+        | `AGENTE` | Solo clientes con al menos una cita asignada a su cuenta |
+        | `ADMINISTRADOR` | Cualquier cliente |
+        | `CLIENTE` | Sin acceso a la ficha CRM |
+
+        Un `CLIENTE` autenticado recibe `403`. Un `AGENTE` que consulta un
+        identificador inexistente, que no corresponde a un usuario `CLIENTE` o
+        que no tiene citas con él recibe `404 resource_not_found`, para no
+        revelar la existencia de cuentas ajenas.
+
+        ### Datos deliberadamente ausentes
+
+        `document_type` y `document_number` no se exponen: son PII de identidad
+        y ningún requisito de esta historia los pide. Las notas internas del
+        cliente (`client_profile.notes`) pertenecen a `TASK-ARC-CRM-04` y
+        tampoco forman parte de esta respuesta.
+
+        `preferences`, `budget_*` e `interest_level` pueden ser `null` cuando el
+        cliente todavía no tiene un `client_profile` o cuando el asistente no ha
+        captado preferencias. El frontend debe tratar esos campos como
+        opcionales, no como un error.
+      responses:
+        '200':
+          description: Ficha del cliente obtenida exitosamente
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientProfile'
+              example:
+                id: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+                full_name: Maria Fernanda Quispe
+                email: maria.quispe@correo.com
+                phone: '+51 987 654 321'
+                is_active: true
+                created_at: '2026-01-12T10:15:00Z'
+                updated_at: '2026-10-05T09:12:44Z'
+                budget_min: 1800
+                budget_max: 2500
+                budget_currency: PEN
+                preferred_district: Miraflores
+                preferences:
+                  mode: ALQUILER
+                  property_type: DEPARTAMENTO
+                  districts:
+                    - Miraflores
+                    - San Isidro
+                  budget:
+                    min: 1800
+                    max: 2500
+                    currency: PEN
+                  bedrooms: 2
+                  bathrooms: 2
+                  parking: true
+                  accepts_pets: true
+                  required_features:
+                    - ascensor
+                    - cerca a transporte
+                  extracted_at: '2026-10-05T09:12:44Z'
+                  source_message_id: 8f2c1a60-1b2c-4d3e-8f5a-6b7c8d9e0f1a
+                interest_level: 4
+                summary:
+                  appointments_total: 6
+                  appointments_upcoming: 2
+                  appointments_completed: 3
+                  appointments_cancelled: 1
+                  appointments_no_show: 0
+                  properties_total: 4
+                  last_appointment_at: '2026-09-28T16:00:00Z'
+                  next_appointment_at: '2026-10-08T15:00:00Z'
+                associated_properties:
+                  - id: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+                    title: Departamento amoblado en Miraflores
+                    district: Miraflores
+                    address: Av. Larco 456, Miraflores
+                    price: 2300.0
+                    currency: PEN
+                    property_type: DEPARTAMENTO
+                    status: DISPONIBLE
+                    is_active: true
+                    appointments_count: 2
+                    last_appointment_at: '2026-09-28T16:00:00Z'
+                    next_appointment_at: '2026-10-08T15:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: |
+            El token es válido pero el rol no puede consultar la ficha CRM de un
+            cliente.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemForbidden'
+              example:
+                type: https://housebroker.pe/errors/forbidden
+                title: Sin permisos sobre el recurso
+                status: 403
+                detail: La ficha CRM del cliente solo está disponible para agentes y administradores.
+                instance: /api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/profile
+                code: forbidden
+                required_roles:
+                  - AGENTE
+                  - ADMINISTRADOR
+        '404':
+          description: |
+            El cliente no existe, el identificador no corresponde a un usuario
+            `CLIENTE`, o el agente no tiene citas con él. Los tres casos
+            responden igual para no revelar la existencia de cuentas ajenas.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemNotFound'
+              examples:
+                noExiste:
+                  summary: Identificador inexistente
+                  value:
+                    type: https://housebroker.pe/errors/resource-not-found
+                    title: Recurso no encontrado
+                    status: 404
+                    detail: No existe un cliente con el identificador indicado.
+                    instance: /api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/profile
+                    code: resource_not_found
+                noAsignado:
+                  summary: El cliente no tiene citas con el agente autenticado
+                  value:
+                    type: https://housebroker.pe/errors/resource-not-found
+                    title: Recurso no encontrado
+                    status: 404
+                    detail: El cliente no existe o no tiene citas asignadas a tu cuenta.
+                    instance: /api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/profile
+                    code: resource_not_found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/clients/{id}/history:
+    parameters:
+      - $ref: '#/components/parameters/ClientId'
+    get:
+      tags:
+        - Clientes
+      operationId: getClientHistory
+      summary: Consultar el historial consolidado de un cliente
+      description: |
+        Devuelve la línea de tiempo paginada del cliente (RF-CRM-03). Cada
+        entrada representa un hecho ocurrido en una cita:
+
+        | `type` | Origen | Significado |
+        |---|---|---|
+        | `APPOINTMENT` | `appointment.created_at` | Solicitud de visita creada |
+        | `STATUS_CHANGE` | `appointment_status_change` | Transición de estado aceptada |
+
+        Las entradas se ordenan por `occurred_at` descendente (lo más reciente
+        primero), con desempate por `id` descendente. El orden es estable para
+        que la paginación no repita ni omita elementos entre páginas.
+
+        ### Alcance según el rol
+
+        Aplica la misma regla que la ficha: un `AGENTE` solo consulta clientes
+        con citas asignadas a su cuenta, un `ADMINISTRADOR` consulta cualquiera
+        y un `CLIENTE` recibe `403`. Un identificador inexistente, un usuario
+        que no es `CLIENTE` o un cliente sin citas con el agente reciben `404`.
+
+        ### Filtros
+
+        Todos los filtros son opcionales y se combinan con conjunción (AND).
+        `type` se repite para aplicar un OR entre valores
+        (`?type=APPOINTMENT&type=STATUS_CHANGE`). `dateFrom` y `dateTo` acotan
+        `occurred_at` en `America/Lima`, con extremos inclusivos; un rango
+        invertido produce `400 invalid_filter_range`.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/XRequestIdParam'
+        - $ref: '#/components/parameters/ClientHistoryTypeFilter'
+        - $ref: '#/components/parameters/ClientHistoryDateFrom'
+        - $ref: '#/components/parameters/ClientHistoryDateTo'
+      responses:
+        '200':
+          description: Historial del cliente obtenido exitosamente
+          headers:
+            X-Total-Count:
+              description: Total de entradas que cumplen los filtros, sin paginar.
+              schema:
+                type: integer
+                format: int32
+              example: 8
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedClientHistory'
+              example:
+                count: 2
+                next: null
+                previous: null
+                results:
+                  - id: 4d5e6f70-3c4d-5e6f-8a90-333333333333
+                    type: STATUS_CHANGE
+                    occurred_at: '2026-10-06T14:03:21Z'
+                    appointment:
+                      id: a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e
+                      status: CONFIRMED
+                      scheduled_at: '2026-10-08T15:00:00Z'
+                      duration_minutes: 45
+                      reason: El cliente confirmó la visita por teléfono.
+                      property:
+                        id: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+                        title: Departamento amoblado en Miraflores
+                        district: Miraflores
+                        address: Av. Larco 456, Miraflores
+                      client:
+                        id: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+                        full_name: Maria Fernanda Quispe
+                        email: maria.quispe@correo.com
+                        phone: '+51 987 654 321'
+                      agent:
+                        id: 7c4a9d21-3b6e-4f80-9a2d-5e7c1b3f8d40
+                        full_name: Brandy Sinche
+                        email: brandy.sinche@housebrokerperu.com
+                      created_at: '2026-10-05T09:12:44Z'
+                      updated_at: '2026-10-06T14:03:21Z'
+                    previous_status: PENDING
+                    status: CONFIRMED
+                    scheduled_at: '2026-10-08T15:00:00Z'
+                    previous_scheduled_at: '2026-10-08T15:00:00Z'
+                    reason: El cliente confirmó la visita por teléfono.
+                    changed_by:
+                      id: 7c4a9d21-3b6e-4f80-9a2d-5e7c1b3f8d40
+                      full_name: Brandy Sinche
+                      email: brandy.sinche@housebrokerperu.com
+                  - id: a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e
+                    type: APPOINTMENT
+                    occurred_at: '2026-10-05T09:12:44Z'
+                    appointment:
+                      id: a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e
+                      status: CONFIRMED
+                      scheduled_at: '2026-10-08T15:00:00Z'
+                      duration_minutes: 45
+                      reason: El cliente confirmó la visita por teléfono.
+                      property:
+                        id: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+                        title: Departamento amoblado en Miraflores
+                        district: Miraflores
+                        address: Av. Larco 456, Miraflores
+                      client:
+                        id: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+                        full_name: Maria Fernanda Quispe
+                        email: maria.quispe@correo.com
+                        phone: '+51 987 654 321'
+                      agent:
+                        id: 7c4a9d21-3b6e-4f80-9a2d-5e7c1b3f8d40
+                        full_name: Brandy Sinche
+                        email: brandy.sinche@housebrokerperu.com
+                      created_at: '2026-10-05T09:12:44Z'
+                      updated_at: '2026-10-06T14:03:21Z'
+                    previous_status: null
+                    status: PENDING
+                    scheduled_at: '2026-10-08T15:00:00Z'
+                    previous_scheduled_at: null
+                    reason: null
+                    changed_by: null
+        '400':
+          description: |
+            Parámetros de consulta, paginación o rango de fechas inválidos.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemBadRequest'
+              examples:
+                tipoInvalido:
+                  summary: '`type` fuera del enum'
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Parámetro de consulta inválido
+                    status: 400
+                    detail: El parámetro 'type' admite los valores APPOINTMENT y STATUS_CHANGE.
+                    instance: /api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/history?type=CHAT
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: type
+                        message: El valor 'CHAT' no pertenece al conjunto permitido (APPOINTMENT, STATUS_CHANGE).
+                rangoInvertido:
+                  summary: Rango de fechas incoherente
+                  value:
+                    type: https://housebroker.pe/errors/invalid-filter-range
+                    title: Rango de fechas inválido
+                    status: 400
+                    detail: El parámetro 'dateTo' no puede ser anterior a 'dateFrom'.
+                    instance: /api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/history?dateFrom=2026-10-31&dateTo=2026-10-01
+                    code: invalid_filter_range
+                    errors:
+                      - parameter: dateTo
+                        message: El valor '2026-10-01' es anterior a 'dateFrom' (2026-10-31).
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: |
+            El token es válido pero el rol no puede consultar el historial CRM
+            de un cliente.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemForbidden'
+              example:
+                type: https://housebroker.pe/errors/forbidden
+                title: Sin permisos sobre el recurso
+                status: 403
+                detail: El historial CRM del cliente solo está disponible para agentes y administradores.
+                instance: /api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/history
+                code: forbidden
+                required_roles:
+                  - AGENTE
+                  - ADMINISTRADOR
+        '404':
+          description: |
+            El cliente no existe, el identificador no corresponde a un usuario
+            `CLIENTE`, o el agente no tiene citas con él. Los tres casos
+            responden igual para no revelar la existencia de cuentas ajenas.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemNotFound'
+              example:
+                type: https://housebroker.pe/errors/resource-not-found
+                title: Recurso no encontrado
+                status: 404
+                detail: El cliente no existe o no tiene citas asignadas a tu cuenta.
+                instance: /api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/history
+                code: resource_not_found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -3043,6 +3417,66 @@ components:
         Fecha máxima de la visita, en formato ISO 8601 (`YYYY-MM-DD`) y
         timezone `America/Lima`. El extremo es **inclusivo**. No puede ser
         anterior a `dateFrom`, lo que produce `400` con `invalid_filter_range`.
+      schema:
+        type: string
+        format: date
+      example: '2026-10-31'
+
+    ClientId:
+      name: id
+      in: path
+      required: true
+      description: |
+        Identificador del cliente. Debe corresponder a un usuario con rol
+        `CLIENTE`. Se serializa como texto, igual que `AppointmentPersonRef.id`.
+      schema:
+        type: string
+        format: uuid
+      example: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+
+    ClientHistoryTypeFilter:
+      name: type
+      in: query
+      required: false
+      description: |
+        Tipo de entrada del historial. Acepta uno o varios valores del enum
+        `ClientHistoryType`; varios valores actúan como un OR dentro de este
+        filtro (`?type=APPOINTMENT&type=STATUS_CHANGE`). Repetir el parámetro
+        es la única forma soportada de combinar valores: no se acepta una lista
+        separada por comas. Un valor fuera del enum produce `400`.
+      schema:
+        type: array
+        items:
+          $ref: '#/components/schemas/ClientHistoryType'
+      style: form
+      explode: true
+      example:
+        - APPOINTMENT
+        - STATUS_CHANGE
+
+    ClientHistoryDateFrom:
+      name: dateFrom
+      in: query
+      required: false
+      description: |
+        Fecha mínima de la entrada del historial, en formato ISO 8601
+        (`YYYY-MM-DD`) y timezone `America/Lima`. Filtra `occurred_at`, no
+        `scheduled_at`, y el extremo es **inclusivo**. Un formato inválido
+        produce `400`.
+      schema:
+        type: string
+        format: date
+      example: '2026-10-01'
+
+    ClientHistoryDateTo:
+      name: dateTo
+      in: query
+      required: false
+      description: |
+        Fecha máxima de la entrada del historial, en formato ISO 8601
+        (`YYYY-MM-DD`) y timezone `America/Lima`. Filtra `occurred_at` y el
+        extremo es **inclusivo**. No puede ser anterior a `dateFrom`, lo que
+        produce `400` con `invalid_filter_range`.
       schema:
         type: string
         format: date
@@ -4337,9 +4771,467 @@ components:
           example: null
         results:
           type: array
-          description: Citas correspondientes a la página solicitada.
+          description: Citas correspondientes a la pǭgina solicitada.
           items:
             $ref: '#/components/schemas/Appointment'
+
+    ClientBudget:
+      type: object
+      description: |
+        Presupuesto declarado por el cliente para la búsqueda. Los tres campos
+        pueden faltar por separado; `min` nunca es mayor que `max` cuando ambos
+        existen, porque el backend valida la coherencia antes de responder.
+      additionalProperties: false
+      properties:
+        min:
+          type: number
+          format: double
+          minimum: 0.0001
+          description: Piso del presupuesto, en la moneda indicada.
+          example: 1800
+        max:
+          type: number
+          format: double
+          minimum: 0.0001
+          description: Techo del presupuesto, en la moneda indicada.
+          example: 2500
+        currency:
+          $ref: '#/components/schemas/Moneda'
+
+    ClientPreferences:
+      type: object
+      description: |
+        Preferencias estructuradas captadas por el asistente virtual
+        (`client_profile.preferences`, jsonb). El esquema declara las claves
+        conocidas del MVP, pero mantiene `additionalProperties: true` porque la
+        base no valida la forma: agregar una preferencia nueva no debe romper a
+        los clientes que ya consumen el contrato.
+      additionalProperties: true
+      properties:
+        mode:
+          $ref: '#/components/schemas/TransactionMode'
+        property_type:
+          $ref: '#/components/schemas/PropertyType'
+        districts:
+          type: array
+          description: Distritos mencionados por el cliente, en texto libre.
+          items:
+            type: string
+          example:
+            - Miraflores
+            - San Isidro
+        budget:
+          $ref: '#/components/schemas/ClientBudget'
+        bedrooms:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Número de dormitorios deseados.
+          example: 2
+        bathrooms:
+          type: number
+          format: double
+          minimum: 0
+          description: Número de baños deseados. Admite medios baños.
+          example: 2
+        parking:
+          type: boolean
+          description: Indica si el cliente exige cochera.
+          example: true
+        accepts_pets:
+          type: boolean
+          description: Indica si el cliente busca un inmueble que acepte mascotas.
+          example: true
+        required_features:
+          type: array
+          description: Características adicionales mencionadas por el cliente.
+          items:
+            type: string
+          example:
+            - ascensor
+            - cerca a transporte
+        extracted_at:
+          type: string
+          format: date-time
+          description: Momento en que el asistente extrajo las preferencias.
+          example: '2026-10-05T09:12:44Z'
+        source_message_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Mensaje del chat del que provinieron las preferencias.
+          example: 8f2c1a60-1b2c-4d3e-8f5a-6b7c8d9e0f1a
+
+    ClientProfileSummary:
+      type: object
+      description: |
+        Resumen de actividad del cliente, calculado sobre sus citas. Los
+        conteos no se suman necesariamente al total: `appointments_upcoming`
+        incluye `PENDING`, `CONFIRMED` y `RESCHEDULED` con `scheduled_at`
+        futuro, mientras que los demás son estados terminales.
+      additionalProperties: false
+      required:
+        - appointments_total
+        - appointments_upcoming
+        - appointments_completed
+        - appointments_cancelled
+        - appointments_no_show
+        - properties_total
+        - last_appointment_at
+        - next_appointment_at
+      properties:
+        appointments_total:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Total de citas registradas, en cualquier estado.
+          example: 6
+        appointments_upcoming:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Citas no terminales cuya fecha de visita aún no pasó.
+          example: 2
+        appointments_completed:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Citas en estado `COMPLETED`.
+          example: 3
+        appointments_cancelled:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Citas en estado `CANCELLED`.
+          example: 1
+        appointments_no_show:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Citas en estado `NO_SHOW`.
+          example: 0
+        properties_total:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Inmuebles distintos asociados a las citas del cliente.
+          example: 4
+        last_appointment_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Fecha de la cita más reciente ya realizada, o `null`.
+          example: '2026-09-28T16:00:00Z'
+        next_appointment_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Fecha de la próxima cita no terminal, o `null`.
+          example: '2026-10-08T15:00:00Z'
+
+    ClientProperty:
+      type: object
+      description: |
+        Inmueble asociado a las citas del cliente. Es una vista derivada de
+        `appointment.property`, no el esquema `Property` completo: la ficha del
+        inmueble se resuelve con `GET /api/v1/properties/{id}`.
+      additionalProperties: false
+      required:
+        - id
+        - title
+        - appointments_count
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador del inmueble.
+          example: b2c1f5a0-1a2b-4c3d-9e0f-111111111111
+        title:
+          type: string
+          description: Título del anuncio.
+          example: Departamento amoblado en Miraflores
+        district:
+          type: string
+          nullable: true
+          description: Distrito del inmueble.
+          example: Miraflores
+        address:
+          type: string
+          description: Dirección del inmueble.
+          example: Av. Larco 456, Miraflores
+        price:
+          type: number
+          format: double
+          minimum: 0.0001
+          description: Precio vigente del inmueble, en su moneda.
+          example: 2300.0
+        currency:
+          $ref: '#/components/schemas/Moneda'
+        property_type:
+          $ref: '#/components/schemas/PropertyType'
+        status:
+          $ref: '#/components/schemas/PropertyStatus'
+        is_active:
+          type: boolean
+          description: Indica si el inmueble sigue visible en el catálogo.
+          example: true
+        appointments_count:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Citas del cliente asociadas a este inmueble.
+          example: 2
+        last_appointment_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Última cita del cliente con este inmueble.
+          example: '2026-09-28T16:00:00Z'
+        next_appointment_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Próxima cita no terminal del cliente con este inmueble.
+          example: '2026-10-08T15:00:00Z'
+
+    ClientProfile:
+      type: object
+      description: |
+        Ficha CRM consolidada del cliente (HU-CRM-03). Reúne la cuenta de
+        usuario, el perfil comercial (`client_profile`), las preferencias
+        captadas y un resumen de las citas.
+
+        Los campos `budget_*`, `preferred_district`, `preferences` e
+        `interest_level` pueden ser `null` si el cliente aún no completó su
+        perfil CRM. `document_type` y `document_number` no se exponen.
+      additionalProperties: false
+      required:
+        - id
+        - full_name
+        - email
+        - phone
+        - is_active
+        - created_at
+        - updated_at
+        - summary
+        - associated_properties
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador del usuario cliente.
+          example: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+        full_name:
+          type: string
+          description: Nombre completo del cliente.
+          example: Maria Fernanda Quispe
+        email:
+          type: string
+          format: email
+          nullable: true
+          description: Correo de contacto.
+          example: maria.quispe@correo.com
+        phone:
+          type: string
+          nullable: true
+          description: Teléfono de contacto.
+          example: '+51 987 654 321'
+        is_active:
+          type: boolean
+          description: Indica si la cuenta puede operar en la plataforma.
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          description: Momento de creación de la cuenta.
+          example: '2026-01-12T10:15:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          description: |
+            Última modificación del perfil CRM. Si el cliente no tiene
+            `client_profile`, refleja la última modificación de la cuenta.
+          example: '2026-10-05T09:12:44Z'
+        budget_min:
+          type: number
+          format: double
+          minimum: 0.0001
+          nullable: true
+          description: Piso del presupuesto declarado, en `budget_currency`.
+          example: 1800
+        budget_max:
+          type: number
+          format: double
+          minimum: 0.0001
+          nullable: true
+          description: Techo del presupuesto declarado, en `budget_currency`.
+          example: 2500
+        budget_currency:
+          $ref: '#/components/schemas/Moneda'
+        preferred_district:
+          type: string
+          maxLength: 100
+          nullable: true
+          description: |
+            Distrito preferido en texto libre, tal como lo mencionó el cliente.
+            No es un `ubigeo`; la resolución a código ocurre en el módulo de
+            recomendaciones.
+          example: Miraflores
+        preferences:
+          type: object
+          allOf:
+            - $ref: '#/components/schemas/ClientPreferences'
+          nullable: true
+          description: Preferencias estructuradas captadas por el asistente.
+        interest_level:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 5
+          nullable: true
+          description: |
+            Nivel de interés consolidado de las visitas (1 a 5). Es un dato
+            interno de seguimiento comercial; no debe usarse para scoring
+            automático sin revisión de sesgo.
+          example: 4
+        summary:
+          $ref: '#/components/schemas/ClientProfileSummary'
+        associated_properties:
+          type: array
+          description: |
+            Inmuebles asociados a las citas del cliente, ordenados por la cita
+            más reciente descendente.
+          items:
+            $ref: '#/components/schemas/ClientProperty'
+
+    ClientHistoryType:
+      type: string
+      description: |
+        Tipo de entrada del historial del cliente. `APPOINTMENT` representa la
+        creación de una solicitud de visita; `STATUS_CHANGE`, una transición de
+        estado aceptada por la máquina de estados de citas.
+      enum:
+        - APPOINTMENT
+        - STATUS_CHANGE
+      example: STATUS_CHANGE
+
+    ClientHistoryEntry:
+      type: object
+      description: |
+        Entrada de la línea de tiempo del cliente. Los campos de estado y
+        horario describen el hecho en el momento en que ocurrió, mientras que
+        el objeto `appointment` es el estado vigente de la cita al consultar.
+        El frontend debe usar `occurred_at`, `status`, `scheduled_at` y
+        `reason` para pintar la línea de tiempo, y `appointment.id` para
+        enlazar al detalle actualizado.
+
+        En una entrada `APPOINTMENT`, `previous_status` y
+        `previous_scheduled_at` son `null` y `status` es siempre `PENDING`.
+      additionalProperties: false
+      required:
+        - id
+        - type
+        - occurred_at
+        - appointment
+        - status
+        - scheduled_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: |
+            Identificador de la entrada. Para `APPOINTMENT` coincide con el id
+            de la cita; para `STATUS_CHANGE`, con el id del registro de cambio.
+          example: 4d5e6f70-3c4d-5e6f-8a90-333333333333
+        type:
+          $ref: '#/components/schemas/ClientHistoryType'
+        occurred_at:
+          type: string
+          format: date-time
+          description: |
+            Momento del hecho, en UTC con sufijo `Z`. Es el campo por el que se
+            ordena y se filtra la línea de tiempo.
+          example: '2026-10-06T14:03:21Z'
+        appointment:
+          $ref: '#/components/schemas/Appointment'
+        previous_status:
+          type: string
+          nullable: true
+          description: |
+            Estado anterior a la transición; `null` en `APPOINTMENT`. Los
+            valores posibles son los mismos del enum `AppointmentStatus`.
+          example: PENDING
+        status:
+          $ref: '#/components/schemas/AppointmentStatus'
+        scheduled_at:
+          type: string
+          format: date-time
+          description: Horario de la visita vigente en el momento del hecho.
+          example: '2026-10-08T15:00:00Z'
+        previous_scheduled_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            Horario anterior en una reprogramación; `null` en `APPOINTMENT`.
+          example: '2026-10-08T15:00:00Z'
+        reason:
+          type: string
+          nullable: true
+          description: Motivo registrado para el cambio, si se envió.
+          example: El cliente confirmó la visita por teléfono.
+        changed_by:
+          type: object
+          nullable: true
+          description: |
+            Usuario que ejecutó el cambio de estado; `null` en `APPOINTMENT` o
+            cuando la cuenta del actor fue eliminada. Tiene la misma forma que
+            `AppointmentPersonRef`.
+          example:
+            id: 7c4a9d21-3b6e-4f80-9a2d-5e7c1b3f8d40
+            full_name: Brandy Sinche
+            email: brandy.sinche@housebrokerperu.com
+
+    PaginatedClientHistory:
+      type: object
+      description: |
+        Envoltorio paginado de la línea de tiempo del cliente. Replica la forma
+        de `PaginatedAppointments` para que el frontend reutilice un único
+        envoltorio de paginación.
+      additionalProperties: false
+      required:
+        - count
+        - next
+        - previous
+        - results
+      properties:
+        count:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Total de entradas que cumplen los filtros, sin paginar.
+          example: 8
+        next:
+          type: string
+          format: uri
+          nullable: true
+          description: |
+            URL absoluta de la siguiente página, arrastrando los filtros
+            activos, o `null` si la página solicitada es la última.
+          example: http://localhost:8000/api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/history?limit=3&page=2
+        previous:
+          type: string
+          format: uri
+          nullable: true
+          description: |
+            URL absoluta de la página anterior, o `null` si la página
+            solicitada es la primera.
+          example: null
+        results:
+          type: array
+          description: Entradas del historial correspondientes a la página.
+          items:
+            $ref: '#/components/schemas/ClientHistoryEntry'
 
     Problem:
       type: object
