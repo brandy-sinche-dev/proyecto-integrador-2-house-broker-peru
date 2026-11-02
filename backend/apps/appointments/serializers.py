@@ -16,8 +16,13 @@ from rest_framework import serializers
 
 from apps.properties.serializers import StrictFieldsSerializer
 
-from .models import Appointment
-from .services import format_iso_utc
+from .models import (
+    REASON_MAX_LENGTH,
+    REASON_MIN_LENGTH,
+    Appointment,
+    AppointmentStatus,
+)
+from .services import STATUS_INPUT_VALUES, format_iso_utc
 
 
 class UtcDateTimeField(serializers.DateTimeField):
@@ -59,6 +64,53 @@ class UserIdField(serializers.Field):
             return uuid.UUID(raw)
         except ValueError:
             self.fail("invalid")
+
+
+class AppointmentStatusInputSerializer(StrictFieldsSerializer):
+    """Cuerpo del `PATCH /api/v1/appointments/{id}/status`.
+
+    `status` no admite `PENDING`: el schema `AppointmentStatusInput` excluye el
+    estado de nacimiento a propósito. Las reglas cruzadas (`scheduled_at`
+    obligatorio al reprogramar, `reason` obligatorio al cancelar) viven en el
+    servicio para que el `code` y el `detail` sean los que documenta el spec.
+    """
+
+    status = serializers.ChoiceField(
+        choices=STATUS_INPUT_VALUES,
+        error_messages={
+            "invalid_choice": (
+                "El valor '{input}' no pertenece al conjunto permitido "
+                "(CONFIRMED, RESCHEDULED, COMPLETED, CANCELLED, NO_SHOW)."
+            )
+        },
+    )
+    scheduled_at = serializers.DateTimeField(required=False)
+    reason = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        trim_whitespace=True,
+        min_length=REASON_MIN_LENGTH,
+        max_length=REASON_MAX_LENGTH,
+    )
+
+
+class AppointmentStatusResultSerializer(serializers.Serializer):
+    """Lectura del `200` de `PATCH .../status` (`AppointmentStatusResult`)."""
+
+    id = serializers.UUIDField()
+    status = serializers.ChoiceField(choices=AppointmentStatus.choices)
+    previous_status = serializers.ChoiceField(choices=AppointmentStatus.choices)
+    scheduled_at = UtcDateTimeField()
+    previous_scheduled_at = UtcDateTimeField()
+    reason = serializers.CharField(allow_null=True, required=False)
+    changed_by = serializers.SerializerMethodField()
+    changed_at = UtcDateTimeField()
+
+    def get_changed_by(self, obj) -> str | None:
+        # Mismo criterio que `PropertyStatusResultSerializer`: el contrato tipa
+        # el campo como uuid, pero la pk del usuario propio todavía puede ser
+        # entera, así que se serializa a texto sin asumir el tipo.
+        return None if obj.changed_by is None else str(obj.changed_by)
 
 
 class AppointmentCreateInputSerializer(StrictFieldsSerializer):

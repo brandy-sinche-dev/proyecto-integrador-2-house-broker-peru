@@ -11,7 +11,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.db import models
-from django.db.models import Q
+from django.db.models import F, Q
 from django.utils import timezone
 
 from apps.properties.models import Property, PropertySchedule
@@ -173,3 +173,70 @@ class Appointment(models.Model):
 
     def __str__(self):
         return f"{self.property_id} · {self.scheduled_at:%Y-%m-%d %H:%M} ({self.status})"
+
+
+class AppointmentStatusChange(models.Model):
+    """Historial append-only de los cambios de estado (`data-model.md` §3.2).
+
+    La cita guarda su estado vigente; esta tabla guarda la cadena de "pasó de X
+    a Y, en este horario, por este motivo y por este actor". Es la pieza que
+    permite que `AppointmentStatusResult` devuelva `previous_status` y
+    `previous_scheduled_at` sin inventarlos, y la que un dashboard de auditoría
+    puede leer sin reconstruir nada.
+
+    `previous_scheduled_at` se guarda siempre, aunque no cambie: el contrato
+    devuelve ese dato en todas las transiciones para que el cliente pueda
+    revertir su actualización optimista.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    appointment = models.ForeignKey(
+        Appointment, on_delete=models.CASCADE, related_name="status_changes"
+    )
+    previous_status = models.CharField(
+        max_length=15, choices=AppointmentStatus.choices, null=True, blank=True
+    )
+    new_status = models.CharField(max_length=15, choices=AppointmentStatus.choices)
+    previous_scheduled_at = models.DateTimeField(null=True, blank=True)
+    new_scheduled_at = models.DateTimeField(null=True, blank=True)
+    reason = models.TextField(null=True, blank=True)
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="appointment_status_changes",
+    )
+    changed_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = "appointment_status_change"
+        ordering = ("-changed_at", "-id")
+        constraints = [
+            # `previous_status IS NULL` queda fuera del `CHECK` por la misma
+            # razón que en `property_status_change`: en SQL una comparación con
+            # `NULL` es `NULL`, y un `CHECK` que da `NULL` se considera cumplido.
+            models.CheckConstraint(
+                condition=~Q(previous_status=F("new_status")),
+                name="appointment_status_change_differs",
+            ),
+            models.CheckConstraint(
+                condition=Q(new_status__in=STATUS_VALUES),
+                name="appointment_status_change_new_status_check",
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.appointment_id} · {self.previous_status} -> "
+            f"{self.new_status} ({self.changed_at:%Y-%m-%d %H:%M})"
+        )
+
+    def save(self, *args, **kwargs):
+        """La tabla es append-only: un `UPDATE` es un bug, no una corrección."""
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise ValueError(
+                "appointment_status_change es append-only: inserte una fila de "
+                "corrección en vez de actualizar la existente."
+            )
+        super().save(*args, **kwargs)
