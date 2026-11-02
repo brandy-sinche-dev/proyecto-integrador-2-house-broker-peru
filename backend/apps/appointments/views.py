@@ -16,13 +16,14 @@ saber que existen las citas.
 from django.urls import reverse
 from rest_framework import status as http_status
 from rest_framework import viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.properties.pagination import PropertyPagination
 from apps.properties.permissions import IsAuthenticatedUser
-from apps.properties.problems import ProblemResponseMixin
+from apps.properties.problems import ProblemError, ProblemResponseMixin
 
 from . import emails, services
 from .filters import (
@@ -32,9 +33,12 @@ from .filters import (
     parse_appointment_filters,
 )
 from .models import Appointment
+from .permissions import CanChangeAppointmentStatus
 from .serializers import (
     AppointmentCreateInputSerializer,
     AppointmentSerializer,
+    AppointmentStatusInputSerializer,
+    AppointmentStatusResultSerializer,
 )
 
 APPOINTMENTS_PATH = "/api/v1/appointments"
@@ -66,13 +70,15 @@ class AppointmentViewSet(ProblemResponseMixin, viewsets.GenericViewSet):
 
     El listado (RF-CRM-02) hace de devolución al `405` de la colección: la
     agenda que se le muestra al usuario depende de su rol, y `role` permite
-    elegir explícitamente una de las perspectivas que ese rol cubre. Los demás
-    verbos del viewset (cambios de estado, reprogamación) son #97.
+    elegir explícitamente una de las perspectivas que ese rol cubre. El
+    `PATCH .../status` es la máquina de estados de RF-CRM-02.
     """
 
     permission_classes = [IsAuthenticatedUser]
     serializer_class = AppointmentSerializer
     pagination_class = PropertyPagination
+    lookup_field = "id"
+    lookup_value_regex = "[0-9a-f-]{36}"
     queryset = Appointment.objects.select_related(
         "property__district", "client", "agent"
     )
@@ -118,4 +124,57 @@ class AppointmentViewSet(ProblemResponseMixin, viewsets.GenericViewSet):
             AppointmentSerializer(appointment).data,
             status=http_status.HTTP_201_CREATED,
             headers={"Location": location},
+        )
+
+    @action(
+        detail=True,
+        methods=["patch"],
+        url_path="status",
+        permission_classes=[CanChangeAppointmentStatus],
+    )
+    def update_status(self, request, *args, **kwargs):
+        """`PATCH .../status` — aceptar, rechazar, reprogramar o cerrar.
+
+        El objeto se resuelve antes que el cuerpo a propósito: un `CLIENTE` que
+        intenta cambiar una cita ajena recibe `403` sin que su payload llegue a
+        validarse, y una cita inexistente responde `404` con el sobre del
+        contrato.
+        """
+        # `get_object()` levantaría un `Http404` que el manejador global deja
+        # con el sobre por defecto de DRF; el contrato pide
+        # `application/problem+json` también en el `404`.
+        appointment = self.get_queryset().filter(pk=self.kwargs["id"]).first()
+        if appointment is None:
+            raise ProblemError(
+                code="resource_not_found",
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail="No existe una cita con el identificador indicado.",
+            )
+        self.check_object_permissions(request, appointment)
+
+        payload = AppointmentStatusInputSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        validated = payload.validated_data
+
+        result = services.change_appointment_status(
+            appointment,
+            validated["status"],
+            scheduled_at=validated.get("scheduled_at"),
+            reason=validated.get("reason"),
+            actor=request.user,
+        )
+
+        # Igual que en el alta: el correo va después del cambio ya persistido.
+        # La repetición idempotente no genera un aviso nuevo.
+        if result.changed:
+            emails.send_status_change_emails(
+                appointment,
+                previous_status=result.previous_status,
+                previous_scheduled_at=result.previous_scheduled_at,
+                reason=result.reason,
+            )
+
+        return Response(
+            AppointmentStatusResultSerializer(result).data,
+            status=http_status.HTTP_200_OK,
         )

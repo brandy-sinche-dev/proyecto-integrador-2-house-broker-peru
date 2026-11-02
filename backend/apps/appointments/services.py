@@ -35,13 +35,75 @@ from apps.properties.permissions import ROLE_ADMIN, ROLE_AGENT, _role_of
 from apps.properties.problems import ProblemError
 from apps.properties.services import schedule_timezone
 
-from .models import ACTIVE_STATUSES, Appointment, AppointmentSource
+from .models import (
+    ACTIVE_STATUSES,
+    Appointment,
+    AppointmentSource,
+    AppointmentStatus,
+    AppointmentStatusChange,
+)
 
 User = get_user_model()
 
 # `openapi_spec.yaml`: la fecha va de hoy a 60 días vista adelante.
 BOOKING_HORIZON_DAYS = 60
 DATE_INPUT_FORMAT = "%Y-%m-%d"
+
+# Máquina de estados de `AppointmentStatus` (RF-CRM-02). La matriz sigue la
+# tabla de `docs/api/openapi_spec.yaml` (`PATCH /appointments/{id}/status`), que
+# es el contrato que consume el frontend. `PENDING` nunca es destino: una cita
+# nace ahí y ninguna transición válida la devuelve.
+STATUS_TRANSITIONS: dict[str, frozenset[str]] = {
+    AppointmentStatus.PENDING: frozenset(
+        {
+            AppointmentStatus.CONFIRMED,
+            AppointmentStatus.RESCHEDULED,
+            AppointmentStatus.CANCELLED,
+        }
+    ),
+    AppointmentStatus.CONFIRMED: frozenset(
+        {
+            AppointmentStatus.RESCHEDULED,
+            AppointmentStatus.COMPLETED,
+            AppointmentStatus.CANCELLED,
+            AppointmentStatus.NO_SHOW,
+        }
+    ),
+    AppointmentStatus.RESCHEDULED: frozenset(
+        {AppointmentStatus.CONFIRMED, AppointmentStatus.CANCELLED}
+    ),
+    AppointmentStatus.COMPLETED: frozenset(),
+    AppointmentStatus.CANCELLED: frozenset(),
+    AppointmentStatus.NO_SHOW: frozenset(),
+}
+
+TERMINAL_STATUSES = frozenset(
+    {
+        AppointmentStatus.COMPLETED,
+        AppointmentStatus.CANCELLED,
+        AppointmentStatus.NO_SHOW,
+    }
+)
+
+# Estados que el `PATCH` admite como destino: el schema excluye `PENDING`.
+STATUS_INPUT_VALUES = tuple(
+    status
+    for status in (
+        AppointmentStatus.CONFIRMED,
+        AppointmentStatus.RESCHEDULED,
+        AppointmentStatus.COMPLETED,
+        AppointmentStatus.CANCELLED,
+        AppointmentStatus.NO_SHOW,
+    )
+)
+
+# `CANCELLED` y `RESCHEDULED` se comunican al cliente por correo: el motivo es
+# parte del mensaje, no un campo opcional de auditoría.
+REASON_REQUIRED_STATUSES = frozenset(
+    {AppointmentStatus.CANCELLED, AppointmentStatus.RESCHEDULED}
+)
+
+STATUS_LABELS = dict(AppointmentStatus.choices)
 
 
 # -------------------------------------------------------------
@@ -187,13 +249,21 @@ def _day_window(day: date) -> tuple[datetime, datetime]:
 
 
 def _overlapping_appointments(
-    property_obj: Property, start: datetime, end: datetime, *, agent=None
+    property_obj: Property,
+    start: datetime,
+    end: datetime,
+    *,
+    agent=None,
+    exclude_id=None,
 ) -> Appointment | None:
     """Primera cita activa que ocupa `[start, end)`, o `None`.
 
     La consulta es la misma que impone el `EXCLUDE` de PostgreSQL, en las dos
     claves que los documentos piden (propiedad y agente): en SQLite, que es
     donde corre la suite, esta comprobación es la única garantía.
+
+    `exclude_id` deja fuera la propia cita al reprogramarla: si no, su horario
+    viejo se vería como un conflicto consigo misma.
     """
     occupied = Appointment.objects.filter(
         status__in=ACTIVE_STATUSES,
@@ -204,6 +274,8 @@ def _overlapping_appointments(
         occupied = occupied.filter(property=property_obj)
     else:
         occupied = occupied.filter(agent=agent)
+    if exclude_id is not None:
+        occupied = occupied.exclude(pk=exclude_id)
     return occupied.order_by("scheduled_at").first()
 
 
@@ -497,3 +569,317 @@ def create_appointment(
         if occupied is None:
             raise
         raise _slot_conflict(match, scheduled_at, occupied) from None
+
+
+# -------------------------------------------------------------
+# Transiciones de estado (RF-CRM-02)
+# -------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class StatusChange:
+    """Resultado de `change_appointment_status`, tal como lo ve el cliente."""
+
+    id: object
+    status: str
+    previous_status: str
+    scheduled_at: datetime
+    previous_scheduled_at: datetime
+    reason: str | None
+    changed_by: object
+    changed_at: datetime
+    # `False` en la repetición idempotente: la vista no reenvía correos ni la
+    # API finge un cambio que no ocurrió.
+    changed: bool = True
+
+
+def allowed_transitions(status: str) -> frozenset[str]:
+    return STATUS_TRANSITIONS.get(status, frozenset())
+
+
+def validate_transition(current: str, target: str) -> None:
+    """Rechaza una transición que la matriz no permite.
+
+    El caso que el contrato destaca es una cita en estado terminal: una visita
+    ya `COMPLETED` no se puede cancelar. El `400` usa
+    `invalid_appointment_transition`, el mismo `code` que el `PATCH` documenta.
+    """
+    if target in allowed_transitions(current):
+        return
+    if current in TERMINAL_STATUSES:
+        detail = (
+            f"No se puede pasar de '{current}' a '{target}'. "
+            "COMPLETED, CANCELLED y NO_SHOW son estados terminales."
+        )
+    else:
+        detail = f"No se puede pasar de '{current}' a '{target}'."
+    raise ProblemError(
+        code="invalid_appointment_transition",
+        detail=detail,
+        errors=[
+            {
+                "parameter": "status",
+                "message": f"La transición {current} -> {target} no está permitida.",
+            }
+        ],
+    )
+
+
+def _validate_status_payload(target: str, scheduled_at) -> None:
+    """Aplica la regla `scheduled_at` del contrato.
+
+    Obligatorio al reprogramar y prohibido en cualquier otra transición, para
+    que "reprogramar" y "mover una cita sin cambiar su estado" no se confundan.
+    """
+    if target == AppointmentStatus.RESCHEDULED and scheduled_at is None:
+        raise ProblemError(
+            code="invalid_query_parameter",
+            detail="El campo 'scheduled_at' es obligatorio para reprogramar una cita.",
+            errors=[
+                {
+                    "parameter": "scheduled_at",
+                    "message": (
+                        "Este campo es obligatorio cuando 'status' es RESCHEDULED."
+                    ),
+                }
+            ],
+        )
+    if target != AppointmentStatus.RESCHEDULED and scheduled_at is not None:
+        raise ProblemError(
+            code="invalid_query_parameter",
+            detail=(
+                "El campo 'scheduled_at' solo se admite cuando 'status' es "
+                "RESCHEDULED."
+            ),
+            errors=[
+                {
+                    "parameter": "scheduled_at",
+                    "message": (
+                        "Enviar 'scheduled_at' solo tiene sentido junto a "
+                        "'status: RESCHEDULED'."
+                    ),
+                }
+            ],
+        )
+
+
+def _validate_reason(target: str, reason: str | None) -> None:
+    if target in REASON_REQUIRED_STATUSES and not reason:
+        raise ProblemError(
+            code="invalid_query_parameter",
+            detail=(
+                "El campo 'reason' es obligatorio para cancelar o reprogramar "
+                "una cita."
+            ),
+            errors=[
+                {
+                    "parameter": "reason",
+                    "message": (
+                        "Este campo es obligatorio cuando 'status' es CANCELLED "
+                        "o RESCHEDULED."
+                    ),
+                }
+            ],
+        )
+
+
+def _reschedule_target(appointment: Appointment, scheduled_at: datetime, now: datetime):
+    """Valida el horario nuevo y devuelve la franja materializada que le toca."""
+    tz = schedule_tz()
+    day = scheduled_at.astimezone(tz).date()
+    validate_horizon(
+        day,
+        parameter="scheduled_at",
+        past_detail="No se puede reprogramar una visita a una fecha pasada.",
+    )
+    if scheduled_at <= now:
+        raise ProblemError(
+            code="invalid_query_parameter",
+            detail=(
+                "No se puede reprogramar una visita a un horario que ya pasó."
+            ),
+            errors=[
+                {
+                    "parameter": "scheduled_at",
+                    "message": (
+                        f"El valor '{format_iso_utc(scheduled_at)}' es anterior "
+                        f"a la hora actual ({format_iso_utc(now)})."
+                    ),
+                }
+            ],
+        )
+
+    match = _match_slot(materialize_day(appointment.property, day), scheduled_at)
+    if match is None:
+        raise _unmatched_message(
+            appointment.property, day, scheduled_at, now
+        )
+
+    conflict = _overlapping_appointments(
+        appointment.property,
+        match.start_at,
+        match.end_at,
+        exclude_id=appointment.pk,
+    ) or _overlapping_appointments(
+        appointment.property,
+        match.start_at,
+        match.end_at,
+        agent=appointment.agent,
+        exclude_id=appointment.pk,
+    )
+    if conflict is not None:
+        raise _slot_conflict(match, scheduled_at, conflict)
+    return match
+
+
+def _apply_transition(
+    appointment: Appointment,
+    target: str,
+    match: MaterializedSlot | None,
+    now: datetime,
+) -> list[str]:
+    """Escribe el estado y los sellos de tiempo; devuelve los `update_fields`."""
+    update_fields = ["status", "updated_at"]
+    appointment.status = target
+
+    if target == AppointmentStatus.CONFIRMED:
+        appointment.confirmed_at = now
+        update_fields.append("confirmed_at")
+    elif target == AppointmentStatus.CANCELLED:
+        appointment.cancelled_at = now
+        update_fields.append("cancelled_at")
+    elif target == AppointmentStatus.COMPLETED:
+        appointment.completed_at = now
+        update_fields.append("completed_at")
+    elif target == AppointmentStatus.RESCHEDULED:
+        # El bloque viejo queda libre en cuanto esta fila cambia de horario,
+        # porque `available-slots` solo mira los estados de `ACTIVE_STATUSES`.
+        appointment.schedule_slot = match.schedule_slot
+        appointment.scheduled_at = match.start_at
+        appointment.duration_minutes = match.duration_minutes
+        appointment.end_at = match.start_at + timedelta(
+            minutes=match.duration_minutes
+        )
+        # Vuelve a quedar pendiente de reconfirmar.
+        appointment.confirmed_at = None
+        appointment.reschedule_count = (appointment.reschedule_count or 0) + 1
+        update_fields.extend(
+            [
+                "schedule_slot",
+                "scheduled_at",
+                "duration_minutes",
+                "end_at",
+                "confirmed_at",
+                "reschedule_count",
+            ]
+        )
+    return update_fields
+
+
+@transaction.atomic
+def change_appointment_status(
+    appointment: Appointment,
+    target: str,
+    *,
+    scheduled_at: datetime | None = None,
+    reason: str | None = None,
+    actor=None,
+    now: datetime | None = None,
+) -> StatusChange:
+    """Aplica una transición válida y deja constancia en el historial.
+
+    Orden deliberado: primero la forma del cuerpo (`scheduled_at` y `reason`),
+    después la matriz de estados, y al final el horario nuevo, que es lo único
+    que puede chocar con otra cita. La idempotencia se resuelve después de
+    validar la matriz: repetir el mismo `status` devuelve `200` sin fila de
+    historial, sin correo y sin tocar `updated_at`.
+    """
+    now = now if now is not None else timezone.now()
+    target = str(target)
+    current = appointment.status
+    cleaned_reason = (reason or "").strip() or None
+
+    _validate_status_payload(target, scheduled_at)
+    _validate_reason(target, cleaned_reason)
+
+    if target == current:
+        if (
+            target == AppointmentStatus.RESCHEDULED
+            and scheduled_at != appointment.scheduled_at
+        ):
+            # Reprogramar de nuevo exige pasar antes por CONFIRMED: la matriz
+            # no admite RESCHEDULED -> RESCHEDULED con otro horario.
+            validate_transition(current, target)
+        return StatusChange(
+            id=appointment.id,
+            status=current,
+            previous_status=current,
+            scheduled_at=appointment.scheduled_at,
+            previous_scheduled_at=appointment.scheduled_at,
+            reason=cleaned_reason,
+            changed_by=getattr(actor, "pk", None),
+            changed_at=now,
+            changed=False,
+        )
+
+    validate_transition(current, target)
+
+    match = None
+    if target == AppointmentStatus.RESCHEDULED:
+        match = _reschedule_target(appointment, scheduled_at, now)
+
+    previous_status = current
+    previous_scheduled_at = appointment.scheduled_at
+    update_fields = _apply_transition(appointment, target, match, now)
+
+    try:
+        with transaction.atomic():
+            appointment.save(update_fields=update_fields)
+    except IntegrityError:
+        # Carrera con otra reprogramación: el índice único parcial o el
+        # `EXCLUDE` de PostgreSQL rechazan el horario que la consulta previa no
+        # llegó a ver. La vista lo traduce al `409` documentado.
+        conflict = _overlapping_appointments(
+            appointment.property,
+            appointment.scheduled_at,
+            appointment.end_at,
+            exclude_id=appointment.pk,
+        ) or _overlapping_appointments(
+            appointment.property,
+            appointment.scheduled_at,
+            appointment.end_at,
+            agent=appointment.agent,
+            exclude_id=appointment.pk,
+        )
+        if conflict is None:
+            raise
+        raise ProblemError(
+            code="appointment_slot_conflict",
+            status_code=409,
+            detail=(
+                f"El horario '{format_iso_utc(appointment.scheduled_at)}' ya "
+                f"esta ocupado por la cita {conflict.id}."
+            ),
+        ) from None
+
+    change = AppointmentStatusChange.objects.create(
+        appointment=appointment,
+        previous_status=previous_status,
+        new_status=target,
+        previous_scheduled_at=previous_scheduled_at,
+        new_scheduled_at=appointment.scheduled_at,
+        reason=cleaned_reason,
+        changed_by=actor if getattr(actor, "is_authenticated", False) else None,
+        changed_at=now,
+    )
+
+    return StatusChange(
+        id=appointment.id,
+        status=appointment.status,
+        previous_status=previous_status,
+        scheduled_at=appointment.scheduled_at,
+        previous_scheduled_at=previous_scheduled_at,
+        reason=cleaned_reason,
+        changed_by=change.changed_by_id,
+        changed_at=change.changed_at,
+    )

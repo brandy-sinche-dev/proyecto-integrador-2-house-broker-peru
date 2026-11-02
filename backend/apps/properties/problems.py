@@ -68,6 +68,10 @@ ERROR_TYPES = {
         "https://housebroker.pe/errors/appointment-slot-conflict",
         "Conflicto de horario de cita",
     ),
+    "invalid_appointment_transition": (
+        "https://housebroker.pe/errors/invalid-appointment-transition",
+        "Transición de estado de cita no permitida",
+    ),
     "unauthorized": (
         "https://housebroker.pe/errors/unauthorized",
         "No autenticado",

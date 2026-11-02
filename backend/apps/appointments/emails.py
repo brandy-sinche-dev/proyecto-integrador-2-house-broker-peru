@@ -11,7 +11,7 @@ import logging
 from django.conf import settings
 from django.core.mail import send_mail
 
-from .services import schedule_tz
+from .services import STATUS_LABELS, schedule_tz
 
 logger = logging.getLogger(__name__)
 
@@ -115,3 +115,64 @@ def send_appointment_emails(appointment) -> None:
         subject=f"Nueva visita por confirmar — {title}",
         body=_agent_message(appointment),
     )
+
+
+def _status_message(
+    appointment, *, previous_status, previous_scheduled_at, reason
+) -> str:
+    """Resumen común para ambas partes: qué cambió, cuándo y por qué."""
+    prop = appointment.property
+    district = prop.district.name if prop.district_id else None
+    city = f"{prop.address}, {district}" if district else prop.address
+    lines = [
+        f"Inmueble: {prop.title}",
+        f"Dirección: {city}",
+        f"Fecha y hora: {format_when(appointment.scheduled_at)} (America/Lima)",
+    ]
+    if previous_scheduled_at and previous_scheduled_at != appointment.scheduled_at:
+        lines.append(
+            f"Horario anterior: {format_when(previous_scheduled_at)} (America/Lima)"
+        )
+    lines.extend(
+        [
+            f"Duración: {appointment.duration_minutes} minutos",
+            f"Código de la cita: {appointment.id}",
+            "",
+            f"Estado anterior: {STATUS_LABELS.get(previous_status, previous_status)}",
+            f"Estado nuevo: {STATUS_LABELS.get(appointment.status, appointment.status)}",
+        ]
+    )
+    if reason:
+        lines.extend(["", f"Motivo: {reason}"])
+    return "\n".join(lines)
+
+
+def send_status_change_emails(
+    appointment, *, previous_status, previous_scheduled_at, reason=None
+) -> None:
+    """Avisa a cliente y agente de cualquier cambio de estado. Nunca lanza.
+
+    El correo es un efecto posterior a la transición: si el buzón falla, la
+    cita ya cambió y `_send` solo deja el error en el log. Se deduplica por
+    dirección para no mandar dos veces el mismo mensaje cuando una cita de
+    pruebas tiene al mismo usuario como cliente y agente.
+    """
+    title = appointment.property.title
+    label = STATUS_LABELS.get(appointment.status, appointment.status)
+    body = _status_message(
+        appointment,
+        previous_status=previous_status,
+        previous_scheduled_at=previous_scheduled_at,
+        reason=reason,
+    )
+    recipients = []
+    for person in (appointment.client, appointment.agent):
+        if person.email and person.email not in recipients:
+            recipients.append(person.email)
+
+    for recipient in recipients:
+        _send(
+            to=recipient,
+            subject=f"Cita {label.lower()} — {title}",
+            body=f"Hola,\n\nLa cita de la visita cambió de estado.\n\n{body}\n\n— HouseBroker Perú",
+        )
