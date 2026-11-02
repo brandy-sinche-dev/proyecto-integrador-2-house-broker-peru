@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'apps.properties',
     'apps.appointments',
     'apps.users',
+    'apps.clients',
 ]
 
 MIDDLEWARE = [

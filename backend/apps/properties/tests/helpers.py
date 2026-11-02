@@ -7,6 +7,7 @@ repetir el mismo `objects.create` de cinco líneas en cada caso.
 from django.contrib.auth import get_user_model
 
 from apps.properties.models import District, Property, PropertyImage, PropertyStatus
+from apps.users.models import UserProfile
 
 User = get_user_model()
 
@@ -29,6 +30,10 @@ def make_user(username, role=None, staff=False, superuser=False):
     )
     if role:
         user.role = role
+        UserProfile.objects.update_or_create(
+            user=user,
+            defaults={"full_name": username, "role": role},
+        )
     if staff or superuser:
         user.is_staff = staff or superuser
         user.is_superuser = superuser

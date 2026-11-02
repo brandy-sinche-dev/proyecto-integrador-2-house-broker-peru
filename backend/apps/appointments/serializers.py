@@ -147,11 +147,13 @@ class AppointmentPersonRefSerializer(serializers.Serializer):
     phone = serializers.SerializerMethodField()
 
     def get_full_name(self, obj):
-        # Mismo criterio que `properties.SellerSerializer`: el usuario propio
-        # todavía no tiene columna `full_name`, y un usuario sin nombre real
-        # no debe salir con un string vacío.
+        # El nombre real vive en `UserProfile`, no en la cuenta de Django. El
+        # fallback conserva el comportamiento anterior para usuarios creados
+        # sin perfil.
+        profile = getattr(obj, "profile", None)
         return (
-            getattr(obj, "full_name", "")
+            (getattr(profile, "full_name", "") if profile is not None else "")
+            or getattr(obj, "full_name", "")
             or obj.get_full_name()
             or obj.get_username()
         )
@@ -160,8 +162,9 @@ class AppointmentPersonRefSerializer(serializers.Serializer):
         return obj.email or None
 
     def get_phone(self, obj):
-        # `django.contrib.auth.User` no tiene `phone` todavía; el getattr lo
-        # devuelve en cuanto `TASK-BACK-SEC-01` agregue el perfil.
+        profile = getattr(obj, "profile", None)
+        if profile is not None:
+            return getattr(profile, "phone", None) or None
         return getattr(obj, "phone", None) or None
 
 
