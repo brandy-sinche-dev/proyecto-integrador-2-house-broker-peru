@@ -2,7 +2,12 @@
 
 from django.urls import path
 
-from .views import ClientHistoryView, ClientProfileView
+from .views import (
+    ClientHistoryView,
+    ClientNoteDetailView,
+    ClientNoteListCreateView,
+    ClientProfileView,
+)
 
 urlpatterns = [
     path(
@@ -14,5 +19,15 @@ urlpatterns = [
         "clients/<str:id>/history",
         ClientHistoryView.as_view(),
         name="client-history",
+    ),
+    path(
+        "clients/<str:id>/notes",
+        ClientNoteListCreateView.as_view(),
+        name="client-note-list",
+    ),
+    path(
+        "clients/<str:id>/notes/<str:note_id>",
+        ClientNoteDetailView.as_view(),
+        name="client-note-detail",
     ),
 ]

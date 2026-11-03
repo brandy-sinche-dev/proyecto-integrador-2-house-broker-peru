@@ -43,6 +43,8 @@ from apps.properties.permissions import ROLE_ADMIN, ROLE_AGENT, ROLE_CLIENT, _ro
 from apps.properties.problems import ProblemError
 from apps.properties.services import schedule_timezone
 
+from .models import ClientNote
+
 User = get_user_model()
 
 HISTORY_TYPES = ("APPOINTMENT", "STATUS_CHANGE")
@@ -497,3 +499,94 @@ def build_client_history(client, filters: HistoryFilters) -> _EntryList:
         reverse=True,
     )
     return _EntryList(entries)
+
+
+# -------------------------------------------------------------
+# Observaciones de atención (HU-CRM-04)
+# -------------------------------------------------------------
+
+NOTE_NOT_FOUND_DETAIL = (
+    "La observación no existe o no pertenece al cliente indicado."
+)
+
+
+def _note_not_found() -> ProblemError:
+    return ProblemError(
+        code="resource_not_found",
+        status_code=404,
+        detail=NOTE_NOT_FOUND_DETAIL,
+    )
+
+
+def _parse_note_pk(raw):
+    """Convierte `{note_id}` a UUID; un valor malformado es un `404`."""
+    try:
+        return uuid.UUID(str(raw).strip())
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
+def list_client_notes(client):
+    """Notas vivas del cliente, de la más reciente a la más antigua.
+
+    `select_related` evita una consulta por nota al serializar el autor y la
+    cita. El orden coincide con el índice `(client, -created_at)` del modelo y
+    desempata por `id` para que la paginación sea estable.
+    """
+    return (
+        ClientNote.objects.filter(client=client, deleted_at__isnull=True)
+        .select_related("author__profile", "appointment")
+        .order_by("-created_at", "-id")
+    )
+
+
+def resolve_note(client, raw_note_id):
+    """La nota del cliente, incluida la ya eliminada lógicamente.
+
+    Incluir `deleted_at` es lo que permite que un segundo `DELETE` devuelva
+    `204` en vez de `404`. La nota de otro cliente no se distingue de una
+    inexistente.
+    """
+    pk = _parse_note_pk(raw_note_id)
+    if pk is None:
+        raise _note_not_found()
+    note = (
+        ClientNote.objects.select_related("author__profile", "appointment")
+        .filter(pk=pk, client=client)
+        .first()
+    )
+    if note is None:
+        raise _note_not_found()
+    return note
+
+
+def create_client_note(client, author, data):
+    """Crea la nota fijando cliente y autor desde fuera del cuerpo."""
+    appointment_id = data.get("appointment_id")
+    if appointment_id is not None:
+        belongs = Appointment.objects.filter(
+            pk=appointment_id, client=client
+        ).exists()
+        if not belongs:
+            raise ProblemError(
+                code="invalid_appointment_reference",
+                detail=(
+                    "La cita indicada no existe o no está asociada al cliente."
+                ),
+                errors=[
+                    {
+                        "parameter": "appointment_id",
+                        "message": "La cita indicada no pertenece a este cliente.",
+                    }
+                ],
+            )
+    return ClientNote.objects.create(client=client, author=author, **data)
+
+
+def soft_delete_client_note(note):
+    """Marca la nota como eliminada sin borrarla de la base."""
+    if note.deleted_at is not None:
+        return note
+    note.deleted_at = timezone.now()
+    note.save(update_fields=["deleted_at"])
+    return note

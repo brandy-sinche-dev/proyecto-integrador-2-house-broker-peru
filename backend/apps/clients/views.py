@@ -13,16 +13,22 @@ from rest_framework.views import APIView
 from apps.properties.pagination import PropertyPagination
 from apps.properties.problems import ProblemResponseMixin
 
-from .permissions import IsAgentOrAdmin
+from .permissions import IsAgentOrAdmin, IsClientNoteAgentOrAdmin
 from .serializers import (
     ClientHistoryEntrySerializer,
+    ClientNoteCreateInputSerializer,
+    ClientNoteSerializer,
     ClientProfileSerializer,
 )
 from .services import (
     build_client_history,
     build_client_profile,
+    create_client_note,
+    list_client_notes,
     parse_history_filters,
     resolve_client,
+    resolve_note,
+    soft_delete_client_note,
 )
 
 
@@ -69,3 +75,69 @@ class ClientHistoryView(ProblemResponseMixin, APIView):
 
         serializer = ClientHistoryEntrySerializer(entries, many=True)
         return Response(serializer.data)
+
+
+class ClientNoteListCreateView(ProblemResponseMixin, APIView):
+    """`GET` y `POST /api/v1/clients/{id}/notes` (HU-CRM-04)."""
+
+    permission_classes = [IsClientNoteAgentOrAdmin]
+    forbidden_detail = (
+        "Las observaciones de atención solo están disponibles para agentes y "
+        "administradores."
+    )
+
+    def get(self, request, id):
+        client = resolve_client(id)
+        self.check_object_permissions(request, client)
+
+        paginator = PropertyPagination()
+        queryset = list_client_notes(client)
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        if page is not None:
+            serializer = ClientNoteSerializer(page, many=True)
+            response = paginator.get_paginated_response(serializer.data)
+            response["X-Total-Count"] = paginator.page.paginator.count
+            return response
+
+        serializer = ClientNoteSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def post(self, request, id):
+        client = resolve_client(id)
+        self.check_object_permissions(request, client)
+
+        serializer = ClientNoteCreateInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        note = create_client_note(
+            client, request.user, serializer.validated_data
+        )
+        response = Response(
+            ClientNoteSerializer(note).data,
+            status=http_status.HTTP_201_CREATED,
+        )
+        response["Location"] = request.build_absolute_uri(
+            f"/api/v1/clients/{client.pk}/notes/{note.pk}"
+        )
+        return response
+
+
+class ClientNoteDetailView(ProblemResponseMixin, APIView):
+    """`DELETE /api/v1/clients/{id}/notes/{note_id}` (HU-CRM-04)."""
+
+    permission_classes = [IsClientNoteAgentOrAdmin]
+    forbidden_detail = (
+        "Las observaciones de atención solo están disponibles para agentes y "
+        "administradores."
+    )
+    note_forbidden_detail = (
+        "Solo el agente autor de la nota o un administrador pueden eliminarla."
+    )
+
+    def delete(self, request, id, note_id):
+        client = resolve_client(id)
+        self.check_object_permissions(request, client)
+
+        note = resolve_note(client, note_id)
+        self.check_object_permissions(request, note)
+        soft_delete_client_note(note)
+        return Response(status=http_status.HTTP_204_NO_CONTENT)
