@@ -2,9 +2,9 @@
 
 Contratos REST del backend (Django REST Framework) bajo especificación **OpenAPI 3.0**.
 
-> **Tarea actual:** [TASK-ARC-CRM-03] Especificación OpenAPI 3.0 para la ficha
-> e historial del cliente —
-> [issue #145](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/145) (HU-CRM-03).
+> **Tarea actual:** [TASK-ARC-CRM-04] Especificación OpenAPI 3.0 para el
+> registro de observaciones y notas de atención —
+> [issue #152](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/152) (HU-CRM-04).
 
 ## Archivo único de contrato
 
@@ -26,6 +26,7 @@ que al cierre (Sprint 7) exista un solo `.yml` con la API completa.
 | 1.8.0 | Sprint 4 | `TASK-ARC-PROP-05` | [#104](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/104) | Favoritos por usuario: `GET`/`POST /favorites/` y `DELETE /favorites/{property_id}/` (HU-PROP-05) |
 | 1.9.0 | Sprint 5 | `TASK-ARC-CRM-03` | [#145](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/145) | Ficha (`GET /clients/{id}/profile`) e historial (`GET /clients/{id}/history`) del cliente (HU-CRM-03) |
 | 1.10.0 | Sprint 5 | `TASK-BACK-CRM-03` | [#148](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/148) | `favorite_properties_total` en `ClientProfileSummary`, para que la ficha informe los inmuebles favoritos junto a los asociados a citas (HU-CRM-03) |
+| 1.11.0 | Sprint 5 | `TASK-ARC-CRM-04` | [#152](https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru/issues/152) | Notas y observaciones de atención: `GET`/`POST /clients/{id}/notes` y `DELETE /clients/{id}/notes/{note_id}` (HU-CRM-04) |
 
 Al crecer el documento, extrae las secciones a `components/schemas` y referencia
 con `$ref`. No dupliques esquemas entre operaciones.
@@ -61,6 +62,9 @@ el schema en el mismo commit.
 | PATCH | `/api/v1/appointments/{id}/status` | `updateAppointmentStatus` — estado de cita | 4 |
 | GET | `/api/v1/clients/{id}/profile` | `getClientProfile` — ficha consolidada | 5 |
 | GET | `/api/v1/clients/{id}/history` | `getClientHistory` — línea de tiempo paginada | 5 |
+| GET | `/api/v1/clients/{id}/notes` | `listClientNotes` — observaciones cronológicas paginadas | 5 |
+| POST | `/api/v1/clients/{id}/notes` | `createClientNote` — registro de una observación | 5 |
+| DELETE | `/api/v1/clients/{id}/notes/{note_id}` | `deleteClientNote` — eliminación lógica autorizada | 5 |
 
 ## Catálogo paginado (HU-PROP-02)
 
@@ -1053,6 +1057,119 @@ el rol `CLIENTE`, donde el problema es el rol y no la existencia del recurso.
 | `404` | `ProblemNotFound` | Cliente inexistente, no es `CLIENTE` o no está asignado al agente |
 | `500` | `ProblemInternalServerError` | Error no controlado |
 
+## Observaciones y notas de atención (HU-CRM-04)
+
+`TASK-ARC-CRM-04` especifica el registro de notas u observaciones de atención
+del agente sobre el cliente (RF-CRM-04). Los tres endpoints se incorporan al
+contrato acumulado `openapi_spec.yaml`, no a un `crm-v1.yaml` aparte.
+
+| Método | Ruta | Operación |
+|---|---|---|
+| GET | `/api/v1/clients/{id}/notes` | `listClientNotes` |
+| POST | `/api/v1/clients/{id}/notes` | `createClientNote` |
+| DELETE | `/api/v1/clients/{id}/notes/{note_id}` | `deleteClientNote` |
+
+### La nota vive en el cliente, no solo en la cita
+
+El contrato modela `ClientNote` como una colección asociada al cliente, con
+`appointment_id` **opcional**. La razón es el flujo de la ficha: el agente
+registra notas rápidas desde el perfil del cliente, y no toda observación nace
+de una visita (una llamada de seguimiento, una contraoferta por teléfono o un
+cambio de preferencia no tienen cita asociada).
+
+Esto obliga a `TASK-BACK-CRM-04` a decidir la persistencia. `docs/database/data-model.md`
+§3.3 define `visit_observation` con `appointment_id` obligatorio y único por
+cita, así que **no alcanza tal cual** para las notas sin visita. Las opciones
+coherentes con este contrato son:
+
+1. Crear una tabla `client_note` con FK a cliente y a autor, y `appointment_id`
+   anulable. Es la opción que refleja directamente los esquemas de la API.
+2. Reutilizar `visit_observation` relajando el `NOT NULL` y el `UNIQUE` de
+   `appointment_id`, aceptando que una fila puede no tener cita.
+
+El campo único `client_profile.notes` tampoco alcanza: la historia pide una
+lista cronológica con autoría y borrado individual, no un texto sobrescribible.
+
+### Orden, paginación y forma
+
+`GET .../notes` devuelve `PaginatedClientNotes` y reutiliza `page`/`limit` del
+catálogo. El orden es `created_at` descendente, con desempate por `id`
+descendente: lo más reciente aparece primero, que es el orden de trabajo del
+agente, y el desempate evita que una paginación inestable repita u omita notas
+con el mismo timestamp.
+
+Cada `ClientNote` incluye:
+
+| Campo | Obligatorio | Origen |
+|---|---|---|
+| `id`, `created_at` | sí | Servidor |
+| `client_id` | sí | Cliente de la ruta |
+| `author` | sí | `sub` del access token, con forma de `AppointmentPersonRef` |
+| `body` | sí | Texto de 1 a 2000 caracteres |
+| `appointment_id` | no | Cita que originó la nota; `null` si no hay visita |
+| `interest_level` | no | Entero 1–5, o `null` |
+| `client_showed_up` | no | Booleano, o `null` |
+| `counteroffer_amount` / `counteroffer_currency` | no | Van juntos o ambos son `null` |
+| `followup_at` | no | Recordatorio de seguimiento, o `null` |
+
+`ClientNoteCreateInput` declara `additionalProperties: false`: `author`,
+`client_id` y `created_at` **no se aceptan en el cuerpo**. El autor siempre sale
+del token, para que un agente no pueda atribuir una nota a otra persona.
+
+### Permisos y autoría
+
+| Operación | `AGENTE` | `ADMINISTRADOR` | `CLIENTE` |
+|---|---|---|---|
+| `GET` | Clientes con citas asignadas a su cuenta | Cualquier cliente | `403` |
+| `POST` | Clientes con citas asignadas a su cuenta | Cualquier cliente | `403` |
+| `DELETE` | Solo sus propias notas | Cualquier nota | `403` |
+
+Un agente asignado al cliente puede **leer** todas las notas, pero solo puede
+borrar las que él escribió. La autoría es el dato que impide que un agente
+reescriba la evaluación comercial de otro. Si la nota existe pero no es suya, la
+respuesta es `403 forbidden` con un `detail` accionable; si el cliente no es
+visible para el agente, la respuesta es `404 resource_not_found`, igual que en
+la ficha y el historial.
+
+### El `DELETE` es lógico e idempotente
+
+`DELETE .../notes/{note_id}` marca la nota como eliminada (`deleted_at`) en vez
+de borrarla físicamente. Así se conserva la trazabilidad de lo que el agente
+observó y de quién lo eliminó. La nota deja de aparecer en el `GET`, pero su
+registro permanece para auditoría.
+
+Repetir el `DELETE` devuelve `204` sin efectos adicionales, para que un reintento
+de red no se traduzca en un error. Un `404` significa que la nota nunca existió,
+pertenece a otro cliente o el cliente no es visible para el agente; los tres
+casos se responden igual para no revelar recursos ajenos.
+
+### Matriz de errores
+
+| Código | Esquema | Cuándo |
+|---|---|---|
+| `400` | `ProblemBadRequest` | `body` vacío o demasiado largo, `interest_level` fuera de rango, paginación inválida |
+| `400` | `ProblemBadRequest` | `invalid_counteroffer`: monto y moneda de contraoferta no van juntos |
+| `400` | `ProblemBadRequest` | `invalid_appointment_reference`: `appointment_id` no existe o no es del cliente |
+| `401` | `ProblemUnauthorized` | Token ausente, vencido o con firma inválida |
+| `403` | `ProblemForbidden` | Rol `CLIENTE`, o agente que no es autor de la nota al eliminar |
+| `404` | `ProblemNotFound` | Cliente invisible, nota inexistente o nota de otro cliente |
+| `500` | `ProblemInternalServerError` | Error no controlado |
+
+```bash
+# listar las observaciones del cliente
+curl -H "Authorization: Bearer $ACCESS" \
+  "http://localhost:8000/api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/notes?page=1&limit=20"
+
+# registrar una observación asociada a una visita
+curl -X POST http://localhost:8000/api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/notes \
+  -H "Authorization: Bearer $ACCESS" -H "Content-Type: application/json" \
+  -d '{"body":"El cliente pidió evaluar una contraoferta.","appointment_id":"a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e","interest_level":4,"counteroffer_amount":2350.0,"counteroffer_currency":"PEN"}'
+
+# eliminar una nota propia (idempotente: repetirlo devuelve 204)
+curl -X DELETE http://localhost:8000/api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/notes/5e6f7081-4d5e-6f70-9a01-444444444444 \
+  -H "Authorization: Bearer $ACCESS"
+```
+
 ## Validación con Spectral
 
 El ruleset `.spectral.yaml` (en esta carpeta) extiende `spectral:oas` y sube a
@@ -1070,7 +1187,7 @@ Validación estructural complementaria:
 npx @apidevtools/swagger-cli validate docs/api/openapi_spec.yaml
 ```
 
-Estado actual (v1.10.0): `swagger-cli` reports *"is valid"* y Spectral
+Estado actual (v1.11.0): `swagger-cli` reports *"is valid"* y Spectral
 `* 4 problems (0 errors, 4 warnings, 0 infos, 0 hints)*`. Los cuatro warnings
 son `path-keys-no-trailing-slash` de las rutas de recuperación y de favoritos, y
 están justificados en
@@ -1236,3 +1353,30 @@ nuevas de `clients` no llevan barra final, así que no añaden warnings.
   aparece: el contrato no debe presentar como "interés" algo que la API no puede
   sustentar. Las recomendaciones previas de la IA llegarán con el módulo
   `assistant` y su propio contrato.
+- La v1.11.0 **no modela las notas como un campo de `ClientProfile`**. Aunque
+  `client_profile.notes` exista en la base, un único texto no permite lista
+  cronológica, autoría ni borrado individual. `ClientNote` es una colección
+  aparte y `client_profile.notes` no se expone en ningún esquema.
+- **`ClientNote.appointment_id` es opcional a propósito.** El enunciado de
+  `TASK-ARC-CRM-04` liga las notas al cliente, mientras que
+  `docs/database/data-model.md` §3.3 define `visit_observation` con una cita
+  obligatoria y única. `TASK-BACK-CRM-04` debe añadir una tabla `client_note`
+  (opción recomendada) o relajar esa restricción; si implementa el contrato
+  sobre `visit_observation` sin cambios, las notas sin visita fallarán con
+  `400` o `500`.
+- `ClientNote.author` nunca se recibe en el cuerpo. El backend lo resuelve desde
+  el `sub` del access token; aceptar `author` en `ClientNoteCreateInput` haría
+  posible atribuir una nota a otro agente. `additionalProperties: false` lo
+  convierte en `400` en vez de ignorarlo.
+- El `DELETE` de notas es lógico (`deleted_at`) e idempotente. Si
+  `TASK-BACK-CRM-04` opta por un borrado físico, repetir el `DELETE` devolverá
+  `404` y el frontend tendrá que tratar ese `404` como éxito para no mostrar un
+  error tras un reintento de red.
+- `counteroffer_currency` repite los valores de `Moneda` (`PEN`, `USD`) en vez
+  de referenciarlo: OpenAPI 3.0 no combina `nullable` con un `$ref` de forma
+  fiable y Spectral rechaza el ejemplo con `null`. Si se agrega una moneda al
+  enum `Moneda`, hay que agregarla también aquí.
+- El orden de las notas es `created_at` descendente con desempate por `id`
+  descendente, igual que el historial. Si el negocio pide una timeline de la más
+  antigua a la más reciente, es un cambio de contrato: no basta con invertir el
+  arreglo en el frontend, porque la paginación quedaría inestable.

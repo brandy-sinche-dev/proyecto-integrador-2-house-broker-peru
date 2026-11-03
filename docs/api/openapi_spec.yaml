@@ -23,6 +23,7 @@ info:
     | Sprint 4 | `TASK-ARC-CRM-02` | Agenda de citas filtrada por rol y estados de cita (HU-CRM-02) |
     | Sprint 4 | `TASK-ARC-PROP-05` | Gestión de propiedades favoritas por usuario (HU-PROP-05) |
     | Sprint 5 | `TASK-ARC-CRM-03` | Ficha e historial consolidado del cliente (HU-CRM-03) |
+    | Sprint 5 | `TASK-ARC-CRM-04` | Observaciones y notas de atención del cliente (HU-CRM-04) |
 
     ### Convenciones
     - Todos los endpoints están bajo el prefijo `/api/v1`.
@@ -47,7 +48,7 @@ info:
       el `sub` del access token y los endpoints no aceptan ningún parámetro de
       usuario. Agregar y quitar son idempotentes, para que un doble clic o un
       reintento no se traduzcan en un error.
-  version: 1.10.0
+  version: 1.11.0
   contact:
     name: Equipo HouseBroker Perú
     url: https://github.com/brandy-sinche-dev/proyecto-integrador-2-house-broker-peru
@@ -92,11 +93,13 @@ tags:
       Administrador modifican el estado de una cita.
   - name: Clientes
     description: |
-      Ficha e historial consolidado del cliente para el CRM. Solo accesible
+      Ficha, historial y observaciones del cliente para el CRM. Solo accesible
       para Agentes que atienden al menos una cita del cliente y para
       Administradores. El perfil expone datos de contacto, preferencias y
       resumen de actividad; el historial pagina las citas y sus cambios de
-      estado como una línea de tiempo.
+      estado como una línea de tiempo; las notas registran el seguimiento
+      comercial del agente y solo su autor o un Administrador pueden
+      eliminarlas.
 
 security:
   - bearerAuth: []
@@ -3075,6 +3078,427 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/clients/{id}/notes:
+    parameters:
+      - $ref: '#/components/parameters/ClientId'
+    get:
+      tags:
+        - Clientes
+      operationId: listClientNotes
+      summary: Consultar las observaciones de atención de un cliente
+      description: |
+        Devuelve la lista cronológica de observaciones de atención registradas
+        por los agentes sobre el cliente (RF-CRM-04). Es información interna de
+        seguimiento comercial: un `CLIENTE` no puede leerla.
+
+        ### Orden y paginación
+
+        Las notas se ordenan por `created_at` descendente, con desempate por
+        `id` descendente. El desempate mantiene la paginación estable cuando dos
+        notas comparten timestamp, igual que en el historial del cliente. Se
+        reutilizan `page` y `limit` del catálogo; los enlaces `next` y
+        `previous` conservan la paginación de la consulta.
+
+        ### Alcance según el rol
+
+        | Rol | Acceso |
+        |---|---|
+        | `AGENTE` | Solo clientes con al menos una cita asignada a su cuenta |
+        | `ADMINISTRADOR` | Cualquier cliente |
+        | `CLIENTE` | Sin acceso a las notas internas |
+
+        Un identificador inexistente, un usuario que no es `CLIENTE` o un
+        cliente sin citas con el agente autenticado responden
+        `404 resource_not_found`, para no revelar la existencia de cuentas
+        ajenas. El `403` se reserva para el rol `CLIENTE`.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/XRequestIdParam'
+      responses:
+        '200':
+          description: Observaciones del cliente obtenidas exitosamente
+          headers:
+            X-Total-Count:
+              description: Total de notas que cumplen la consulta, sin paginar.
+              schema:
+                type: integer
+                format: int32
+              example: 2
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedClientNotes'
+              example:
+                count: 2
+                next: null
+                previous: null
+                results:
+                  - id: 5e6f7081-4d5e-6f70-9a01-444444444444
+                    client_id: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+                    author:
+                      id: 7c4a9d21-3b6e-4f80-9a2d-5e7c1b3f8d40
+                      full_name: Brandy Sinche
+                      email: brandy.sinche@housebrokerperu.com
+                      phone: '+51 987 111 222'
+                    appointment_id: a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e
+                    body: >-
+                      El cliente mostró interés en la vista al mar y pidió
+                      evaluar una contraoferta.
+                    interest_level: 4
+                    client_showed_up: true
+                    counteroffer_amount: 2350.0
+                    counteroffer_currency: PEN
+                    followup_at: '2026-10-12T15:00:00Z'
+                    created_at: '2026-10-08T16:30:00Z'
+                  - id: 6f708192-5e6f-7081-9a12-555555555555
+                    client_id: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+                    author:
+                      id: 8d5b0e32-4c7f-5091-8b3e-6f8d2c4a9e51
+                      full_name: Jhon Ordoñez
+                      email: jhon.ordonez@housebrokerperu.com
+                      phone: null
+                    appointment_id: null
+                    body: >-
+                      Llamada de seguimiento: el cliente prefiere visitar
+                      inmuebles en San Isidro durante la tarde.
+                    interest_level: null
+                    client_showed_up: null
+                    followup_at: '2026-10-15T18:00:00Z'
+                    created_at: '2026-10-07T11:05:00Z'
+        '400':
+          description: |
+            La paginación solicitada es inválida.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemBadRequest'
+              example:
+                type: https://housebroker.pe/errors/invalid-query-parameter
+                title: Parámetro de consulta inválido
+                status: 400
+                detail: El parámetro 'page' debe ser un entero mayor o igual a 1.
+                instance: /api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/notes?page=0
+                code: invalid_query_parameter
+                errors:
+                  - parameter: page
+                    message: El valor '0' es menor que el mínimo permitido (1).
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: |
+            El token es válido pero el rol no puede consultar las notas internas
+            del cliente.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemForbidden'
+              example:
+                type: https://housebroker.pe/errors/forbidden
+                title: Sin permisos sobre el recurso
+                status: 403
+                detail: Las observaciones de atención solo están disponibles para agentes y administradores.
+                instance: /api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/notes
+                code: forbidden
+                required_roles:
+                  - AGENTE
+                  - ADMINISTRADOR
+        '404':
+          description: |
+            El cliente no existe, el identificador no corresponde a un usuario
+            `CLIENTE`, o el agente no tiene citas con él. Los tres casos
+            responden igual para no revelar la existencia de cuentas ajenas.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemNotFound'
+              example:
+                type: https://housebroker.pe/errors/resource-not-found
+                title: Recurso no encontrado
+                status: 404
+                detail: El cliente no existe o no tiene citas asignadas a tu cuenta.
+                instance: /api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/notes
+                code: resource_not_found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - Clientes
+      operationId: createClientNote
+      summary: Registrar una observación de atención
+      description: |
+        Registra una nota u observación de seguimiento comercial sobre el
+        cliente (RF-CRM-04). El autor se toma del `sub` del access token y
+        **nunca** del cuerpo, para que un agente no pueda atribuir una nota a
+        otra persona.
+
+        La nota puede asociarse opcionalmente a una cita (`appointment_id`), pero
+        también admite notas de seguimiento sin visita previa, como una llamada
+        telefónica. Los campos de resultado de la visita (`interest_level`,
+        `client_showed_up`, `counteroffer_*`, `followup_at`) son opcionales; una
+        nota puede ser solo texto.
+
+        ### Reglas de validación
+
+        | Regla | Código | Respuesta |
+        |---|---|---|
+        | `body` ausente o vacío | `invalid_query_parameter` | `400` |
+        | `body` de más de 2000 caracteres | `invalid_query_parameter` | `400` |
+        | `interest_level` fuera de 1–5 | `invalid_query_parameter` | `400` |
+        | `counteroffer_amount` sin moneda, o moneda sin monto | `invalid_counteroffer` | `400` |
+        | `appointment_id` inexistente o de otro cliente | `invalid_appointment_reference` | `400` |
+
+        Los campos de escritura no se aceptan fuera de `ClientNoteCreateInput`:
+        el esquema declara `additionalProperties: false`, así que `author`,
+        `client_id` o `created_at` en el cuerpo producen `400` en lugar de
+        ignorarse en silencio.
+
+        ### Alcance según el rol
+
+        Aplica la misma regla que la ficha: un `AGENTE` solo registra notas sobre
+        clientes con citas asignadas a su cuenta, un `ADMINISTRADOR` sobre
+        cualquiera y un `CLIENTE` recibe `403`. Un cliente invisible responde
+        `404 resource_not_found`.
+      parameters:
+        - $ref: '#/components/parameters/XRequestIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientNoteCreateInput'
+            example:
+              body: >-
+                El cliente mostró interés en la vista al mar y pidió evaluar
+                una contraoferta.
+              appointment_id: a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e
+              interest_level: 4
+              client_showed_up: true
+              counteroffer_amount: 2350.0
+              counteroffer_currency: PEN
+              followup_at: '2026-10-12T15:00:00Z'
+      responses:
+        '201':
+          description: Observación registrada exitosamente
+          headers:
+            Location:
+              description: URL absoluta del recurso creado.
+              schema:
+                type: string
+                format: uri
+              example: http://localhost:8000/api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/notes/5e6f7081-4d5e-6f70-9a01-444444444444
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientNote'
+              example:
+                id: 5e6f7081-4d5e-6f70-9a01-444444444444
+                client_id: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+                author:
+                  id: 7c4a9d21-3b6e-4f80-9a2d-5e7c1b3f8d40
+                  full_name: Brandy Sinche
+                  email: brandy.sinche@housebrokerperu.com
+                  phone: '+51 987 111 222'
+                appointment_id: a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e
+                body: >-
+                  El cliente mostró interés en la vista al mar y pidió evaluar
+                  una contraoferta.
+                interest_level: 4
+                client_showed_up: true
+                counteroffer_amount: 2350.0
+                counteroffer_currency: PEN
+                followup_at: '2026-10-12T15:00:00Z'
+                created_at: '2026-10-08T16:30:00Z'
+        '400':
+          description: |
+            Cuerpo de la observación inválido.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemBadRequest'
+              examples:
+                cuerpoVacio:
+                  summary: La observación no tiene texto
+                  value:
+                    type: https://housebroker.pe/errors/invalid-query-parameter
+                    title: Cuerpo de la petición inválido
+                    status: 400
+                    detail: El campo 'body' es obligatorio y no puede estar vacío.
+                    instance: /api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/notes
+                    code: invalid_query_parameter
+                    errors:
+                      - parameter: body
+                        message: Este campo es obligatorio.
+                contraofertaIncompleta:
+                  summary: Monto y moneda de la contraoferta no van juntos
+                  value:
+                    type: https://housebroker.pe/errors/invalid-counteroffer
+                    title: Contraoferta inválida
+                    status: 400
+                    detail: >-
+                      'counteroffer_amount' y 'counteroffer_currency' deben
+                      enviarse juntos o ambos omitirse.
+                    instance: /api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/notes
+                    code: invalid_counteroffer
+                    errors:
+                      - parameter: counteroffer_currency
+                        message: Falta la moneda que acompaña al monto de la contraoferta.
+                citaAjena:
+                  summary: La cita no pertenece al cliente
+                  value:
+                    type: https://housebroker.pe/errors/invalid-appointment-reference
+                    title: Referencia de cita inválida
+                    status: 400
+                    detail: La cita indicada no existe o no está asociada al cliente.
+                    instance: /api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/notes
+                    code: invalid_appointment_reference
+                    errors:
+                      - parameter: appointment_id
+                        message: La cita indicada no pertenece a este cliente.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: |
+            El token es válido pero el rol no puede registrar observaciones
+            sobre clientes.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemForbidden'
+              example:
+                type: https://housebroker.pe/errors/forbidden
+                title: Sin permisos sobre el recurso
+                status: 403
+                detail: Solo los agentes y administradores pueden registrar observaciones de atención.
+                instance: /api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/notes
+                code: forbidden
+                required_roles:
+                  - AGENTE
+                  - ADMINISTRADOR
+        '404':
+          description: |
+            El cliente no existe, el identificador no corresponde a un usuario
+            `CLIENTE`, o el agente no tiene citas con él.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemNotFound'
+              example:
+                type: https://housebroker.pe/errors/resource-not-found
+                title: Recurso no encontrado
+                status: 404
+                detail: El cliente no existe o no tiene citas asignadas a tu cuenta.
+                instance: /api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/notes
+                code: resource_not_found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/clients/{id}/notes/{note_id}:
+    parameters:
+      - $ref: '#/components/parameters/ClientId'
+      - $ref: '#/components/parameters/ClientNoteId'
+    delete:
+      tags:
+        - Clientes
+      operationId: deleteClientNote
+      summary: Eliminar una observación de atención
+      description: |
+        Elimina una observación de atención del cliente (RF-CRM-04). La
+        operación es una **eliminación lógica** (`deleted_at`), de modo que el
+        registro se conserva para auditoría pero deja de aparecer en
+        `GET /api/v1/clients/{id}/notes`.
+
+        ### Autorización por autoría
+
+        | Rol | Puede eliminar |
+        |---|---|
+        | `ADMINISTRADOR` | Cualquier nota visible del cliente |
+        | `AGENTE` autor | La nota que él mismo escribió |
+        | `AGENTE` no autor | No: `403 forbidden` |
+        | `CLIENTE` | No: `403 forbidden` |
+
+        Un agente asignado al cliente puede **leer** todas las notas, pero solo
+        puede borrar las propias. La distinción importa porque la nota registra
+        una opinión comercial y su autoría no debe reescribirse.
+
+        ### Idempotencia
+
+        Repetir el `DELETE` de una nota ya eliminada devuelve `204` sin efectos
+        adicionales, para que un reintento de red no se traduzca en un error. Un
+        `404` significa que la nota nunca existió, que pertenece a otro cliente o
+        que el cliente no es visible para el agente autenticado; los tres casos
+        se responden igual para no revelar recursos ajenos.
+      responses:
+        '204':
+          description: Observación eliminada, o ya estaba eliminada
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: |
+            El token es válido pero el usuario no es el autor de la nota ni un
+            administrador. La autoría se evalúa después de comprobar que la nota
+            es visible para el agente.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemForbidden'
+              example:
+                type: https://housebroker.pe/errors/forbidden
+                title: Sin permisos sobre el recurso
+                status: 403
+                detail: Solo el agente autor de la nota o un administrador pueden eliminarla.
+                instance: /api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/notes/5e6f7081-4d5e-6f70-9a01-444444444444
+                code: forbidden
+        '404':
+          description: |
+            La nota no existe, pertenece a otro cliente, o el cliente no es
+            visible para el agente autenticado. Un `note_id` con formato inválido
+            también responde `404`, igual que en `DELETE /favorites/{property_id}/`.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemNotFound'
+              example:
+                type: https://housebroker.pe/errors/resource-not-found
+                title: Recurso no encontrado
+                status: 404
+                detail: La observación no existe o no pertenece al cliente indicado.
+                instance: /api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/notes/5e6f7081-4d5e-6f70-9a01-444444444444
+                code: resource_not_found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -3434,6 +3858,18 @@ components:
         type: string
         format: uuid
       example: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+
+    ClientNoteId:
+      name: note_id
+      in: path
+      required: true
+      description: |
+        Identificador de la observación de atención. Se llama `note_id` y no
+        `id` porque la ruta ya usa `id` para el cliente.
+      schema:
+        type: string
+        format: uuid
+      example: 5e6f7081-4d5e-6f70-9a01-444444444444
 
     ClientHistoryTypeFilter:
       name: type
@@ -5241,6 +5677,201 @@ components:
           items:
             $ref: '#/components/schemas/ClientHistoryEntry'
 
+    ClientNote:
+      type: object
+      description: |
+        Observación de atención registrada por un agente sobre un cliente
+        (RF-CRM-04). Es un dato interno de seguimiento comercial: no se expone
+        en el catálogo ni en ningún endpoint público.
+
+        El `author` es el usuario del access token que creó la nota, no un campo
+        de la entrada. `appointment_id` enlaza la nota con la visita que la
+        originó y es `null` cuando se trata de un seguimiento sin cita, como una
+        llamada telefónica.
+      additionalProperties: false
+      required:
+        - id
+        - client_id
+        - author
+        - body
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador de la observación.
+          example: 5e6f7081-4d5e-6f70-9a01-444444444444
+        client_id:
+          type: string
+          format: uuid
+          description: Cliente al que pertenece la observación.
+          example: c3d4e5f6-2b3c-4d5e-9f70-222222222222
+        author:
+          $ref: '#/components/schemas/AppointmentPersonRef'
+        appointment_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            Cita que originó la observación, o `null` si es una nota de
+            seguimiento sin visita asociada.
+          example: a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e
+        body:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: Texto de la observación.
+          example: El cliente mostró interés en la vista al mar y pidió evaluar una contraoferta.
+        interest_level:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 5
+          nullable: true
+          description: |
+            Nivel de interés observado durante la atención (1 a 5), o `null` si
+            el agente no lo registró.
+          example: 4
+        client_showed_up:
+          type: boolean
+          nullable: true
+          description: |
+            Indica si el cliente asistió a la visita. `null` cuando la nota no
+            corresponde a una visita concreta o el dato no se registró.
+          example: true
+        counteroffer_amount:
+          type: number
+          format: double
+          minimum: 0.0001
+          nullable: true
+          description: Monto de la contraoferta del cliente, en su moneda.
+          example: 2350.0
+        counteroffer_currency:
+          type: string
+          nullable: true
+          enum:
+            - PEN
+            - USD
+          description: |
+            Moneda de la contraoferta. Aparece junto a `counteroffer_amount` o
+            ambos son `null`: un monto sin moneda no tiene significado. Repite
+            los valores de `Moneda` porque OpenAPI 3.0 no combina `nullable`
+            con un `$ref` de forma fiable.
+          example: PEN
+        followup_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Recordatorio de seguimiento comercial, o `null` si no se programó.
+          example: '2026-10-12T15:00:00Z'
+        created_at:
+          type: string
+          format: date-time
+          description: Momento en que se registró la observación.
+          example: '2026-10-08T16:30:00Z'
+
+    ClientNoteCreateInput:
+      type: object
+      description: |
+        Cuerpo de `POST /api/v1/clients/{id}/notes`. Solo `body` es
+        obligatorio: una observación puede ser únicamente texto. El autor, el
+        cliente y la fecha de creación los fija el servidor y no se aceptan en
+        la entrada (`additionalProperties: false`).
+      additionalProperties: false
+      required:
+        - body
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: Texto de la observación, obligatorio.
+          example: El cliente mostró interés en la vista al mar y pidió evaluar una contraoferta.
+        appointment_id:
+          type: string
+          format: uuid
+          description: |
+            Cita que originó la observación. Si se envía, debe existir y
+            pertenecer al cliente de la ruta; de lo contrario responde `400`
+            con `invalid_appointment_reference`.
+          example: a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e
+        interest_level:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 5
+          description: Nivel de interés observado durante la atención (1 a 5).
+          example: 4
+        client_showed_up:
+          type: boolean
+          description: Indica si el cliente asistió a la visita.
+          example: true
+        counteroffer_amount:
+          type: number
+          format: double
+          minimum: 0.0001
+          description: |
+            Monto de la contraoferta del cliente. Debe enviarse junto a
+            `counteroffer_currency`; si falta uno de los dos, responde `400`
+            con `invalid_counteroffer`.
+          example: 2350.0
+        counteroffer_currency:
+          $ref: '#/components/schemas/Moneda'
+        followup_at:
+          type: string
+          format: date-time
+          description: Recordatorio de seguimiento comercial.
+          example: '2026-10-12T15:00:00Z'
+      example:
+        body: El cliente mostró interés en la vista al mar y pidió evaluar una contraoferta.
+        appointment_id: a9c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e
+        interest_level: 4
+        client_showed_up: true
+        counteroffer_amount: 2350.0
+        counteroffer_currency: PEN
+        followup_at: '2026-10-12T15:00:00Z'
+
+    PaginatedClientNotes:
+      type: object
+      description: |
+        Envoltorio paginado de las observaciones de atención del cliente.
+        Replica la forma de `PaginatedClientHistory` para que el frontend
+        reutilice un único envoltorio de paginación.
+      additionalProperties: false
+      required:
+        - count
+        - next
+        - previous
+        - results
+      properties:
+        count:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Total de notas que cumplen la consulta, sin paginar.
+          example: 2
+        next:
+          type: string
+          format: uri
+          nullable: true
+          description: |
+            URL absoluta de la siguiente página, conservando la paginación de
+            la consulta, o `null` si la página solicitada es la última.
+          example: http://localhost:8000/api/v1/clients/c3d4e5f6-2b3c-4d5e-9f70-222222222222/notes?limit=20&page=2
+        previous:
+          type: string
+          format: uri
+          nullable: true
+          description: |
+            URL absoluta de la página anterior, o `null` si la página
+            solicitada es la primera.
+          example: null
+        results:
+          type: array
+          description: Observaciones de la página, de la más reciente a la más antigua.
+          items:
+            $ref: '#/components/schemas/ClientNote'
+
     Problem:
       type: object
       description: |
@@ -5310,6 +5941,11 @@ components:
                 es alcanzable desde el estado actual de la cita, y
                 `property_not_bookable` cuando se intenta agendar una visita
                 sobre una propiedad cuyo `PropertyStatus` no admite reservas.
+
+                En el módulo de observaciones se suman `invalid_counteroffer`
+                cuando `counteroffer_amount` y `counteroffer_currency` no se
+                envían juntos, e `invalid_appointment_reference` cuando la cita
+                indicada no existe o no pertenece al cliente.
 
                 En el módulo de autenticación se suman `weak_password` cuando
                 una clave no cumple la política de seguridad, tanto en el
