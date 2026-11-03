@@ -11,6 +11,8 @@ from apps.properties.permissions import (
 )
 from apps.properties.problems import ProblemError
 
+from .models import ClientNote
+
 REQUIRED_ROLES = [ROLE_AGENT, ROLE_ADMIN]
 
 DEFAULT_FORBIDDEN_DETAIL = (
@@ -69,3 +71,35 @@ class IsAgentOrAdmin(IsAuthenticatedUser):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=getattr(view, "not_found_detail", DEFAULT_NOT_FOUND_DETAIL),
         )
+
+
+class IsClientNoteAgentOrAdmin(IsAgentOrAdmin):
+    """Permiso de las observaciones de atención (HU-CRM-04).
+
+    Las operaciones de lectura y alta aplican la misma regla que la ficha: un
+    agente solo sobre clientes con citas asignadas y un administrador sobre
+    cualquiera. El borrado suma la autoría: un agente asignado puede leer todas
+    las notas del cliente, pero solo eliminar las que él escribió. Un
+    administrador puede eliminar cualquiera.
+    """
+
+    note_forbidden_detail = (
+        "Solo el agente autor de la nota o un administrador pueden eliminarla."
+    )
+
+    def has_object_permission(self, request, view, obj):
+        if isinstance(obj, ClientNote):
+            if _role_of(request.user) == ROLE_ADMIN:
+                return True
+            if obj.author_id == request.user.pk:
+                return True
+            raise ProblemError(
+                code="forbidden",
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=getattr(
+                    view,
+                    "note_forbidden_detail",
+                    self.note_forbidden_detail,
+                ),
+            )
+        return super().has_object_permission(request, view, obj)

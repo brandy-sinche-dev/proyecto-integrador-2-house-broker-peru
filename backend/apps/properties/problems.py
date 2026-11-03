@@ -72,6 +72,14 @@ ERROR_TYPES = {
         "https://housebroker.pe/errors/invalid-appointment-transition",
         "Transición de estado de cita no permitida",
     ),
+    "invalid_counteroffer": (
+        "https://housebroker.pe/errors/invalid-counteroffer",
+        "Contraoferta inválida",
+    ),
+    "invalid_appointment_reference": (
+        "https://housebroker.pe/errors/invalid-appointment-reference",
+        "Referencia de cita inválida",
+    ),
     "unauthorized": (
         "https://housebroker.pe/errors/unauthorized",
         "No autenticado",
