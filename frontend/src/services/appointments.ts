@@ -36,6 +36,22 @@ export const listAppointments = (params: {
   status?: AppointmentStatus
 }) => api.get<PaginatedAppointments>('/v1/appointments', { params }).then((response) => response.data)
 
+/** Returns every appointment visible to the authenticated user. */
+export const listAgentAppointments = async (): Promise<Appointment[]> => {
+  const appointments: Appointment[] = []
+  let page = 1
+  let next: string | null = null
+
+  do {
+    const response = await listAppointments({ page, limit: 100 })
+    appointments.push(...response.results)
+    next = response.next
+    page += 1
+  } while (next)
+
+  return appointments
+}
+
 export const updateAppointmentStatus = (id: string, input: AppointmentStatusInput) =>
   api.patch<AppointmentStatusResult>(`/v1/appointments/${id}/status`, input).then((response) => response.data)
 

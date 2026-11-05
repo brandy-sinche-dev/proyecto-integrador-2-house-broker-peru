@@ -9,7 +9,12 @@
 
 import MockAdapter from 'axios-mock-adapter'
 import api from './axios'
-import { createAppointment, formatSlotTime, getAvailableSlots } from './appointments'
+import {
+  createAppointment,
+  formatSlotTime,
+  getAvailableSlots,
+  listAgentAppointments,
+} from './appointments'
 
 const PROPERTY_ID = 'b2c1f5a0-1a2b-4c3d-9e0f-111111111111'
 const AVAILABLE_SLOTS_PATH = `/v1/properties/${PROPERTY_ID}/available-slots`
@@ -108,6 +113,40 @@ describe('services/appointments', () => {
         status: 409,
         userMessage: 'El horario seleccionado ya fue reservado por otro cliente.',
       })
+    })
+  })
+
+  describe('listAgentAppointments', () => {
+    it('combina todas las páginas de citas asignadas al agente', async () => {
+      const secondAppointment = { ...appointment, id: 'appointment-2' }
+      const requestedPages = []
+
+      mock.onGet(APPOINTMENTS_PATH).reply((config) => {
+        const page = Number(config.params?.page)
+        requestedPages.push(config.params)
+
+        if (page === 1) {
+          return [200, {
+            count: 2,
+            next: 'http://localhost:8000/api/v1/appointments?page=2',
+            previous: null,
+            results: [appointment],
+          }]
+        }
+
+        return [200, {
+          count: 2,
+          next: null,
+          previous: 'http://localhost:8000/api/v1/appointments?page=1',
+          results: [secondAppointment],
+        }]
+      })
+
+      await expect(listAgentAppointments()).resolves.toEqual([appointment, secondAppointment])
+      expect(requestedPages).toEqual([
+        { page: 1, limit: 100 },
+        { page: 2, limit: 100 },
+      ])
     })
   })
 
