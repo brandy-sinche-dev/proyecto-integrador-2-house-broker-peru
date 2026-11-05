@@ -228,7 +228,33 @@ No es una omisión por descuido, son las dos verificaciones que fallan si se agr
 
 ---
 
-## 7. Referencias
+## 7. Registro de ejecución QA — noviembre de 2026
+
+La auditoría funcional, de accesibilidad, teclado, responsive y calidad visual realizada sobre el
+stack Docker actual queda registrada en el informe:
+
+[`docs/qa/01_Informe_Auditoria_QA_A11y_UI.md`](qa/01_Informe_Auditoria_QA_A11y_UI.md)
+
+| Verificación | Resultado registrado |
+| ------------ | -------------------- |
+| Servicios Docker | Frontend, backend y PostgreSQL activos |
+| Smoke test | Frontend `200`; API `/api/health/` `200` con `status: ok` |
+| Flujo cliente–agente | Catálogo, detalle, favorito, disponibilidad, reserva, CRM y confirmación ejecutados |
+| Backend | `335/335` pruebas |
+| Frontend build | Correcto |
+| Suite CRM | `15/15` pruebas |
+| Accesibilidad automatizada existente | `72/72` pruebas |
+| AXE sobre la aplicación completa | No conforme: contraste, nombres accesibles, headings y landmarks |
+| Teclado/foco | Login no conforme; reserva conforme y cierre con `Escape` |
+| Responsive | Vistas públicas conformes; dashboard agente con overflow a `390px` |
+| Suite frontend completa | `475` pasan y `4` fallan en `useFilterParams.test.jsx` |
+| Lighthouse | No ejecutado: paquete no instalado localmente |
+
+Este registro corresponde a una auditoría de alcance transversal y actual. No reemplaza los
+resultados históricos de las tareas específicas de catálogo y filtros documentadas en este archivo
+y en `docs/08_TASK_A11Y_PROP_02.md` / `docs/15_TASK_A11Y_PROP_03.md`.
+
+## 8. Referencias
 
 * `docs/09_TASK_TEST_PROP_02.md` — detalle de la implementación de las pruebas de frontend
   (configuración de Jest/Babel, caso `import.meta.env`, cobertura).
