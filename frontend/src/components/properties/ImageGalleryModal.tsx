@@ -11,7 +11,7 @@ export function ImageGalleryModal({ images, initialIndex = 0, onClose }: { image
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentIndex, images.length])
+  }, [currentIndex, images?.length ?? 0])
 
   if (!images || images.length === 0) return null
 
