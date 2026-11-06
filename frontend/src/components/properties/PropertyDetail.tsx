@@ -16,6 +16,13 @@ interface PropertyDetailProps {
 
 type Status = 'loading' | 'error' | 'ready'
 
+const DEFAULT_COVERS: Record<string, string> = {
+  casa: '/properties/demo/casa1.jpg',
+  departamento: '/properties/demo/departamento1.jpg',
+  terreno: '/properties/demo/terreno1.jpg',
+  local: '/properties/demo/local1.jpg'
+}
+
 const OP_LABEL: Record<TransactionMode, string> = {
   VENTA: 'En venta',
   ALQUILER: 'En alquiler',

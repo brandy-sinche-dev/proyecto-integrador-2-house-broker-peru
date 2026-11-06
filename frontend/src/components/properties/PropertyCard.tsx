@@ -15,6 +15,13 @@ interface PropertyCardProps {
   onBookVisit?: (title: string, id: string) => void
 }
 
+const DEFAULT_COVERS: Record<string, string> = {
+  casa: '/properties/demo/casa1.jpg',
+  departamento: '/properties/demo/departamento1.jpg',
+  terreno: '/properties/demo/terreno1.jpg',
+  local: '/properties/demo/local1.jpg'
+};
+
 const TYPE_LABEL: Record<string, string> = {
   DEPARTAMENTO: 'Departamento',
   CASA: 'Casa',
