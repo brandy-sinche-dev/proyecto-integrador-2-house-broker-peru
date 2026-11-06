@@ -359,18 +359,31 @@ const DEMO_IMAGES: Record<PropertyType, string[]> = {
     '/properties/demo/casa2.jpg',
     '/properties/demo/casa3.jpg',
     '/properties/demo/casa4.jpg',
+    '/properties/demo/casa5.jpg',
+    '/properties/demo/casa6.jpg',
+    '/properties/demo/casa7.jpg',
   ],
   DEPARTAMENTO: [
     '/properties/demo/depa1.jpg',
     '/properties/demo/depa2.jpg',
     '/properties/demo/depa3.jpg',
+    '/properties/demo/depa4.jpg',
+    '/properties/demo/depa5.jpg',
+    '/properties/demo/depa6.jpg',
   ],
   OFICINA: [
     '/properties/demo/oficina1.jpg',
     '/properties/demo/oficina2.jpg',
     '/properties/demo/oficina3.jpg',
+    '/properties/demo/oficina4.jpg',
+    '/properties/demo/oficina5.jpg',
   ],
-  TERRENO: ['/properties/demo/terreno1.jpg', '/properties/demo/terreno2.jpg'],
+  TERRENO: [
+    '/properties/demo/terreno1.jpg',
+    '/properties/demo/terreno2.jpg',
+    '/properties/demo/terreno3.jpg',
+    '/properties/demo/terreno4.jpg',
+  ],
 }
 
 /**
