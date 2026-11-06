@@ -33,6 +33,21 @@ Plataforma web que conecta a agentes, compradores e inquilinos (Lima Metropolita
 
 ---
 
+## Cuentas de Acceso y Demostración (Demo Accounts)
+
+Para evaluar y probar todos los módulos y niveles de acceso del sistema tanto en modo local (Django + DB / Docker) como en modo simulado frontend (`VITE_ENABLE_MOCKS=true`), se encuentran preconfiguradas las siguientes cuentas de prueba:
+
+| Rol | Correo Electrónico | Contraseña | Vistas y Capacidades |
+|---|---|---|---|
+| **Administrador** | `admin@housebroker.pe` | `Housebroker2026.` | Panel administrativo `/admin`, control total del sistema, gestión de roles y supervisión. |
+| **Agente Inmobiliario (Titular)** | `yohan.nato@housebroker.pe` | `Housebroker2026.` | Panel de agente `/agente`, titular de la cartera demo, configuración de horarios/disponibilidad y gestión de citas CRM. |
+| **Agente Inmobiliario (Secundario)** | `agente@housebroker.pe` | `Housebroker2026.` | Segundo agente comercial para pruebas de reasignación de citas y chat entre agentes. |
+| **Cliente Demo** | `cliente@housebroker.pe` | `Housebroker2026.` | Catálogo de inmuebles `/`, guardado de favoritos, reserva de citas con fecha/hora y asistente virtual IA. |
+
+> **Nota:** En despliegue local o Docker, las cuentas se siembran automáticamente mediante `python manage.py seed_demo`. En el frontend simulado, estas credenciales permiten autenticarse directamente desde el modal de Login.
+
+---
+
 ## 1. Requerimientos y Backlog
 
 ### 1.1 Épicas
@@ -95,9 +110,9 @@ Tallas S/M/L · Riesgo Bajo/Medio/Alto. Priorización por flujo de negocio e int
 | Sprint 7 | 15–16 | Estabilización, QA, WPO, A11y, métricas | — |
 | Cierre | 17–18 | Code freeze, documentación final | **Entrega final** |
 
-Métricas y artefactos ejecutados: Sprint Planning (goal, DoR, DoD), Daily Scrum, Sprint Review, Retrospectiva (Mad/Sad/Glad) y tablero en GitHub Projects. Ejemplo real: **Sprint 1** completó HU-PROP-01 (13 pts) con 100% de velocidad; **Sprint 2** (en curso) comprometió HU-PROP-02 + HU-PROP-03 = 21 pts.
+Métricas y artefactos ejecutados: Sprint Planning (goal, DoR, DoD), Daily Scrum, Sprint Review, Retrospectiva (Mad/Sad/Glad) y tablero en GitHub Projects. Los Sprints 1 al 5 fueron completados al 100% de velocidad (Hitos APF1 y APF2 aprobados); actualmente el equipo se encuentra ejecutando el **Sprint 6 (en curso)** con 28 puntos de historia comprometidos para el Hito **APF3** (Inteligencia Artificial y Recomendaciones).
 
-> **Mostrar en el repo:** `docs/scrum/sprint-1/planning.md`, `dailies.md`, `review.md`, `retrospective.md` · `docs/scrum/sprint-2/planning.md`. Doc de gestión (privado) no se presenta: resumen en `skills/`.
+> **Mostrar en el repo:** Carpetas `docs/scrum/sprint-1/` a `docs/scrum/sprint-6/` (`planning.md`, `dailies.md`, `review.md`, `retrospective.md`) · `docs/scrum/roadmap.md` y `docs/scrum/backlog.md`. Doc de gestión (privado) no se presenta: resumen en `skills/`.
 
 ---
 
@@ -145,7 +160,18 @@ docker compose -f infra/docker-compose.yml up -d --build
 | Backend | http://localhost:8000/api | API Django REST Framework ejecutada con gunicorn |
 | PostgreSQL | localhost:5433 | Base de datos (DB/usuario/clave por defecto `housebroker`) |
 
-Al iniciar, el backend aplica migraciones y ejecuta `seed_demo` (datos de demostración idempotentes: propiedades, distritos, agendas y usuarios). Los valores sensibles se pueden sobrescribir con variables de entorno (`POSTGRES_*`, `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, `CORS_ALLOWED_ORIGINS`).
+Al iniciar, el backend aplica migraciones y ejecuta `seed_demo` (datos de demostración idempotentes: propiedades con fotografías, distritos, agendas y usuarios). Los valores sensibles se pueden sobrescribir con variables de entorno (`POSTGRES_*`, `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, `CORS_ALLOWED_ORIGINS`).
+
+### Cuentas de demostración
+
+El inicio de sesión se realiza con **correo electrónico** y contraseña. Todas las cuentas sembradas por `seed_demo` comparten la contraseña `Housebroker2026.` (se puede cambiar con `--password` al ejecutar el comando).
+
+| Rol | Correo | Contraseña | Uso recomendado |
+|---|---|---|---|
+| Administrador | `admin@housebroker.pe` | `Housebroker2026.` | Panel de administración |
+| Agente | `yohan.nato@housebroker.pe` | `Housebroker2026.` | Agente asignado a la cartera demo; agenda y CRM |
+| Agente | `agente@housebroker.pe` | `Housebroker2026.` | Segunda cuenta de agente |
+| Cliente | `cliente@housebroker.pe` | `Housebroker2026.` | Catálogo, favoritos y reserva de visitas |
 
 Para detener y limpiar el stack:
 

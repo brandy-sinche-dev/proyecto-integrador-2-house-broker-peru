@@ -6,6 +6,8 @@ dirección, y la escritura exige un `AGENTE` o un `ADMINISTRADOR`. La baja es
 lógica (`is_active=False`) y devuelve el inmueble, no un cuerpo vacío.
 """
 
+import pytest
+
 from django.utils import timezone
 from rest_framework import status as http_status
 from rest_framework.test import APITestCase
@@ -13,6 +15,8 @@ from rest_framework.test import APITestCase
 from apps.properties.models import Property, PropertyStatus
 from apps.properties.permissions import ROLE_ADMIN, ROLE_AGENT, ROLE_CLIENT
 from apps.properties.tests.helpers import make_district, make_property, make_user
+
+pytestmark = pytest.mark.integration
 
 BASE = "/api/v1/properties"
 
@@ -31,6 +35,7 @@ def minimal_payload(**overrides):
     return payload
 
 
+# ===== PropertyCrudTestCase: grupo de pruebas de property crud =====
 class PropertyCrudTestCase(APITestCase):
     def setUp(self):
         self.district = make_district(ubigeo="150131", name="San Isidro")
@@ -65,8 +70,18 @@ class PropertyCrudTestCase(APITestCase):
         return problem
 
 
+# ===== PropertyCreatePermissionTests: grupo de pruebas de property create permission =====
 class PropertyCreatePermissionTests(PropertyCrudTestCase):
     def test_anonymous_create_is_rejected_with_401(self):
+        """IT-PROP-124 - Prueba de Integración - anonymous create is rejected with 401
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / PropertyCreatePermissionTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: anonymous create is rejected with 401.
+        Código HTTP Esperado: 401 Unauthorized
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 401 Unauthorized y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.request("post", BASE, payload=minimal_payload()),
             "unauthorized",
@@ -76,6 +91,15 @@ class PropertyCreatePermissionTests(PropertyCrudTestCase):
         self.assertEqual(Property.objects.count(), 0)
 
     def test_client_create_is_rejected_with_403(self):
+        """IT-PROP-125 - Prueba de Integración - client create is rejected with 403
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / PropertyCreatePermissionTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: client create is rejected with 403.
+        Código HTTP Esperado: 403 Forbidden
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 403 Forbidden y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.create_ok(self.client_user),
             "forbidden",
@@ -92,6 +116,15 @@ class PropertyCreatePermissionTests(PropertyCrudTestCase):
         self.assertEqual(Property.objects.count(), 0)
 
     def test_agent_create_returns_201_with_server_managed_fields(self):
+        """IT-PROP-126 - Prueba de Integración - agent create returns 201 with server managed fields
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / PropertyCreatePermissionTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: agent create returns 201 with server managed fields.
+        Código HTTP Esperado: 201 Created, 250
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 201 Created, 250 y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.create_ok(self.agent)
 
         self.assertEqual(response.status_code, http_status.HTTP_201_CREATED)
@@ -116,12 +149,30 @@ class PropertyCreatePermissionTests(PropertyCrudTestCase):
         self.assertIn(f"/{prop.id}", response["Location"])
 
     def test_admin_create_returns_201(self):
+        """IT-PROP-127 - Prueba de Integración - admin create returns 201
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / PropertyCreatePermissionTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: admin create returns 201.
+        Código HTTP Esperado: 201 Created
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 201 Created y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.create_ok(self.admin)
 
         self.assertEqual(response.status_code, http_status.HTTP_201_CREATED)
         self.assertEqual(Property.objects.count(), 1)
 
     def test_new_property_appears_in_public_catalog(self):
+        """IT-PROP-128 - Prueba de Integración - new property appears in public catalog
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / PropertyCreatePermissionTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: new property appears in public catalog.
+        Código HTTP Esperado: 200 OK
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         self.create_ok(self.agent)
         response = self.client.get(BASE)
 
@@ -129,8 +180,18 @@ class PropertyCreatePermissionTests(PropertyCrudTestCase):
         self.assertEqual(len(response.json()["results"]), 1)
 
 
+# ===== PropertyCreateValidationTests: grupo de pruebas de property create validation =====
 class PropertyCreateValidationTests(PropertyCrudTestCase):
     def test_unknown_field_is_rejected_with_400(self):
+        """IT-PROP-129 - Prueba de Integración - unknown field is rejected with 400
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / PropertyCreateValidationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: unknown field is rejected with 400.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.create_ok(self.agent, campo_extra="x"),
             "invalid_query_parameter",
@@ -143,6 +204,15 @@ class PropertyCreateValidationTests(PropertyCrudTestCase):
         self.assertEqual(Property.objects.count(), 0)
 
     def test_missing_required_field_is_rejected_with_400(self):
+        """IT-PROP-130 - Prueba de Integración - missing required field is rejected with 400
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / PropertyCreateValidationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: missing required field is rejected with 400.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         payload = minimal_payload()
         payload.pop("mode")
 
@@ -157,6 +227,15 @@ class PropertyCreateValidationTests(PropertyCrudTestCase):
         self.assertEqual(Property.objects.count(), 0)
 
     def test_price_below_minimum_is_rejected_with_400(self):
+        """IT-PROP-131 - Prueba de Integración - price below minimum is rejected with 400
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / PropertyCreateValidationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: price below minimum is rejected with 400.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.create_ok(self.agent, price="0.00001"),
             "invalid_query_parameter",
@@ -168,6 +247,15 @@ class PropertyCreateValidationTests(PropertyCrudTestCase):
         self.assertEqual(Property.objects.count(), 0)
 
     def test_address_without_known_district_is_rejected_with_400(self):
+        """IT-PROP-132 - Prueba de Integración - address without known district is rejected with 400
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / PropertyCreateValidationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: address without known district is rejected with 400.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.create_ok(self.agent, address="Calle Los Pinos 123"),
             "invalid_query_parameter",
@@ -185,6 +273,7 @@ class PropertyCreateValidationTests(PropertyCrudTestCase):
         self.assertEqual(Property.objects.count(), 0)
 
 
+# ===== PropertyUpdateTests: grupo de pruebas de property update =====
 class PropertyUpdateTests(PropertyCrudTestCase):
     def setUp(self):
         super().setUp()
@@ -194,6 +283,15 @@ class PropertyUpdateTests(PropertyCrudTestCase):
         return f"{BASE}/{prop.id}"
 
     def test_agent_updates_own_property(self):
+        """IT-PROP-133 - Prueba de Integración - agent updates own property
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / PropertyUpdateTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: agent updates own property.
+        Código HTTP Esperado: 200 OK, 280
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 200 OK, 280 y el efecto se refleja en el estado o la base de datos.
+        """
         before_active = self.property.is_active
         before_code = self.property.code
         before_created = self.property.created_at
@@ -221,6 +319,15 @@ class PropertyUpdateTests(PropertyCrudTestCase):
         self.assertEqual(self.property.status, before_status)
 
     def test_admin_updates_any_property(self):
+        """IT-PROP-134 - Prueba de Integración - admin updates any property
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / PropertyUpdateTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: admin updates any property.
+        Código HTTP Esperado: 200 OK
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         other = make_user("agente2", role=ROLE_AGENT)
         self.property.agent = other
         self.property.save(update_fields=["agent"])
@@ -237,6 +344,15 @@ class PropertyUpdateTests(PropertyCrudTestCase):
         self.assertEqual(self.property.title, "Renovado por admin")
 
     def test_agent_cannot_update_another_agents_property(self):
+        """IT-PROP-135 - Prueba de Integración - agent cannot update another agents property
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / PropertyUpdateTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: agent cannot update another agents property.
+        Código HTTP Esperado: 403 Forbidden
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 403 Forbidden y el efecto se refleja en el estado o la base de datos.
+        """
         other = make_user("agente2", role=ROLE_AGENT)
         self.property.agent = other
         self.property.save(update_fields=["agent"])
@@ -255,6 +371,15 @@ class PropertyUpdateTests(PropertyCrudTestCase):
         self.assertEqual(self.property.title, "Propiedad 1")
 
     def test_client_cannot_update_property(self):
+        """IT-PROP-136 - Prueba de Integración - client cannot update property
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / PropertyUpdateTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: client cannot update property.
+        Código HTTP Esperado: 403 Forbidden
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 403 Forbidden y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.request(
                 "put",
@@ -267,6 +392,15 @@ class PropertyUpdateTests(PropertyCrudTestCase):
         )
 
     def test_update_of_missing_property_is_404(self):
+        """IT-PROP-137 - Prueba de Integración - update of missing property is 404
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / PropertyUpdateTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: update of missing property is 404.
+        Código HTTP Esperado: 404 Not Found
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 404 Not Found y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.request(
             "put",
             f"{BASE}/00000000-0000-0000-0000-000000000000",
@@ -276,6 +410,7 @@ class PropertyUpdateTests(PropertyCrudTestCase):
         self.assertEqual(response.status_code, http_status.HTTP_404_NOT_FOUND)
 
 
+# ===== PropertyDeleteTests: grupo de pruebas de property delete =====
 class PropertyDeleteTests(PropertyCrudTestCase):
     def setUp(self):
         super().setUp()
@@ -285,6 +420,15 @@ class PropertyDeleteTests(PropertyCrudTestCase):
         return f"{BASE}/{prop.id}"
 
     def test_agent_deletes_own_property_as_soft_delete(self):
+        """IT-PROP-138 - Prueba de Integración - agent deletes own property as soft delete
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / PropertyDeleteTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: agent deletes own property as soft delete.
+        Código HTTP Esperado: 200 OK
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         before_id = self.property.id
 
         response = self.request(
@@ -304,6 +448,15 @@ class PropertyDeleteTests(PropertyCrudTestCase):
         self.assertEqual(str(self.property.id), str(before_id))
 
     def test_deleted_property_vanishes_from_public_catalog(self):
+        """IT-PROP-139 - Prueba de Integración - deleted property vanishes from public catalog
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / PropertyDeleteTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: deleted property vanishes from public catalog.
+        Código HTTP Esperado: 404 Not Found, 200 OK
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 404 Not Found, 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         self.request("delete", self.url(self.property), user=self.agent)
 
         detail = self.client.get(self.url(self.property))
@@ -314,6 +467,15 @@ class PropertyDeleteTests(PropertyCrudTestCase):
         self.assertEqual(listing.json()["results"], [])
 
     def test_agent_cannot_delete_another_agents_property(self):
+        """IT-PROP-140 - Prueba de Integración - agent cannot delete another agents property
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / PropertyDeleteTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: agent cannot delete another agents property.
+        Código HTTP Esperado: 403 Forbidden
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 403 Forbidden y el efecto se refleja en el estado o la base de datos.
+        """
         other = make_user("agente2", role=ROLE_AGENT)
         self.property.agent = other
         self.property.save(update_fields=["agent"])
@@ -327,6 +489,15 @@ class PropertyDeleteTests(PropertyCrudTestCase):
         self.assertTrue(self.property.is_active)
 
     def test_anonymous_delete_is_rejected_with_401(self):
+        """IT-PROP-141 - Prueba de Integración - anonymous delete is rejected with 401
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / PropertyDeleteTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: anonymous delete is rejected with 401.
+        Código HTTP Esperado: 401 Unauthorized
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 401 Unauthorized y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.request("delete", self.url(self.property)),
             "unauthorized",
