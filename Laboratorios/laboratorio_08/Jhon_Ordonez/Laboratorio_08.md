@@ -55,7 +55,8 @@ Diseñar, implementar y ejecutar una suite exhaustiva de **pruebas unitarias sob
 | **HU-PROP-05** (Favoritos de inmuebles) | `LoginPrompt` | `src/components/auth/LoginPrompt.test.jsx` | Aviso al usuario no autenticado cuando intenta guardar un favorito; opciones de ir a login o continuar. |
 | **HU-SEC-01** (Inicio de sesión y roles) | `LoginModal`, `Header` | `src/components/auth/LoginModal.test.jsx`<br>`src/components/Header.test.jsx` | Modal de login/registro, cambio de visibilidad de contraseña, redirección según rol (Admin/Agente/Cliente) y barra de navegación. |
 | **Transversal** (Acciones críticas) | `ConfirmDialog`, `Button` | `src/components/ConfirmDialog.test.jsx`<br>`src/components/Button.test.jsx` | Diálogo accesible para confirmaciones de borrado lógico o descarte de cambios con trampa de foco y variantes. |
-| **Transversal** (Identidad y contacto) | `Footer` | `src/components/Footer.test.jsx` | Visualización institucional, enlaces a Libro de Reclamaciones, WhatsApp directo y políticas de privacidad. |
+| **Transversal** (Asesoría y contacto) | `ContactModal` | `src/components/ContactModal.test.jsx` | Modal interactivo de contacto directo con asesor, formulario con validación de teléfono/nombre, trampa de escape y portal centrado accesible. |
+| **Transversal** (Identidad institucional) | `Footer` | `src/components/Footer.test.jsx` | Visualización institucional, enlaces a Libro de Reclamaciones, WhatsApp directo y políticas de privacidad. |
 
 ---
 
@@ -152,22 +153,67 @@ Diseñar, implementar y ejecutar una suite exhaustiva de **pruebas unitarias sob
 - **Respaldo gremial:** Mención a CoDIP y Defensoría del Cliente Inmobiliario (DCI).
 - **Marco normativo:** Enlaces a Libro de Reclamaciones, Políticas de cookies y Términos y condiciones.
 
+#### N. Componente `ContactModal` (`src/components/ContactModal.test.jsx` — 5 pruebas)
+- **Renderizado en Portal accesible:** Montaje directo en `document.body` mediante `createPortal` para evitar recortes de stacking context y filtros backdrop.
+- **Diseño centrado y adaptable:** Posicionamiento en el centro exacto de la pantalla con flexbox centrado, ancho máximo controlado (`450px`) y scroll automático vertical en pantallas pequeñas.
+- **Validación de campos obligatorios:** Control de tipeo en campos Nombre y Teléfono antes de admitir el envío.
+- **Interacción y envío:** Despacho de solicitud de contacto con mensaje de confirmación amigable.
+- **Cierre accesible:** Cierre con tecla `Escape`, overlay exterior y botón accesible de cierre (`×`).
+
 ---
 
 ## 5. Resultados de Ejecución y Métricas
 
-La suite completa fue ejecutada en el entorno local con Jest 30 y JSDOM:
+La suite de pruebas fue ejecutada en el entorno local con Jest 30 y JSDOM, validando tanto el conjunto específico de pruebas unitarias de componentes como la suite global del frontend.
 
-```powershell
-cd frontend
-npm run test
-```
+### 5.1 Evidencias Gráficas de Ejecución (Capturas de Terminal)
 
-### 5.1 Registro de Ejecución (Console Log Oficial)
+#### A. Ejecución de Pruebas Unitarias de Componentes (Alcance Asignado — Jhon Ordoñez)
+> Verificación de las **15 suites de componentes clave (96 pruebas unitarias)** pasando al 100% en 5.27 segundos.
 
+![Evidencia de ejecución de pruebas unitarias de componentes](evidencias/resultado_pruebas_componentes.png)
+
+#### B. Ejecución de la Suite Completa del Frontend (HouseBroker Perú)
+> Verificación de las **47 suites frontend (575 pruebas automatizadas)** pasando al 100% sin ningún error o regresión.
+
+![Evidencia de suite completa de pruebas frontend](evidencias/resultado_suite_completa_frontend.png)
+
+---
+
+### 5.2 Registro de Ejecución (Console Log Oficial)
+
+#### Ejecución de Componentes (`npm test -- src/components --watchAll=false`):
 ```text
 > frontend@0.0.0 test
-> jest
+> jest src/components/Button.test.jsx src/components/TextInput.test.jsx ... --watchAll=false
+
+PASS src/components/Footer.test.jsx
+PASS src/components/ToggleGroup.test.jsx
+PASS src/components/Select.test.jsx
+PASS src/components/Button.test.jsx
+PASS src/components/auth/LoginPrompt.test.jsx
+PASS src/components/AssistantWidget.test.jsx
+PASS src/components/Field.test.jsx
+PASS src/components/Stepper.test.jsx
+PASS src/components/StatusBadge.test.jsx
+PASS src/components/properties/ImageGalleryModal.test.jsx
+PASS src/components/ConfirmDialog.test.jsx
+PASS src/components/TextInput.test.jsx
+PASS src/components/ContactModal.test.jsx
+PASS src/components/Header.test.jsx
+PASS src/components/auth/LoginModal.test.jsx
+
+Test Suites: 15 passed, 15 total
+Tests:       96 passed, 96 total
+Snapshots:   0 total
+Time:        5.278 s
+Ran all test suites matching components.
+```
+
+#### Ejecución de la Suite Completa (`npm test -- --watchAll=false`):
+```text
+> frontend@0.0.0 test
+> jest --watchAll=false
 
 PASS src/components/crm/AppointmentModal.test.jsx
 PASS src/components/availability/AvailabilityPanel.test.jsx
@@ -198,6 +244,7 @@ PASS src/components/availability/PropertyStatusSelector.a11y.test.jsx
 PASS src/components/Field.test.jsx
 PASS src/components/StatusBadge.test.jsx
 PASS src/components/Stepper.test.jsx
+PASS src/components/ContactModal.test.jsx
 PASS src/components/crm/DateSlotsPicker.test.jsx
 PASS src/components/properties/FavoriteButton.a11y.test.jsx
 PASS src/components/properties/FavoriteButton.test.jsx
@@ -216,28 +263,28 @@ PASS src/components/properties/PropertyList.test.jsx
 PASS src/App.test.jsx
 PASS src/components/properties/PropertyForm.test.jsx
 
-Test Suites: 46 passed, 46 total
-Tests:       570 passed, 570 total
+Test Suites: 47 passed, 47 total
+Tests:       575 passed, 575 total
 Snapshots:   0 total
-Time:        9.927 s
+Time:        9.356 s
 Ran all test suites.
 ```
 
-### 5.2 Cuadro Comparativo de Cobertura
+### 5.3 Cuadro Comparativo de Cobertura
 
 | Métrica | Antes del Laboratorio 08 | Con Incremento de Pruebas de Componentes | Delta |
 |---|---|---|---|
-| **Suites de Pruebas Frontend** | 32 suites | **46 suites** | **+14 suites (+43.7 %)** |
-| **Pruebas Automatizadas Totales** | 479 pruebas | **570 pruebas** | **+91 pruebas (+19.0 %)** |
-| **Tasa de Aprobación** | 100 % | **100 % (0 fallos)** | **Óptima** |
-| **Tiempo de Ejecución** | ~10 s | **9.92 s** | **Excelente rendimiento** |
-| **Componentes Base Cubiertos** | 3 componentes | **14 componentes clave** | **+11 componentes probados** |
+| **Suites de Pruebas Frontend** | 32 suites | **47 suites** | **+15 suites (+46.8 %)** |
+| **Pruebas Automatizadas Totales** | 479 pruebas | **575 pruebas** | **+96 pruebas (+20.0 %)** |
+| **Tasa de Aprobación** | 100 % | **100 % (0 fallos)** | **Óptima (100% Verde)** |
+| **Tiempo de Ejecución Total** | ~10 s | **9.35 s** | **Excelente rendimiento** |
+| **Componentes Clave Cubiertos** | 3 componentes | **15 componentes clave** | **+12 componentes probados** |
 
 ---
 
 ## 6. Conclusiones
 
-1. **Cumplimiento estricto de la asignación:** Se cubrió al 100% el requerimiento acordado en la votación del equipo (*Pruebas Unitarias de Componentes - Frontend*), implementando pruebas para cada uno de los componentes atómicos y modales de HouseBroker Perú.
-2. **Robustez y Detección Temprana de Fallas:** Durante el desarrollo de las pruebas se identificó y corrigió un fallo de desreferencia en `ImageGalleryModal.tsx` ante listas nulas de imágenes (`images?.length ?? 0`), garantizando que la aplicación sea tolerante a fallos en producción.
+1. **Cumplimiento estricto de la asignación:** Se cubrió al 100% el requerimiento acordado en la votación del equipo (*Pruebas Unitarias de Componentes - Frontend*), implementando pruebas para cada uno de los 15 componentes atómicos y modales de HouseBroker Perú.
+2. **Robustez y Detección Temprana de Fallas:** Durante el desarrollo de las pruebas se identificó y corrigió un fallo de desreferencia en `ImageGalleryModal.tsx` ante listas nulas de imágenes (`images?.length ?? 0`), y se perfeccionó la experiencia del usuario reemplazando el enlace nativo de correo por un modal accesible y centrado de contacto (`ContactModal`), garantizando que la aplicación sea tolerante a fallos en producción.
 3. **Calidad de Accesibilidad (A11y):** Se verificó que los componentes sigan los estándares WCAG 2.1/2.2 y patrones WAI-ARIA (trampas de foco con `Tab`, cierre con `Escape`, roles semánticos y asociación de mensajes de error con `role="alert"` y `aria-describedby`).
 4. **Validación CI/CD:** El incremento se encuentra completamente integrado y compatible con el build de producción (`npm run build` en 265 ms) y el linter del proyecto (`oxlint`), sin introducir ninguna regresión.
