@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { ContactModal } from './ContactModal'
 import './Header.css'
 
 export type Section = 'inicio' | 'propiedades' | 'guardados' | 'visitas'
@@ -26,6 +27,7 @@ export function Header({ current, conciergeOpen, savedCount, visitsCount, onNavi
   const { user, signOut } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [contactModalOpen, setContactModalOpen] = useState(false)
   const navigate = useNavigate()
 
   const counts: Partial<Record<NavTarget, number>> = {
@@ -67,9 +69,14 @@ export function Header({ current, conciergeOpen, savedCount, visitsCount, onNavi
         </div>
 
         <div className="hdr__right">
-          <a className="hdr__cta hdr__desktop-only" href="mailto:asesores@housebroker.pe">
+          <button 
+            type="button"
+            className="hdr__cta hdr__desktop-only" 
+            onClick={() => setContactModalOpen(true)}
+            style={{ border: 'none', cursor: 'pointer' }}
+          >
             Contactar asesor
-          </a>
+          </button>
 
           {!user ? (
             <button 
@@ -183,19 +190,28 @@ export function Header({ current, conciergeOpen, savedCount, visitsCount, onNavi
                   key={item.id}
                   type="button"
                   className={`hdr__mobile-link ${active ? 'hdr__mobile-link--active' : ''}`}
+                  aria-current={active ? 'page' : undefined}
                   onClick={() => handleNav(item.id)}
                 >
                   {item.label}
-                  {badge != null && badge > 0 && <span className="hdr__count" style={{marginLeft: '8px'}}>{badge}</span>}
+                  {badge != null && badge > 0 && <span className="hdr__mobile-count">{badge}</span>}
                 </button>
               )
             })}
           </nav>
 
           <div className="hdr__mobile-actions">
-            <a className="hdr__mobile-cta" href="mailto:asesores@housebroker.pe">
+            <button 
+              type="button" 
+              className="hdr__mobile-cta" 
+              onClick={() => {
+                setMobileMenuOpen(false)
+                setContactModalOpen(true)
+              }}
+              style={{ border: 'none', cursor: 'pointer', textAlign: 'center', width: '100%' }}
+            >
               Contactar asesor
-            </a>
+            </button>
 
             {!user ? (
               <button 
@@ -250,6 +266,9 @@ export function Header({ current, conciergeOpen, savedCount, visitsCount, onNavi
           </div>
         </div>
       )}
+
+      {/* Modal interactivo de contacto directo */}
+      <ContactModal isOpen={contactModalOpen} onClose={() => setContactModalOpen(false)} />
     </header>
   )
 }
