@@ -40,7 +40,7 @@ export function useFilterParams(bounds: { min: number; max: number }) {
       const monedaChanged = prevMoneda !== nextMoneda
       const prevOp = searchParams.get('operacion') || ''
       const nextOp = newFilters.operacion || ''
-      const opChanged = prevOp !== nextOp
+      const opChanged = Boolean(prevOp && nextOp && prevOp !== nextOp)
 
       if (newFilters.operacion) params.set('operacion', newFilters.operacion)
       else params.delete('operacion')
