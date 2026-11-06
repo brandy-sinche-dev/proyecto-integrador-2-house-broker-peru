@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 interface ContactModalProps {
   isOpen: boolean
@@ -33,19 +34,19 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
   }, [isOpen, onClose])
 
   if (!isOpen) return null
+  if (typeof document === 'undefined') return null
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
-    // Simulación de envío de lead a CRM / API
     setTimeout(() => {
       setLoading(false)
       setSent(true)
-    }, 600)
+    }, 500)
   }
 
-  return (
+  const modalElement = (
     <div
       style={{
         position: 'fixed',
@@ -53,12 +54,15 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
         left: 0,
         right: 0,
         bottom: 0,
+        width: '100vw',
+        height: '100vh',
         backgroundColor: 'rgba(0, 0, 0, 0.65)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 99999,
+        zIndex: 999999,
         padding: '1rem',
+        boxSizing: 'border-box',
         backdropFilter: 'blur(4px)',
       }}
       onClick={onClose}
@@ -68,10 +72,15 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
           background: 'white',
           borderRadius: '16px',
           width: '100%',
-          maxWidth: '460px',
+          maxWidth: '450px',
+          maxHeight: 'min(92vh, 640px)',
+          display: 'flex',
+          flexDirection: 'column',
           position: 'relative',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
           overflow: 'hidden',
+          boxSizing: 'border-box',
+          margin: 'auto',
           animation: 'fadeIn 0.2s ease-out',
         }}
         onClick={(e) => e.stopPropagation()}
@@ -83,9 +92,10 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
         <div
           style={{
             backgroundColor: 'var(--brand-bronze-deep, #562B05)',
-            padding: '1.5rem',
+            padding: '1.25rem 1.5rem',
             color: 'var(--brand-cream, #fbf9f8)',
             position: 'relative',
+            flexShrink: 0,
           }}
         >
           <button
@@ -93,41 +103,66 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
             aria-label="Cerrar"
             style={{
               position: 'absolute',
-              top: '14px',
-              right: '16px',
+              top: '12px',
+              right: '14px',
               background: 'none',
               border: 'none',
               fontSize: '26px',
               cursor: 'pointer',
-              color: 'rgba(255, 255, 255, 0.8)',
+              color: 'rgba(255, 255, 255, 0.85)',
               lineHeight: 1,
+              padding: '4px 8px',
             }}
           >
             &times;
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span
               style={{
-                width: '10px',
-                height: '10px',
+                width: '9px',
+                height: '9px',
                 borderRadius: '50%',
                 backgroundColor: '#22c55e',
                 boxShadow: '0 0 8px #22c55e',
               }}
             />
-            <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--brand-gold, #e9c484)', fontWeight: 600 }}>
+            <span
+              style={{
+                fontSize: '11px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                color: 'var(--brand-gold, #e9c484)',
+                fontWeight: 700,
+              }}
+            >
               Asesores disponibles ahora
             </span>
           </div>
-          <h2 id="contact-modal-title" style={{ margin: '0.4rem 0 0.2rem 0', fontSize: '1.25rem', fontWeight: 700 }}>
+          <h2
+            id="contact-modal-title"
+            style={{
+              margin: '0.35rem 0 0.15rem 0',
+              fontSize: '1.2rem',
+              fontWeight: 700,
+              color: 'var(--brand-cream, #fbf9f8)',
+            }}
+          >
             Contacta con un Asesor
           </h2>
-          <p style={{ margin: 0, fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.8)' }}>
+          <p style={{ margin: 0, fontSize: '0.82rem', color: 'rgba(255, 255, 255, 0.8)' }}>
             HouseBroker Perú — Atención personalizada inmediata
           </p>
         </div>
 
-        <div style={{ padding: '1.5rem' }}>
+        {/* Cuerpo del modal scrolleable si la pantalla es muy pequeña */}
+        <div
+          style={{
+            padding: '1.25rem 1.5rem',
+            overflowY: 'auto',
+            flex: 1,
+            boxSizing: 'border-box',
+          }}
+        >
           {sent ? (
             <div style={{ textAlign: 'center', padding: '1.5rem 0.5rem' }}>
               <div
@@ -142,15 +177,16 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
                   justifyContent: 'center',
                   margin: '0 auto 1rem auto',
                   fontSize: '28px',
+                  fontWeight: 'bold',
                 }}
               >
                 ✓
               </div>
-              <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--brand-bronze-deep, #562B05)', fontSize: '1.2rem' }}>
+              <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--brand-bronze-deep, #562B05)', fontSize: '1.15rem' }}>
                 ¡Solicitud enviada con éxito!
               </h3>
-              <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.9rem', color: '#4b5563', lineHeight: 1.5 }}>
-                Gracias por comunicarte con nosotros, <strong>{name || 'cliente'}</strong>. Un asesor inmobiliario te escribirá o llamará a la brevedad al número <strong>{phone}</strong>.
+              <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.88rem', color: '#4b5563', lineHeight: 1.5 }}>
+                Gracias por comunicarte con nosotros, <strong>{name || 'estimado cliente'}</strong>. Un asesor especializado de HouseBroker Perú te escribirá o llamará a la brevedad al número <strong>{phone}</strong>.
               </p>
               <button
                 type="button"
@@ -172,7 +208,7 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
           ) : (
             <>
               {/* Canales Directos Inmediatos */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginBottom: '1rem' }}>
                 <a
                   href="https://wa.me/51908941175?text=Hola,%20deseo%20información%20y%20asesoría%20sobre%20propiedades%20en%20HouseBroker%20Perú."
                   target="_blank"
@@ -182,15 +218,14 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '10px',
-                    padding: '0.85rem 1rem',
+                    padding: '0.75rem 1rem',
                     backgroundColor: '#25D366',
                     color: 'white',
                     borderRadius: '8px',
                     textDecoration: 'none',
                     fontWeight: 700,
-                    fontSize: '14px',
+                    fontSize: '13.5px',
                     boxShadow: '0 2px 4px rgba(37, 211, 102, 0.25)',
-                    transition: 'opacity 0.2s',
                   }}
                 >
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -199,25 +234,25 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
                   Chatear por WhatsApp (+51 908 941 175)
                 </a>
 
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                   <a
                     href="tel:968614624"
                     style={{
-                      flex: 1,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '8px',
-                      padding: '0.65rem 0.75rem',
+                      gap: '6px',
+                      padding: '0.6rem 0.5rem',
                       backgroundColor: '#f3f4f6',
                       color: '#374151',
                       borderRadius: '8px',
                       textDecoration: 'none',
-                      fontSize: '13px',
+                      fontSize: '12.5px',
                       fontWeight: 600,
+                      textAlign: 'center',
                     }}
                   >
-                    📞 Llamar: 968 614 624
+                    📞 968 614 624
                   </a>
                   <button
                     type="button"
@@ -226,12 +261,16 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
                       alert('Correo asesores@housebroker.pe copiado al portapapeles.')
                     }}
                     style={{
-                      padding: '0.65rem 0.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      padding: '0.6rem 0.5rem',
                       backgroundColor: '#f3f4f6',
                       color: '#374151',
                       border: 'none',
                       borderRadius: '8px',
-                      fontSize: '13px',
+                      fontSize: '12.5px',
                       fontWeight: 600,
                       cursor: 'pointer',
                     }}
@@ -243,18 +282,34 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
               </div>
 
               {/* Separador */}
-              <div style={{ display: 'flex', alignItems: 'center', margin: '1rem 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', margin: '0.85rem 0' }}>
                 <div style={{ flex: 1, height: '1px', backgroundColor: '#e5e7eb' }} />
-                <span style={{ padding: '0 0.75rem', fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <span
+                  style={{
+                    padding: '0 0.5rem',
+                    fontSize: '10.5px',
+                    color: '#9ca3af',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}
+                >
                   O déjanos tus datos
                 </span>
                 <div style={{ flex: 1, height: '1px', backgroundColor: '#e5e7eb' }} />
               </div>
 
               {/* Formulario de captura rápida */}
-              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '0.25rem' }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.2rem',
+                    }}
+                  >
                     Tu nombre completo *
                   </label>
                   <input
@@ -265,7 +320,7 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
                     placeholder="Ej. Juan Pérez"
                     style={{
                       width: '100%',
-                      padding: '0.65rem 0.75rem',
+                      padding: '0.6rem 0.75rem',
                       borderRadius: '6px',
                       border: '1px solid #d1d5db',
                       fontSize: '13px',
@@ -275,7 +330,15 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '0.25rem' }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.2rem',
+                    }}
+                  >
                     Teléfono / WhatsApp *
                   </label>
                   <input
@@ -286,7 +349,7 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
                     placeholder="Ej. 999 888 777"
                     style={{
                       width: '100%',
-                      padding: '0.65rem 0.75rem',
+                      padding: '0.6rem 0.75rem',
                       borderRadius: '6px',
                       border: '1px solid #d1d5db',
                       fontSize: '13px',
@@ -296,7 +359,15 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '0.25rem' }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '0.2rem',
+                    }}
+                  >
                     Mensaje o consulta
                   </label>
                   <textarea
@@ -305,7 +376,7 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
                     onChange={(e) => setMessage(e.target.value)}
                     style={{
                       width: '100%',
-                      padding: '0.65rem 0.75rem',
+                      padding: '0.6rem 0.75rem',
                       borderRadius: '6px',
                       border: '1px solid #d1d5db',
                       fontSize: '13px',
@@ -319,14 +390,14 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
                   type="submit"
                   disabled={loading}
                   style={{
-                    marginTop: '0.5rem',
+                    marginTop: '0.35rem',
                     padding: '0.75rem',
                     backgroundColor: 'var(--brand-gold, #e9c484)',
                     color: 'var(--brand-bronze-deep, #562B05)',
                     border: 'none',
                     borderRadius: '8px',
                     fontWeight: 700,
-                    fontSize: '14px',
+                    fontSize: '13.5px',
                     cursor: loading ? 'not-allowed' : 'pointer',
                     boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
                     opacity: loading ? 0.7 : 1,
@@ -341,4 +412,6 @@ export function ContactModal({ isOpen, onClose }: ContactModalProps) {
       </div>
     </div>
   )
+
+  return createPortal(modalElement, document.body)
 }

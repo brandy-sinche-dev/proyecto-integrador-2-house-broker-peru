@@ -2,8 +2,7 @@
 // Pruebas unitarias del modal de contacto directo (ContactModal)
 // =============================================================
 
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { ContactModal } from './ContactModal'
 
 describe('Componente ContactModal (Pruebas Unitarias)', () => {
@@ -39,7 +38,7 @@ describe('Componente ContactModal (Pruebas Unitarias)', () => {
     expect(whatsappLink).toHaveAttribute('rel', 'noreferrer')
 
     // Enlace telefónico directo
-    const phoneLink = screen.getByRole('link', { name: /Llamar: 968 614 624/i })
+    const phoneLink = screen.getByRole('link', { name: /968 614 624/i })
     expect(phoneLink).toHaveAttribute('href', 'tel:968614624')
 
     // Formulario de contacto
