@@ -71,7 +71,7 @@ footer{padding:30px 0 40px;color:var(--mut);font-size:.88rem}
 <article class="card"><p class="who">Backend · Pytest · Brandy</p><div class="donut" id="d-back" data-label="Backend: 565 aprobadas, 0 fallidas"></div></article>
 <article class="card"><p class="who">E2E · Playwright · Yohan Ñato</p><div class="donut" id="d-e2e" data-label="E2E: 6 aprobadas, 2 fallidas"></div></article>
 <article class="card"><p class="who">Accesibilidad · axe · Anderson Villanes</p><div class="donut" id="d-sev" data-label="Hallazgos por severidad"></div></article>
-<article class="card"><p class="who">Frontend · Jest · Jhon Ordoñez</p><p style="font-size:1.6rem;font-weight:700;margin:4px 0">Por confirmar</p><p class="note">Esperando el reporte de Jest con cobertura.</p><p style="margin:10px 0 0"><span class="chip wr">Pendiente</span></p></article>
+<article class="card"><p class="who">Frontend · Jest · Jhon Ordoñez</p><div class="donut" id="d-front" data-label="Frontend: 575 aprobadas, 0 fallidas"></div></article>
 </div></section>
 
 <section id="metas"><h2>Metas y umbrales de aceptación</h2>
@@ -81,8 +81,8 @@ footer{padding:30px 0 40px;color:var(--mut);font-size:.88rem}
 <div class="gau" data-v="94.64" data-m="93" data-c="ok"><div class="row"><span>Cobertura backend</span><b>94.64 % · meta ≥ 93 %</b></div><div class="tk"><i></i><b></b></div></div>
 <div class="gau" data-v="100" data-m="100" data-c="ok"><div class="row"><span>Éxito de pruebas backend</span><b>100 % · meta 100 %</b></div><div class="tk"><i></i><b></b></div></div>
 <div class="gau" data-v="75" data-m="100" data-c="bad"><div class="row"><span>Éxito de escenarios E2E</span><b>75 % · meta 100 %</b></div><div class="tk"><i></i><b></b></div></div>
-<p class="note">La línea negra marca la meta.</p></div>
-<div class="card"><h3>Estado de cumplimiento</h3><div class="donut" id="d-meta" data-label="Metas: 3 cumplen, 4 no cumplen, 2 por medir"></div></div></div>
+<div class="gau" data-v="100" data-m="100" data-c="ok"><div class="row"><span>Éxito de pruebas frontend</span><b>100 % · meta 100 %</b></div><div class="tk"><i></i><b></b></div></div><p class="note">La línea negra marca la meta.</p></div>
+<div class="card"><h3>Estado de cumplimiento</h3><div class="donut" id="d-meta" data-label="Metas: 4 cumplen, 4 no cumplen, 2 por medir"></div></div></div>
 <div class="tw"><table><thead><tr><th>Capa</th><th>Métrica</th><th>Meta</th><th>Actual</th><th>Estado</th><th>Origen</th></tr></thead><tbody>
 <tr><td>Backend</td><td>Cobertura de líneas</td><td>≥ 93 %</td><td>94.64 %</td><td><span class="chip ok">Cumple</span></td><td>Formal: el runner falla si baja</td></tr>
 <tr><td>Backend</td><td>Pruebas aprobadas</td><td>100 %</td><td>565 de 565</td><td><span class="chip ok">Cumple</span></td><td>Propuesta</td></tr>
@@ -92,7 +92,7 @@ footer{padding:30px 0 40px;color:var(--mut);font-size:.88rem}
 <tr><td>Accesibilidad</td><td>Contraste de texto normal</td><td>≥ 4.5:1</td><td>Caso medido 4.48:1</td><td><span class="chip bad">No cumple</span></td><td>Formal: WCAG 2.2 AA</td></tr>
 <tr><td>Accesibilidad</td><td>Desbordamiento horizontal en 390 px</td><td>0 px</td><td>424 px en el panel del agente</td><td><span class="chip bad">No cumple</span></td><td>Formal: criterio de salida del informe</td></tr>
 <tr><td>Accesibilidad</td><td>Lighthouse, puntaje de accesibilidad</td><td>≥ 90</td><td>No se ejecutó</td><td><span class="chip wr">Por medir</span></td><td>Propuesta (banda «buena» de Lighthouse)</td></tr>
-<tr><td>Frontend</td><td>Pruebas Jest aprobadas y cobertura</td><td>Por definir</td><td>Sin reporte oficial</td><td><span class="chip wr">Por medir</span></td><td>Propuesta</td></tr></tbody></table></div>
+<tr><td>Frontend</td><td>Pruebas Jest aprobadas</td><td>100 %</td><td>575 de 575</td><td><span class="chip ok">Cumple</span></td><td>Propuesta</td></tr><tr><td>Frontend</td><td>Cobertura de líneas de Jest</td><td>Por definir</td><td>El informe no la reporta</td><td><span class="chip wr">Por medir</span></td><td>Propuesta</td></tr></tbody></table></div>
 </section>
 
 <section id="backend"><h2>Backend: Pytest y Django Test Runner</h2>
@@ -101,7 +101,7 @@ footer{padding:30px 0 40px;color:var(--mut);font-size:.88rem}
 <div class="card"><h3>Unitarias frente a integración</h3><div class="donut" id="d-capas" data-label="144 unitarias, 421 de integración"></div></div>
 <div class="card"><h3>Pruebas por módulo</h3><div id="b-mod"></div></div>
 <div class="card"><h3>Cobertura de líneas</h3><div class="gau" data-v="94.64" data-m="93" data-c="ok"><div class="row"><span>2331 de 2463 líneas</span><b>94.64 %</b></div><div class="tk"><i></i><b></b></div></div><p class="note">Los servicios de negocio no aparecen entre los archivos con líneas sin cubrir. Margen sobre el umbral: 1.64 puntos.</p></div></div>
-<div class="card" style="margin-top:14px"><h3>Respuestas HTTP evaluadas (todos los módulos)</h3><div id="b-http"></div><p class="note">Cuenta respuestas, no pruebas: una prueba puede hacer varias llamadas.</p></div>
+<div class="card" style="margin-top:14px"><h3>Respuestas HTTP evaluadas (todos los módulos)</h3><div id="b-http"></div><p class="note">Solo las pruebas de integración generan códigos HTTP; las 144 unitarias no tienen endpoint. Se cuentan respuestas, no pruebas: una prueba puede hacer varias llamadas. Casos de error o permisos (400, 401, 403, 404, 409): 256 de 565, cerca de 45 %.</p></div>
 <div class="tw"><table><caption>Detalle por módulo</caption><thead><tr><th>Módulo</th><th class="n">Pruebas</th><th class="n">OK</th><th>Códigos HTTP</th></tr></thead><tbody>
 <tr><td>Autenticación</td><td class="n">25</td><td class="n">25</td><td>200 ×15, 201 ×2, 202 ×4, 400 ×8, 401 ×7, 403 ×2, 409 ×1</td></tr>
 <tr><td>Propiedades</td><td class="n">241</td><td class="n">241</td><td>200 ×121, 201 ×4, 204 ×8, 400 ×52, 401 ×13, 403 ×20, 404 ×18</td></tr>
@@ -138,19 +138,32 @@ footer{padding:30px 0 40px;color:var(--mut);font-size:.88rem}
 <div class="alert w"><strong>Limitaciones del informe:</strong> Lighthouse no se ejecutó (no estaba instalado), por lo que no hay métricas de rendimiento, SEO ni buenas prácticas. Tampoco hubo lector de pantalla real ni matriz de navegadores. La suite jest-axe existente pasa 72 de 72, pero no cubre todas las rutas y estados. El flujo cliente–agente se completó de principio a fin.</div></section>
 
 <section id="front"><h2>Frontend: Jest y React Testing Library</h2>
-<div class="alert w"><strong>Por confirmar con Jhon.</strong> No hay reporte oficial de Jest. Como referencia, el informe de accesibilidad registra una corrida completa con 475 pruebas aprobadas y 4 fallidas en <code>useFilterParams.test.jsx</code>. Ese dato no entra en los totales hasta confirmarlo.</div></section>
+<p class="sub">Informe del Laboratorio 08 de Jhon Ordoñez: 575 pruebas en 47 suites, todas aprobadas, en 9.36 s. Su alcance son las pruebas unitarias de componentes: 15 suites y 96 pruebas, en 5.28 s.</p>
+<div class="grid">
+<div class="card"><h3>Alcance de Jhon dentro de la suite</h3><div class="donut" id="d-fscope" data-label="96 pruebas de componentes y 479 del resto"></div></div>
+<div class="card"><h3>Antes y después del laboratorio</h3><div id="b-fant"></div><div id="b-fsu" style="margin-top:6px"></div><p class="note">Sin fallos en la corrida actual.</p></div>
+<div class="card"><h3>Pruebas por componente</h3><div id="b-fcomp"></div><p class="note">*AssistantWidget: 7 pruebas deducidas (96 menos las 89 descritas); el informe no lo detalla.</p></div></div>
+<div class="tw"><table><caption>Trazabilidad: historia de usuario, componentes y pruebas</caption><thead><tr><th>Historia de usuario</th><th>Componentes</th><th class="n">Pruebas</th><th>Criterio validado</th></tr></thead><tbody>
+<tr><td>HU-PROP-01 Registro y edición de inmuebles</td><td>Field, TextInput, Select, Stepper</td><td class="n">24</td><td>Campos obligatorios, rótulos accesibles, estados de error, progreso por pasos</td></tr>
+<tr><td>HU-PROP-02 Catálogo y galería</td><td>ToggleGroup, StatusBadge, ImageGalleryModal</td><td class="n">13</td><td>Filtro por modalidad, estado del inmueble, navegación con teclado</td></tr>
+<tr><td>HU-PROP-05 Favoritos</td><td>LoginPrompt</td><td class="n">6</td><td>Aviso al usuario sin sesión</td></tr>
+<tr><td>HU-SEC-01 Sesión y roles</td><td>LoginModal, Header</td><td class="n">16</td><td>Login y registro, redirección por rol, navegación</td></tr>
+<tr><td>Transversal</td><td>ConfirmDialog, Button, ContactModal, Footer</td><td class="n">30</td><td>Diálogos accesibles con trampa de foco, variantes, contacto, enlaces institucionales</td></tr>
+<tr><th>Total descrito</th><th></th><th class="n">89</th><th>Más AssistantWidget (7 deducidas) = 96</th></tr></tbody></table></div>
+<div class="alert w"><strong>Defecto detectado y corregido:</strong> las pruebas revelaron un fallo en <code>ImageGalleryModal</code> cuando la lista de imágenes llegaba nula. Se corrigió con <code>images?.length ?? 0</code>.</div>
+<div class="alert w"><strong>Limitaciones:</strong> el informe no reporta cobertura de líneas de Jest; su cuadro de «cobertura» cuenta suites y pruebas. Dentro de las 575 hay 7 suites de accesibilidad con jest-axe (72 pruebas según el informe de accesibilidad).</div></section>
 
 <section id="herr"><h2>Herramientas y relación con estándares</h2>
 <div class="tw"><table><thead><tr><th>Capa</th><th>Responsable</th><th>Herramienta</th><th>Evidencia que aporta</th><th>Estándar o referencia</th></tr></thead><tbody>
 <tr><td>Backend</td><td>Brandy</td><td>Pytest 9.2.0, Django 6.1.1, pytest-django 4.14.0, pytest-cov 7.1.0</td><td>Reglas de negocio, permisos por rol, códigos HTTP, cobertura</td><td>ISO/IEC 25010 (adecuación funcional, seguridad, fiabilidad); ISTQB (valores límite, transiciones de estado)</td></tr>
-<tr><td>Frontend</td><td>Jhon Ordoñez</td><td>Jest, React Testing Library</td><td>Comportamiento de componentes (por confirmar)</td><td>ISTQB, pruebas de componente</td></tr>
+<tr><td>Frontend</td><td>Jhon Ordoñez</td><td>Jest 30.5.1, React Testing Library 16.3.3, user-event 14.6.7, jest-axe 11.0.0</td><td>Comportamiento de componentes, foco, teclado y roles ARIA</td><td>ISTQB (nivel componente); WAI-ARIA y WCAG 2.1/2.2 en foco y roles</td></tr>
 <tr><td>E2E</td><td>Yohan Ñato</td><td>Playwright</td><td>Flujos completos en navegador</td><td>ISTQB, nivel sistema</td></tr>
 <tr><td>Accesibilidad</td><td>Anderson Villanes</td><td>axe-core, jest-axe, revisión manual</td><td>Violaciones por ruta, foco, landmarks, contraste</td><td>WCAG 2.2 AA; ISO/IEC 25010 (usabilidad)</td></tr></tbody></table></div>
 <p class="note">Las pruebas aportan evidencia alineada con estos estándares; no certifican cumplimiento.</p></section>
 
 <section id="pend"><h2>Pendiente</h2>
 <div class="tw"><table><thead><tr><th>Elemento</th><th>Estado</th></tr></thead><tbody>
-<tr><td>Reporte de Jest con cobertura</td><td><span class="chip wr">Por confirmar</span></td></tr>
+<tr><td>Cobertura de líneas de Jest (el informe no la reporta)</td><td><span class="chip wr">Por confirmar</span></td></tr>
 <tr><td>Evolución de pruebas por sprint (sprints 1 a 5)</td><td><span class="chip wr">Por confirmar: faltan fechas y módulos</span></td></tr>
 <tr><td>Acordar las metas marcadas como «Propuesta»</td><td><span class="chip wr">Por acordar</span></td></tr>
 <tr><td>Corregir los 2 selectores de Playwright y repetir</td><td><span class="chip pn">Sprint 6</span></td></tr>
@@ -173,7 +186,12 @@ items.forEach(function(i){h+='<div class="br"><span>'+i.l+'</span><span class="t
 donut('d-back',[{v:565,c:'ok',l:'Aprobadas'},{v:0,c:'bad',l:'Fallidas'}],'565','de 565');
 donut('d-e2e',[{v:6,c:'ok',l:'Aprobadas'},{v:2,c:'bad',l:'Fallidas'}],'6 de 8','75 %');
 donut('d-sev',[{v:1,c:'bad',l:'Crítica'},{v:5,c:'wr',l:'Alta'},{v:3,c:'in',l:'Media'},{v:1,c:'pn',l:'Baja'}],'10','hallazgos');
-donut('d-meta',[{v:3,c:'ok',l:'Cumplen'},{v:4,c:'bad',l:'No cumplen'},{v:2,c:'wr',l:'Por medir'}],'3 de 9','cumplen');
+donut('d-meta',[{v:4,c:'ok',l:'Cumplen'},{v:4,c:'bad',l:'No cumplen'},{v:2,c:'wr',l:'Por medir'}],'4 de 10','cumplen');
+donut('d-front',[{v:575,c:'ok',l:'Aprobadas'},{v:0,c:'bad',l:'Fallidas'}],'575','de 575');
+donut('d-fscope',[{v:96,c:'in',l:'Componentes (Lab. 08)'},{v:479,c:'pn',l:'Resto de la suite'}],'575','pruebas');
+bars('b-fant',[{l:'Antes: pruebas',v:479,c:'pn'},{l:'Ahora: pruebas',v:575,c:'ok'}]);
+bars('b-fsu',[{l:'Antes: suites',v:32,c:'pn'},{l:'Ahora: suites',v:47,c:'ok'}],47);
+bars('b-fcomp',[{l:'Button',v:11},{l:'ConfirmDialog',v:10},{l:'LoginModal',v:9},{l:'TextInput',v:7},{l:'Select',v:7},{l:'ImageGalleryModal',v:7},{l:'Header',v:7},{l:'AssistantWidget*',v:7,c:'wr'},{l:'Field',v:6},{l:'LoginPrompt',v:6},{l:'ContactModal',v:5},{l:'Stepper',v:4},{l:'ToggleGroup',v:4},{l:'Footer',v:4},{l:'StatusBadge',v:2}]);
 donut('d-capas',[{v:144,c:'in',l:'Unitarias'},{v:421,c:'wr',l:'Integración'}],'565','pruebas');
 donut('d-det',[{v:7,c:'in',l:'axe-core'},{v:3,c:'wr',l:'Revisión manual'}],'10','hallazgos');
 bars('b-mod',[{l:'Autenticación',v:25},{l:'Propiedades',v:241},{l:'Citas',v:174},{l:'CRM',v:125}]);
