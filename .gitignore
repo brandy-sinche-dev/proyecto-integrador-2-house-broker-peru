@@ -9,6 +9,8 @@ __pycache__/
 *.pyc
 *.sqlite3
 backend/staticfiles/
+backend/.coverage
+backend/htmlcov/
 
 # Node / React (Vite)
 node_modules/

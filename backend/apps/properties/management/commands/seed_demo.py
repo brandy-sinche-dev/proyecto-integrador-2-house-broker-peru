@@ -16,6 +16,7 @@ from django.db import transaction
 from apps.properties.models import (
     District,
     Property,
+    PropertyImage,
     PropertySchedule,
     PropertyStatus,
     PropertyType,
@@ -151,6 +152,31 @@ WEEKDAY_SLOTS = {
     Weekday.SABADO: [(time(9, 0), time(13, 0))],
 }
 
+# Fotografías de demostración servidas desde `frontend/public/properties/demo`.
+# La primera imagen de cada conjunto es la portada; el resto forma la galería.
+IMAGE_SETS = {
+    PropertyType.CASA: [
+        "/properties/demo/casa1.jpg",
+        "/properties/demo/casa2.jpg",
+        "/properties/demo/casa3.jpg",
+        "/properties/demo/casa4.jpg",
+    ],
+    PropertyType.DEPARTAMENTO: [
+        "/properties/demo/depa1.jpg",
+        "/properties/demo/depa2.jpg",
+        "/properties/demo/depa3.jpg",
+    ],
+    PropertyType.OFICINA: [
+        "/properties/demo/oficina1.jpg",
+        "/properties/demo/oficina2.jpg",
+        "/properties/demo/oficina3.jpg",
+    ],
+    PropertyType.TERRENO: [
+        "/properties/demo/terreno1.jpg",
+        "/properties/demo/terreno2.jpg",
+    ],
+}
+
 
 class Command(BaseCommand):
     help = "Siembra usuarios, distritos, propiedades y agendas de demostración."
@@ -214,7 +240,10 @@ class Command(BaseCommand):
             )
             if was_created:
                 created += 1
-                self._ensure_schedules(prop)
+            # Se ejecutan también sobre propiedades ya sembradas para que una
+            # base existente reciba las imágenes y agendas sin recrear filas.
+            self._ensure_schedules(prop)
+            self._ensure_images(prop, index)
 
         self.stdout.write(
             self.style.SUCCESS(
@@ -271,3 +300,26 @@ class Command(BaseCommand):
                     start_time=start,
                     defaults={"end_time": end},
                 )
+
+    def _ensure_images(self, prop, index):
+        gallery = IMAGE_SETS[PropertyType(prop.property_type)]
+        # La rotación evita que todas las tarjetas del catálogo compartan la
+        # misma portada, aun cuando reutilicen el conjunto de fotos del tipo.
+        offset = index % len(gallery)
+        ordered = gallery[offset:] + gallery[:offset]
+
+        has_cover = (
+            PropertyImage.objects.filter(property=prop, is_cover=True)
+            .exclude(storage_key=ordered[0])
+            .exists()
+        )
+        for order, storage_key in enumerate(ordered):
+            PropertyImage.objects.get_or_create(
+                property=prop,
+                storage_key=storage_key,
+                defaults={
+                    "sort_order": order,
+                    "is_cover": order == 0 and not has_cover,
+                    "alt_text": f"{prop.title} — imagen {order + 1}",
+                },
+            )

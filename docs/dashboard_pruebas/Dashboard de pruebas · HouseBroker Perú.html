@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dashboard de pruebas · HouseBroker Perú</title>
+<style>
+:root{--bg:#f3f5f7;--sf:#fff;--ink:#17222d;--mut:#566170;--ln:#d6dce3;--ok:#16684a;--okb:#dff2e9;--bad:#a9302f;--badb:#f8e0df;--wr:#8a5a0c;--wrb:#f8ecd2;--in:#24569b;--inb:#e1ebf8;--pn:#6b7480;--pnb:#e8ebef;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#11171e;--sf:#18212b;--ink:#e8edf2;--mut:#a3aebb;--ln:#2d3a47;--ok:#6fd1a5;--okb:#17372b;--bad:#f09a98;--badb:#3d1f1f;--wr:#e9bd6a;--wrb:#3a2f14;--in:#8db7f0;--inb:#1b2d47;--pn:#a3aebb;--pnb:#232e3a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#11171e;--sf:#18212b;--ink:#e8edf2;--mut:#a3aebb;--ln:#2d3a47;--ok:#6fd1a5;--okb:#17372b;--bad:#f09a98;--badb:#3d1f1f;--wr:#e9bd6a;--wrb:#3a2f14;--in:#8db7f0;--inb:#1b2d47;--pn:#a3aebb;--pnb:#232e3a;color-scheme:dark}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 52px);scroll-behavior:smooth}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Public Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+:focus-visible{outline:3px solid var(--in);outline-offset:2px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+header.top{padding:34px 0 16px}
+h1{font-size:clamp(1.6rem,4vw,2.3rem);line-height:1.15;margin:0 0 8px}
+h2{font-size:1.35rem;margin:0 0 4px}h3{font-size:1rem;margin:0 0 8px}
+.sub,.note{color:var(--mut);margin:0}.sub{max-width:70ch}.note{font-size:.88rem}
+nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--ln)}
+nav .wrap{display:flex;gap:6px;overflow-x:auto;padding-top:8px;padding-bottom:8px}
+nav a{white-space:nowrap;padding:6px 12px;border-radius:6px;text-decoration:none;color:var(--ink);font-size:.92rem}
+nav a:hover{background:var(--pnb)}
+section{padding:32px 0 6px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));margin-top:12px}
+.card{background:var(--sf);border:1px solid var(--ln);border-radius:10px;padding:16px}
+.who{color:var(--mut);font-size:.86rem;margin:0 0 8px}
+.chip{display:inline-block;padding:2px 9px;border-radius:99px;font-size:.82rem;font-weight:600;border:1px solid currentColor;white-space:nowrap}
+.ok{color:var(--ok);background:var(--okb)}.bad{color:var(--bad);background:var(--badb)}.wr{color:var(--wr);background:var(--wrb)}.pn{color:var(--pn);background:var(--pnb)}.in{color:var(--in);background:var(--inb)}
+.donut{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.donut svg{width:112px;height:112px;flex:none}
+.donut text{fill:var(--ink);font-weight:700;font-size:7px}.donut .t2{font-size:3.4px;font-weight:500;fill:var(--mut)}
+.lg{list-style:none;margin:0;padding:0;font-size:.88rem}
+.lg li{display:flex;align-items:center;gap:7px;margin:2px 0}.lg i{width:11px;height:11px;border-radius:3px;flex:none}
+.br{display:grid;grid-template-columns:minmax(90px,150px) 1fr 52px;align-items:center;gap:8px;margin:7px 0;font-size:.88rem}
+.br .tr{height:14px;border-radius:7px;background:var(--pnb);overflow:hidden}.br .tr i{display:block;height:100%;border-radius:7px}
+.br b{text-align:right;font-variant-numeric:tabular-nums}
+.c-ok{background:var(--ok)}.c-bad{background:var(--bad)}.c-wr{background:var(--wr)}.c-in{background:var(--in)}.c-pn{background:var(--pn)}
+.gau{margin:14px 0}.gau .row{display:flex;justify-content:space-between;gap:8px;font-size:.9rem;flex-wrap:wrap}
+.gau .tk{position:relative;height:16px;border-radius:8px;background:var(--pnb);margin-top:6px}
+.gau .tk i{position:absolute;inset:0 auto 0 0;border-radius:8px}.gau .tk b{position:absolute;top:-4px;bottom:-4px;width:3px;background:var(--ink)}
+.tw{overflow-x:auto;border:1px solid var(--ln);border-radius:10px;background:var(--sf);margin:12px 0}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:560px}
+caption{text-align:left;padding:10px 12px;color:var(--mut);font-size:.88rem}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--ln);vertical-align:top}
+th{background:var(--pnb);font-weight:600}tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+td.h{text-align:center}.hit{display:inline-block;width:22px;height:22px;border-radius:5px;background:var(--bad);color:var(--sf);font-weight:700;line-height:22px}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.filters button,#theme{font:inherit;font-size:.9rem;padding:6px 12px;border-radius:99px;border:1px solid var(--ln);background:var(--sf);color:var(--ink);cursor:pointer}
+.filters button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+#theme{float:right;border-radius:6px;padding:4px 10px;font-size:.85rem}
+.alert{border-left:4px solid var(--bad);background:var(--badb);padding:12px 14px;border-radius:0 8px 8px 0;margin:12px 0}.alert.w{border-color:var(--wr);background:var(--wrb)}
+code{font-family:ui-monospace,Consolas,monospace;font-size:.88em}
+footer{padding:30px 0 40px;color:var(--mut);font-size:.88rem}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+<button id="theme" type="button" aria-label="Cambiar entre tema claro y oscuro">Tema</button>
+<h1>Dashboard de pruebas · HouseBroker Perú</h1>
+<p class="sub">Avance 3, sprint 5 de 7. Resultados reales de las pruebas del equipo, con herramienta, responsable, metas de aceptación y relación con los estándares. Lo que aún no tiene datos aparece como «por confirmar».</p>
+</div></header>
+<nav aria-label="Secciones"><div class="wrap"><a href="#resumen">Resumen</a><a href="#metas">Metas y umbrales</a><a href="#backend">Backend</a><a href="#e2e">E2E</a><a href="#a11y">Accesibilidad</a><a href="#front">Frontend</a><a href="#herr">Herramientas y estándares</a><a href="#pend">Pendiente</a></div></nav>
+<main class="wrap">
+
+<section id="resumen"><h2>Resumen por capa</h2>
+<p class="note">Cada capa mide algo distinto (pruebas de código, flujos de navegador, hallazgos de auditoría), por eso no se suman.</p>
+<div class="grid">
+<article class="card"><p class="who">Backend · Pytest · Brandy</p><div class="donut" id="d-back" data-label="Backend: 565 aprobadas, 0 fallidas"></div></article>
+<article class="card"><p class="who">E2E · Playwright · Yohan Ñato</p><div class="donut" id="d-e2e" data-label="E2E: 6 aprobadas, 2 fallidas"></div></article>
+<article class="card"><p class="who">Accesibilidad · axe · Anderson Villanes</p><div class="donut" id="d-sev" data-label="Hallazgos por severidad"></div></article>
+<article class="card"><p class="who">Frontend · Jest · Jhon Ordoñez</p><p style="font-size:1.6rem;font-weight:700;margin:4px 0">Por confirmar</p><p class="note">Esperando el reporte de Jest con cobertura.</p><p style="margin:10px 0 0"><span class="chip wr">Pendiente</span></p></article>
+</div></section>
+
+<section id="metas"><h2>Metas y umbrales de aceptación</h2>
+<p class="sub">«Formal» significa que ya está configurado o escrito en un documento del proyecto. «Propuesta» es una meta sugerida que el equipo debe acordar: hoy no está definida.</p>
+<div class="grid">
+<div class="card"><h3>Meta frente a resultado actual</h3>
+<div class="gau" data-v="94.64" data-m="93" data-c="ok"><div class="row"><span>Cobertura backend</span><b>94.64 % · meta ≥ 93 %</b></div><div class="tk"><i></i><b></b></div></div>
+<div class="gau" data-v="100" data-m="100" data-c="ok"><div class="row"><span>Éxito de pruebas backend</span><b>100 % · meta 100 %</b></div><div class="tk"><i></i><b></b></div></div>
+<div class="gau" data-v="75" data-m="100" data-c="bad"><div class="row"><span>Éxito de escenarios E2E</span><b>75 % · meta 100 %</b></div><div class="tk"><i></i><b></b></div></div>
+<p class="note">La línea negra marca la meta.</p></div>
+<div class="card"><h3>Estado de cumplimiento</h3><div class="donut" id="d-meta" data-label="Metas: 3 cumplen, 4 no cumplen, 2 por medir"></div></div></div>
+<div class="tw"><table><thead><tr><th>Capa</th><th>Métrica</th><th>Meta</th><th>Actual</th><th>Estado</th><th>Origen</th></tr></thead><tbody>
+<tr><td>Backend</td><td>Cobertura de líneas</td><td>≥ 93 %</td><td>94.64 %</td><td><span class="chip ok">Cumple</span></td><td>Formal: el runner falla si baja</td></tr>
+<tr><td>Backend</td><td>Pruebas aprobadas</td><td>100 %</td><td>565 de 565</td><td><span class="chip ok">Cumple</span></td><td>Propuesta</td></tr>
+<tr><td>Backend</td><td>Cobertura de los servicios</td><td>100 %</td><td>100 % (por verificar con comando)</td><td><span class="chip ok">Cumple</span></td><td>Documentada en el inventario</td></tr>
+<tr><td>E2E</td><td>Escenarios aprobados</td><td>100 %</td><td>6 de 8</td><td><span class="chip bad">No cumple</span></td><td>Propuesta</td></tr>
+<tr><td>Accesibilidad</td><td>Violaciones crítica o seria en axe (inicio, catálogo, detalle, login, reserva, CRM)</td><td>0</td><td>Hay (F-001, F-003, F-004, F-005)</td><td><span class="chip bad">No cumple</span></td><td>Formal: criterio de salida del informe</td></tr>
+<tr><td>Accesibilidad</td><td>Contraste de texto normal</td><td>≥ 4.5:1</td><td>Caso medido 4.48:1</td><td><span class="chip bad">No cumple</span></td><td>Formal: WCAG 2.2 AA</td></tr>
+<tr><td>Accesibilidad</td><td>Desbordamiento horizontal en 390 px</td><td>0 px</td><td>424 px en el panel del agente</td><td><span class="chip bad">No cumple</span></td><td>Formal: criterio de salida del informe</td></tr>
+<tr><td>Accesibilidad</td><td>Lighthouse, puntaje de accesibilidad</td><td>≥ 90</td><td>No se ejecutó</td><td><span class="chip wr">Por medir</span></td><td>Propuesta (banda «buena» de Lighthouse)</td></tr>
+<tr><td>Frontend</td><td>Pruebas Jest aprobadas y cobertura</td><td>Por definir</td><td>Sin reporte oficial</td><td><span class="chip wr">Por medir</span></td><td>Propuesta</td></tr></tbody></table></div>
+</section>
+
+<section id="backend"><h2>Backend: Pytest y Django Test Runner</h2>
+<p class="sub">565 pruebas aprobadas y 69 subtests en 7.08 s, con <code>scripts/run_tests.py</code>.</p>
+<div class="grid">
+<div class="card"><h3>Unitarias frente a integración</h3><div class="donut" id="d-capas" data-label="144 unitarias, 421 de integración"></div></div>
+<div class="card"><h3>Pruebas por módulo</h3><div id="b-mod"></div></div>
+<div class="card"><h3>Cobertura de líneas</h3><div class="gau" data-v="94.64" data-m="93" data-c="ok"><div class="row"><span>2331 de 2463 líneas</span><b>94.64 %</b></div><div class="tk"><i></i><b></b></div></div><p class="note">Los servicios de negocio no aparecen entre los archivos con líneas sin cubrir. Margen sobre el umbral: 1.64 puntos.</p></div></div>
+<div class="card" style="margin-top:14px"><h3>Respuestas HTTP evaluadas (todos los módulos)</h3><div id="b-http"></div><p class="note">Cuenta respuestas, no pruebas: una prueba puede hacer varias llamadas.</p></div>
+<div class="tw"><table><caption>Detalle por módulo</caption><thead><tr><th>Módulo</th><th class="n">Pruebas</th><th class="n">OK</th><th>Códigos HTTP</th></tr></thead><tbody>
+<tr><td>Autenticación</td><td class="n">25</td><td class="n">25</td><td>200 ×15, 201 ×2, 202 ×4, 400 ×8, 401 ×7, 403 ×2, 409 ×1</td></tr>
+<tr><td>Propiedades</td><td class="n">241</td><td class="n">241</td><td>200 ×121, 201 ×4, 204 ×8, 400 ×52, 401 ×13, 403 ×20, 404 ×18</td></tr>
+<tr><td>Citas</td><td class="n">174</td><td class="n">174</td><td>200 ×87, 201 ×16, 301 ×2, 400 ×53, 401 ×4, 403 ×11, 404 ×8, 409 ×5</td></tr>
+<tr><td>CRM</td><td class="n">125</td><td class="n">125</td><td>200 ×35, 201 ×6, 204 ×9, 400 ×22, 401 ×5, 403 ×10, 404 ×17</td></tr></tbody></table></div>
+<div class="alert w"><strong>Menor cobertura:</strong> <code>config/urls.py</code> 83 %, <code>properties/problems.py</code> 90 %, y <code>seed_demo.py</code>, <code>asgi.py</code> y <code>wsgi.py</code> en 0 % (siembra y arranque). Estos tres sí cuentan dentro del 94.64 %.</div></section>
+
+<section id="e2e"><h2>Flujos de navegador: Playwright</h2>
+<p class="sub">8 escenarios en 5 archivos, 1 worker, 15.4 s. Ejecutado el 31 de octubre de 2026, 12:03 (hora de Lima).</p>
+<div class="grid"><div class="card"><h3>Duración por escenario (ms)</h3><div id="b-e2e"></div><p class="note">Rojo: el escenario falló.</p></div>
+<div class="card"><h3>Resultado por archivo</h3><div id="b-files"></div><p class="note">Escenarios aprobados de cada archivo.</p></div></div>
+<div class="alert"><strong>Causa de los 2 fallos:</strong> «strict mode violation»: el selector coincide con varios elementos a la vez (botón del título y botón de favorito, o tres textos «Cliente»). Es ambigüedad del selector del test, no un error mostrado por la aplicación. Corrección: <code>exact: true</code> o un selector más específico.</div></section>
+
+<section id="a11y"><h2>Accesibilidad: axe-core y revisión manual</h2>
+<p class="sub">Auditoría del 4 al 5 de noviembre de 2026 sobre toda la aplicación. Dictamen del informe: <strong>no aprobado</strong>. Criterio: WCAG 2.2 AA.</p>
+<div class="grid">
+<div class="card"><h3>Hallazgos por severidad</h3><div id="b-sev"></div></div>
+<div class="card"><h3>Prioridad de remediación</h3><div id="b-pri"></div></div>
+<div class="card"><h3>Cómo se detectaron</h3><div class="donut" id="d-det" data-label="7 con axe, 3 manuales"></div></div>
+<div class="card"><h3>Reglas de axe con violación por ruta</h3><div id="b-ruta"></div></div></div>
+<div class="tw"><table><caption>Mapa de reglas de axe por ruta o estado (● = violación observada)</caption><thead id="hm-h"></thead><tbody id="hm-b"></tbody></table></div>
+<div class="filters" role="group" aria-label="Filtrar hallazgos por severidad"><button type="button" data-f="all" aria-pressed="true">Todos</button><button type="button" data-f="Crítica" aria-pressed="false">Crítica</button><button type="button" data-f="Alta" aria-pressed="false">Alta</button><button type="button" data-f="Media" aria-pressed="false">Media</button><button type="button" data-f="Baja" aria-pressed="false">Baja</button></div>
+<div class="tw"><table id="hall"><thead><tr><th>ID</th><th>Hallazgo</th><th>Severidad</th><th>Detección</th><th>Prioridad</th></tr></thead><tbody>
+<tr data-s="Crítica"><td>F-001</td><td>Botón de mostrar contraseña sin nombre accesible (login)</td><td><span class="chip bad">Crítica</span></td><td>axe: button-name</td><td>P0</td></tr>
+<tr data-s="Alta"><td>F-002</td><td>El foco escapa del modal de login</td><td><span class="chip bad">Alta</span></td><td>Manual (teclado)</td><td>P0</td></tr>
+<tr data-s="Alta"><td>F-003</td><td>Cuatro enlaces sociales del footer sin nombre</td><td><span class="chip bad">Alta</span></td><td>axe: link-name</td><td>P0</td></tr>
+<tr data-s="Alta"><td>F-004</td><td>Contraste insuficiente (4.48:1 frente a 4.5:1)</td><td><span class="chip bad">Alta</span></td><td>axe: color-contrast</td><td>P0</td></tr>
+<tr data-s="Alta"><td>F-005</td><td>Nombre accesible distinto del texto visible en el filtro de metraje</td><td><span class="chip bad">Alta</span></td><td>axe: label-content-name-mismatch</td><td>P1</td></tr>
+<tr data-s="Alta"><td>F-006</td><td>Desbordamiento horizontal del panel del agente en 390 px (424 px)</td><td><span class="chip bad">Alta</span></td><td>Manual (responsive)</td><td>P0</td></tr>
+<tr data-s="Media"><td>F-007</td><td>Contenido fuera de landmarks</td><td><span class="chip wr">Media</span></td><td>axe: region</td><td>P1</td></tr>
+<tr data-s="Media"><td>F-008</td><td>Encabezados mal jerarquizados y dashboard sin h1</td><td><span class="chip wr">Media</span></td><td>axe: heading-order, page-has-heading-one</td><td>P1</td></tr>
+<tr data-s="Media"><td>F-009</td><td>Elementos main anidados y duplicados en la ficha CRM</td><td><span class="chip wr">Media</span></td><td>axe: landmark-*</td><td>P1</td></tr>
+<tr data-s="Baja"><td>F-010</td><td>Texto literal «\n» visible al final de las páginas</td><td><span class="chip pn">Baja</span></td><td>Manual (capturas)</td><td>P2</td></tr></tbody></table></div>
+<div class="alert w"><strong>Limitaciones del informe:</strong> Lighthouse no se ejecutó (no estaba instalado), por lo que no hay métricas de rendimiento, SEO ni buenas prácticas. Tampoco hubo lector de pantalla real ni matriz de navegadores. La suite jest-axe existente pasa 72 de 72, pero no cubre todas las rutas y estados. El flujo cliente–agente se completó de principio a fin.</div></section>
+
+<section id="front"><h2>Frontend: Jest y React Testing Library</h2>
+<div class="alert w"><strong>Por confirmar con Jhon.</strong> No hay reporte oficial de Jest. Como referencia, el informe de accesibilidad registra una corrida completa con 475 pruebas aprobadas y 4 fallidas en <code>useFilterParams.test.jsx</code>. Ese dato no entra en los totales hasta confirmarlo.</div></section>
+
+<section id="herr"><h2>Herramientas y relación con estándares</h2>
+<div class="tw"><table><thead><tr><th>Capa</th><th>Responsable</th><th>Herramienta</th><th>Evidencia que aporta</th><th>Estándar o referencia</th></tr></thead><tbody>
+<tr><td>Backend</td><td>Brandy</td><td>Pytest 9.2.0, Django 6.1.1, pytest-django 4.14.0, pytest-cov 7.1.0</td><td>Reglas de negocio, permisos por rol, códigos HTTP, cobertura</td><td>ISO/IEC 25010 (adecuación funcional, seguridad, fiabilidad); ISTQB (valores límite, transiciones de estado)</td></tr>
+<tr><td>Frontend</td><td>Jhon Ordoñez</td><td>Jest, React Testing Library</td><td>Comportamiento de componentes (por confirmar)</td><td>ISTQB, pruebas de componente</td></tr>
+<tr><td>E2E</td><td>Yohan Ñato</td><td>Playwright</td><td>Flujos completos en navegador</td><td>ISTQB, nivel sistema</td></tr>
+<tr><td>Accesibilidad</td><td>Anderson Villanes</td><td>axe-core, jest-axe, revisión manual</td><td>Violaciones por ruta, foco, landmarks, contraste</td><td>WCAG 2.2 AA; ISO/IEC 25010 (usabilidad)</td></tr></tbody></table></div>
+<p class="note">Las pruebas aportan evidencia alineada con estos estándares; no certifican cumplimiento.</p></section>
+
+<section id="pend"><h2>Pendiente</h2>
+<div class="tw"><table><thead><tr><th>Elemento</th><th>Estado</th></tr></thead><tbody>
+<tr><td>Reporte de Jest con cobertura</td><td><span class="chip wr">Por confirmar</span></td></tr>
+<tr><td>Evolución de pruebas por sprint (sprints 1 a 5)</td><td><span class="chip wr">Por confirmar: faltan fechas y módulos</span></td></tr>
+<tr><td>Acordar las metas marcadas como «Propuesta»</td><td><span class="chip wr">Por acordar</span></td></tr>
+<tr><td>Corregir los 2 selectores de Playwright y repetir</td><td><span class="chip pn">Sprint 6</span></td></tr>
+<tr><td>Corregir los hallazgos P0 y repetir la auditoría</td><td><span class="chip pn">Sprints 6 y 7</span></td></tr>
+<tr><td>Ejecutar Lighthouse</td><td><span class="chip pn">Sprints 6 y 7</span></td></tr></tbody></table></div></section>
+</main>
+<footer><div class="wrap">Fuentes: <code>run_tests.py</code> y <code>coverage report</code> del backend, reporte HTML de Playwright e informe de auditoría QA de accesibilidad y UI. Datos de noviembre de 2026.</div></footer>
+<script>
+(function(){
+var $=function(i){return document.getElementById(i)};
+var K={ok:'c-ok',bad:'c-bad',wr:'c-wr',in:'c-in',pn:'c-pn'},V={ok:'var(--ok)',bad:'var(--bad)',wr:'var(--wr)',in:'var(--in)',pn:'var(--pn)'};
+function donut(id,parts,big,small){
+var el=$(id),tot=0,off=0,s='',lg='';parts.forEach(function(p){tot+=p.v});
+parts.forEach(function(p){if(!p.v)return;var d=p.v/tot*100;
+s+='<circle cx="21" cy="21" r="15.9" fill="none" stroke="'+V[p.c]+'" stroke-width="6" stroke-dasharray="'+d+' '+(100-d)+'" stroke-dashoffset="'+(25-off)+'"/>';off+=d});
+parts.forEach(function(p){lg+='<li><i style="background:'+V[p.c]+'"></i>'+p.l+': <b>'+p.v+'</b></li>'});
+el.innerHTML='<svg viewBox="0 0 42 42" role="img" aria-label="'+el.dataset.label+'"><circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--pnb)" stroke-width="6"/>'+s+'<text x="21" y="22.5" text-anchor="middle">'+big+'</text><text class="t2" x="21" y="27" text-anchor="middle">'+small+'</text></svg><ul class="lg">'+lg+'</ul>'}
+function bars(id,items,max){var m=max||Math.max.apply(null,items.map(function(i){return i.v})),h='';
+items.forEach(function(i){h+='<div class="br"><span>'+i.l+'</span><span class="tr"><i class="'+K[i.c||'in']+'" style="width:'+(i.v/m*100)+'%"></i></span><b>'+i.v+'</b></div>'});$(id).innerHTML=h}
+donut('d-back',[{v:565,c:'ok',l:'Aprobadas'},{v:0,c:'bad',l:'Fallidas'}],'565','de 565');
+donut('d-e2e',[{v:6,c:'ok',l:'Aprobadas'},{v:2,c:'bad',l:'Fallidas'}],'6 de 8','75 %');
+donut('d-sev',[{v:1,c:'bad',l:'Crítica'},{v:5,c:'wr',l:'Alta'},{v:3,c:'in',l:'Media'},{v:1,c:'pn',l:'Baja'}],'10','hallazgos');
+donut('d-meta',[{v:3,c:'ok',l:'Cumplen'},{v:4,c:'bad',l:'No cumplen'},{v:2,c:'wr',l:'Por medir'}],'3 de 9','cumplen');
+donut('d-capas',[{v:144,c:'in',l:'Unitarias'},{v:421,c:'wr',l:'Integración'}],'565','pruebas');
+donut('d-det',[{v:7,c:'in',l:'axe-core'},{v:3,c:'wr',l:'Revisión manual'}],'10','hallazgos');
+bars('b-mod',[{l:'Autenticación',v:25},{l:'Propiedades',v:241},{l:'Citas',v:174},{l:'CRM',v:125}]);
+bars('b-http',[{l:'200',v:258,c:'ok'},{l:'201',v:28,c:'ok'},{l:'202',v:4,c:'ok'},{l:'204',v:17,c:'ok'},{l:'301',v:2,c:'in'},{l:'400',v:135,c:'wr'},{l:'401',v:29,c:'bad'},{l:'403',v:43,c:'bad'},{l:'404',v:43,c:'bad'},{l:'409',v:6,c:'bad'}]);
+bars('b-e2e',[{l:'Carga de inicio',v:1516,c:'ok'},{l:'Catálogo al detalle',v:1415,c:'bad'},{l:'Formulario de registro',v:1041,c:'ok'},{l:'Modal de login',v:854,c:'ok'},{l:'Favorito anónimo',v:2201,c:'ok'},{l:'AppointmentModal',v:772,c:'bad'},{l:'/admin sin sesión',v:1068,c:'ok'},{l:'/agente sin sesión',v:704,c:'ok'}]);
+bars('b-files',[{l:'01-navegacion',v:1,c:'bad'},{l:'02-autenticacion',v:2,c:'ok'},{l:'03-favoritos',v:1,c:'ok'},{l:'04-citas',v:0,c:'bad'},{l:'05-roles',v:2,c:'ok'}],2);
+bars('b-sev',[{l:'Crítica',v:1,c:'bad'},{l:'Alta',v:5,c:'wr'},{l:'Media',v:3,c:'in'},{l:'Baja',v:1,c:'pn'}],5);
+bars('b-pri',[{l:'P0 antes del sign-off',v:5,c:'bad'},{l:'P1 antes de WCAG AA',v:4,c:'wr'},{l:'P2 calidad visual',v:1,c:'pn'}],5);
+var R=['color-contrast','region','link-name','heading-order','button-name','label-content-name-mismatch','page-has-heading-one','landmark-*'];
+var M=[['Inicio',[1,1,1,1,0,0,0,0]],['Catálogo',[1,1,1,0,0,1,0,0]],['Detalle',[1,1,1,1,0,0,0,0]],['Login abierto',[1,1,1,1,1,0,0,0]],['Modal de reserva',[0,0,0,0,0,0,0,0]],['Panel del agente',[1,1,0,0,0,0,1,0]],['Clientes',[1,1,0,0,0,0,0,0]],['Ficha CRM',[1,1,0,0,0,0,0,1]]];
+var hh='<tr><th>Ruta o estado</th>';R.forEach(function(r){hh+='<th class="h" style="font-size:.78rem">'+r+'</th>'});$('hm-h').innerHTML=hh+'</tr>';
+var hb='',rt=[];M.forEach(function(m){var n=0,row='<tr><td>'+m[0]+'</td>';
+m[1].forEach(function(x,i){n+=(i===7&&x)?3:x;row+='<td class="h">'+(x?'<span class="hit" aria-label="Violación">●</span>':'<span class="note" aria-label="Sin violación">–</span>')+'</td>'});
+hb+=row+'</tr>';rt.push({l:m[0],v:n,c:n===0?'ok':n>=5?'bad':'wr'})});
+$('hm-b').innerHTML=hb;bars('b-ruta',rt,5);
+document.querySelectorAll('.gau').forEach(function(g){var v=+g.dataset.v,m=+g.dataset.m,i=g.querySelector('i'),b=g.querySelector('.tk b');
+i.style.width=v+'%';i.style.background=V[g.dataset.c];b.style.left=m+'%';
+g.querySelector('.tk').setAttribute('role','img');g.querySelector('.tk').setAttribute('aria-label','Resultado '+v+' por ciento, meta '+m+' por ciento')});
+var btns=document.querySelectorAll('.filters button'),rows=document.querySelectorAll('#hall tbody tr');
+btns.forEach(function(b){b.addEventListener('click',function(){btns.forEach(function(x){x.setAttribute('aria-pressed',x===b?'true':'false')});
+rows.forEach(function(r){r.hidden=!(b.dataset.f==='all'||r.dataset.s===b.dataset.f)})})});
+var root=document.documentElement;$('theme').addEventListener('click',function(){
+var dk=root.dataset.theme?root.dataset.theme==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;root.dataset.theme=dk?'light':'dark'});
+})();
+</script>
+</body>
+</html>

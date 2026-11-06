@@ -89,3 +89,15 @@ const creada = await createProperty({ title, price, address, property_type })
 const actualizada = await updateProperty('id-propiedad', { ... })
 const desactivada = await deleteProperty('id-propiedad')
 ```
+
+## Cuentas de demostración para pruebas frontend
+
+Al iniciar sesión desde el modal o formulario de Login (tanto en modo simulado `VITE_ENABLE_MOCKS=true` como con backend real):
+
+| Rol | Correo | Contraseña | Vistas habilitadas |
+|---|---|---|---|
+| Administrador | `admin@housebroker.pe` | `Housebroker2026.` | Panel `/admin`, gestión global |
+| Agente | `yohan.nato@housebroker.pe` | `Housebroker2026.` | Panel `/agente`, disponibilidad y citas |
+| Agente Secundario | `agente@housebroker.pe` | `Housebroker2026.` | Panel `/agente` |
+| Cliente | `cliente@housebroker.pe` | `Housebroker2026.` | Catálogo `/`, favoritos y agendamiento |
+

@@ -6,6 +6,8 @@ los extremos, `search` case/accent-insensitive con mínimo de 2 caracteres, y el
 rechazo `400` con todos las parámetros inválidos acumulados.
 """
 
+import pytest
+
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -16,6 +18,8 @@ from apps.properties.models import District, Property, PropertyStatus
 
 from .helpers import make_property
 
+pytestmark = pytest.mark.integration
+
 User = get_user_model()
 
 
@@ -25,6 +29,7 @@ def _search_url(**params):
     return f"/api/v1/properties?{query}" if query else "/api/v1/properties"
 
 
+# ===== CatalogFiltersTests: grupo de pruebas de catalog filters =====
 class CatalogFiltersTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -105,11 +110,29 @@ class CatalogFiltersTests(TestCase):
         return Property.objects.get(code=f"PROP-{index:05d}")
 
     def test_no_filter_returns_all_active(self):
+        """IT-PROP-079 - Prueba de Integración - no filter returns all active
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: no filter returns all active.
+        Código HTTP Esperado: 200 OK
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get("/api/v1/properties", {"limit": 50})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["count"], 4)
 
     def test_search_by_title_ignores_case_and_accents(self):
+        """IT-PROP-080 - Prueba de Integración - search by title ignores case and accents
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: search by title ignores case and accents.
+        Código HTTP Esperado: N/A
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(_search_url(search="MIRAFLORES", limit=50))
         ids = self._ids(response)
         self.assertIn(str(self._property_by_index(1).id), ids)
@@ -117,6 +140,15 @@ class CatalogFiltersTests(TestCase):
         self.assertNotIn(str(self._property_by_index(4).id), ids)
 
     def test_search_matches_address(self):
+        """IT-PROP-081 - Prueba de Integración - search matches address
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: search matches address.
+        Código HTTP Esperado: N/A
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(_search_url(search="jesus maria", limit=50))
         ids = self._ids(response)
         self.assertEqual(
@@ -124,10 +156,28 @@ class CatalogFiltersTests(TestCase):
         )
 
     def test_search_with_accented_query_finds_plain_title(self):
+        """IT-PROP-082 - Prueba de Integración - search with accented query finds plain title
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: search with accented query finds plain title.
+        Código HTTP Esperado: N/A
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(_search_url(search="Casa con jardin", limit=50))
         self.assertIn(str(self._property_by_index(2).id), self._ids(response))
 
     def test_search_shorter_than_two_chars_is_rejected(self):
+        """IT-PROP-083 - Prueba de Integración - search shorter than two chars is rejected
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: search shorter than two chars is rejected.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(_search_url(search="a"))
         self.assertEqual(response.status_code, 400)
         body = response.json()
@@ -144,16 +194,43 @@ class CatalogFiltersTests(TestCase):
         )
 
     def test_search_longer_than_120_is_rejected(self):
+        """IT-PROP-084 - Prueba de Integración - search longer than 120 is rejected
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: search longer than 120 is rejected.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(_search_url(search="a" * 121))
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["code"], "invalid_query_parameter")
 
     def test_empty_search_is_treated_as_omitted(self):
+        """IT-PROP-085 - Prueba de Integración - empty search is treated as omitted
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: empty search is treated as omitted.
+        Código HTTP Esperado: 200 OK
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(_search_url(search="", limit=50))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["count"], 4)
 
     def test_min_price_is_inclusive(self):
+        """IT-PROP-086 - Prueba de Integración - min price is inclusive
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: min price is inclusive.
+        Código HTTP Esperado: N/A
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(_search_url(minPrice="150000", limit=50))
         ids = self._ids(response)
         self.assertIn(str(self._property_by_index(1).id), ids)
@@ -161,12 +238,30 @@ class CatalogFiltersTests(TestCase):
         self.assertNotIn(str(self._property_by_index(3).id), ids)
 
     def test_max_price_is_inclusive(self):
+        """IT-PROP-087 - Prueba de Integración - max price is inclusive
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: max price is inclusive.
+        Código HTTP Esperado: N/A
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(_search_url(maxPrice="98000", limit=50))
         ids = self._ids(response)
         self.assertIn(str(self._property_by_index(3).id), ids)
         self.assertNotIn(str(self._property_by_index(1).id), ids)
 
     def test_price_range_filters_between(self):
+        """IT-PROP-088 - Prueba de Integración - price range filters between
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: price range filters between.
+        Código HTTP Esperado: N/A
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(
             _search_url(minPrice="100000", maxPrice="460000", limit=50)
         )
@@ -177,6 +272,15 @@ class CatalogFiltersTests(TestCase):
         self.assertNotIn(str(self._property_by_index(3).id), ids)
 
     def test_inverted_price_range_is_rejected_with_specific_code(self):
+        """IT-PROP-089 - Prueba de Integración - inverted price range is rejected with specific code
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: inverted price range is rejected with specific code.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(_search_url(minPrice="450000", maxPrice="150000"))
         self.assertEqual(response.status_code, 400)
         body = response.json()
@@ -194,6 +298,15 @@ class CatalogFiltersTests(TestCase):
         )
 
     def test_non_numeric_price_is_rejected(self):
+        """IT-PROP-090 - Prueba de Integración - non numeric price is rejected
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: non numeric price is rejected.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(_search_url(minPrice="caro"))
         self.assertEqual(response.status_code, 400)
         body = response.json()
@@ -201,11 +314,29 @@ class CatalogFiltersTests(TestCase):
         self.assertEqual(body["errors"][0]["parameter"], "minPrice")
 
     def test_property_type_single_value(self):
+        """IT-PROP-091 - Prueba de Integración - property type single value
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: property type single value.
+        Código HTTP Esperado: N/A
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(_search_url(propertyType="CASA", limit=50))
         ids = self._ids(response)
         self.assertEqual(ids, [str(self._property_by_index(2).id)])
 
     def test_property_type_multiple_values_are_or(self):
+        """IT-PROP-092 - Prueba de Integración - property type multiple values are or
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: property type multiple values are or.
+        Código HTTP Esperado: N/A
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(
             f"/api/v1/properties?propertyType=CASA&propertyType=TERRENO&limit=50"
         )
@@ -215,6 +346,15 @@ class CatalogFiltersTests(TestCase):
         self.assertNotIn(str(self._property_by_index(1).id), ids)
 
     def test_invalid_property_type_is_rejected(self):
+        """IT-PROP-093 - Prueba de Integración - invalid property type is rejected
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: invalid property type is rejected.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(_search_url(propertyType="DUPLEX"))
         self.assertEqual(response.status_code, 400)
         body = response.json()
@@ -230,14 +370,41 @@ class CatalogFiltersTests(TestCase):
         )
 
     def test_ubigeo_filters_by_district(self):
+        """IT-PROP-094 - Prueba de Integración - ubigeo filters by district
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: ubigeo filters by district.
+        Código HTTP Esperado: N/A
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(_search_url(ubigeo="150140", limit=50))
         self.assertEqual(self._ids(response), [str(self._property_by_index(2).id)])
 
     def test_ubigeo_multiple_values_are_or(self):
+        """IT-PROP-095 - Prueba de Integración - ubigeo multiple values are or
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: ubigeo multiple values are or.
+        Código HTTP Esperado: N/A
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(f"/api/v1/properties?ubigeo=150131&ubigeo=150140&limit=50")
         self.assertEqual(response.data["count"], 4)
 
     def test_malformed_ubigeo_is_rejected(self):
+        """IT-PROP-096 - Prueba de Integración - malformed ubigeo is rejected
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: malformed ubigeo is rejected.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(_search_url(ubigeo="1501"))
         self.assertEqual(response.status_code, 400)
         body = response.json()
@@ -253,6 +420,15 @@ class CatalogFiltersTests(TestCase):
         )
 
     def test_filters_combine_with_and(self):
+        """IT-PROP-097 - Prueba de Integración - filters combine with and
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: filters combine with and.
+        Código HTTP Esperado: N/A
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(
             _search_url(propertyType="DEPARTAMENTO", ubigeo="150131", minPrice="100000", limit=50)
         )
@@ -260,6 +436,15 @@ class CatalogFiltersTests(TestCase):
         self.assertEqual(self._ids(response), [str(self._property_by_index(1).id)])
 
     def test_multiple_invalid_params_are_reported_together(self):
+        """IT-PROP-098 - Prueba de Integración - multiple invalid params are reported together
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: multiple invalid params are reported together.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(_search_url(propertyType="DUPLEX", search="a"))
         self.assertEqual(response.status_code, 400)
         body = response.json()
@@ -268,6 +453,15 @@ class CatalogFiltersTests(TestCase):
         self.assertEqual(params, ["propertyType", "search"])
 
     def test_x_total_count_reflects_filters(self):
+        """IT-PROP-099 - Prueba de Integración - x total count reflects filters
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: x total count reflects filters.
+        Código HTTP Esperado: 200 OK
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(_search_url(propertyType="DEPARTAMENTO"))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["X-Total-Count"], "1")
@@ -275,6 +469,15 @@ class CatalogFiltersTests(TestCase):
 
     def test_pagination_links_carry_filters(self):
         # 3 propiedades de Miraflores: minPrice deja 2, `limit=1` fuerza pages.
+        """IT-PROP-100 - Prueba de Integración - pagination links carry filters
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFiltersTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: pagination links carry filters.
+        Código HTTP Esperado: 200 OK
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(
             _search_url(ubigeo="150131") + "&minPrice=50000&limit=1&page=1"
         )

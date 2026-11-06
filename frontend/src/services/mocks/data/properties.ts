@@ -1,4 +1,4 @@
-import type { Property, Seller } from '../../types'
+import type { Property, PropertyType, Seller } from '../../types'
 
 /**
  * Agente responsable de la cartera simulada. El panel de disponibilidad exige
@@ -349,15 +349,53 @@ const fixtures: Property[] = [
 ]
 
 /**
+ * Galería local por tipo de inmueble. Cada propiedad sin `images` recibe una
+ * portada y fotos de apoyo, de modo que el modo simulado también muestre
+ * fotografías en las tarjetas del catálogo.
+ */
+const DEMO_IMAGES: Record<PropertyType, string[]> = {
+  CASA: [
+    '/properties/demo/casa1.jpg',
+    '/properties/demo/casa2.jpg',
+    '/properties/demo/casa3.jpg',
+    '/properties/demo/casa4.jpg',
+  ],
+  DEPARTAMENTO: [
+    '/properties/demo/depa1.jpg',
+    '/properties/demo/depa2.jpg',
+    '/properties/demo/depa3.jpg',
+  ],
+  OFICINA: [
+    '/properties/demo/oficina1.jpg',
+    '/properties/demo/oficina2.jpg',
+    '/properties/demo/oficina3.jpg',
+  ],
+  TERRENO: ['/properties/demo/terreno1.jpg', '/properties/demo/terreno2.jpg'],
+}
+
+/**
  * Todos los inmuebles arrancan con estado operativo derivado de `is_active`, de
  * forma coherente con `property_suspended_is_inactive`: lo que está fuera del
  * catálogo está suspendido, y nada más.
  */
-const withAvailability = fixtures.map<Property>((property) => ({
-  ...property,
-  status: property.is_active ? 'DISPONIBLE' : 'SUSPENDIDO',
-  is_bookable: property.is_active,
-  seller: MOCK_SELLER,
-}))
+const withAvailability = fixtures.map<Property>((property, index) => {
+  const pool = DEMO_IMAGES[property.property_type]
+  const offset = index % pool.length
+  const rotated = [...pool.slice(offset), ...pool.slice(0, offset)]
+
+  return {
+    ...property,
+    images:
+      property.images && property.images.length > 0
+        ? property.images
+        : rotated.map((url, position) => ({
+            url,
+            es_principal: position === 0,
+          })),
+    status: property.is_active ? 'DISPONIBLE' : 'SUSPENDIDO',
+    is_bookable: property.is_active,
+    seller: MOCK_SELLER,
+  }
+})
 
 export default withAvailability

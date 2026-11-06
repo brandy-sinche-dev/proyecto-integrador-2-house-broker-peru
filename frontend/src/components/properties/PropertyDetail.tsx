@@ -60,7 +60,7 @@ export function PropertyDetail({ onBack, onBookVisit, favorite = false, onToggle
   }
 
   const cover = property
-    ? property.images?.find((img) => img.es_principal)?.url ??
+    ? property.images?.find((img) => img.es_principal || (img as { is_cover?: boolean }).is_cover)?.url ??
       property.images?.[0]?.url ??
       property.link_galeria
     : undefined
@@ -103,6 +103,12 @@ export function PropertyDetail({ onBack, onBookVisit, favorite = false, onToggle
                 height={540}
                 fetchPriority="high"
                 decoding="async"
+                onError={(e) => {
+                  const fallback = DEFAULT_COVERS[property.property_type] || '/properties/demo/casa1.jpg'
+                  if (e.currentTarget.src !== fallback) {
+                    e.currentTarget.src = fallback
+                  }
+                }}
               />
             )}
           </div>

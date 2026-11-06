@@ -88,7 +88,7 @@ export const PropertyCard = memo(function PropertyCard({
   const glassBadge = property.destacado ? 'DESTACADO' : property.negociable ? 'NEGOCIABLE' : null
 
   const cover =
-    property.images?.find((img) => img.es_principal)?.url ??
+    property.images?.find((img) => img.es_principal || (img as { is_cover?: boolean }).is_cover)?.url ??
     property.images?.[0]?.url ??
     property.link_galeria
 
@@ -104,6 +104,12 @@ export const PropertyCard = memo(function PropertyCard({
             height={256}
             loading="lazy"
             decoding="async"
+            onError={(e) => {
+              const fallback = DEFAULT_COVERS[property.property_type] || '/properties/demo/casa1.jpg'
+              if (e.currentTarget.src !== fallback) {
+                e.currentTarget.src = fallback
+              }
+            }}
           />
         )}
         <div className="hpc__badges">

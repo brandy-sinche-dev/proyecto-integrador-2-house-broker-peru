@@ -1,5 +1,7 @@
 """Pruebas de `GET /api/v1/clients/{id}/history` (HU-CRM-03)."""
 
+import pytest
+
 from datetime import timezone as dt_timezone
 
 from django.db import connection
@@ -16,6 +18,8 @@ from apps.properties.tests.helpers import make_district, make_property, make_use
 
 from .helpers import make_appointment, utc
 
+pytestmark = pytest.mark.integration
+
 SCHEDULED_ORIGINAL = utc(2026, 10, 8, 15)
 SCHEDULED_NEW = utc(2026, 10, 10, 15)
 CREATED_AT = utc(2026, 10, 5, 14)
@@ -23,6 +27,7 @@ CONFIRMED_AT = utc(2026, 10, 6, 14)
 RESCHEDULED_AT = utc(2026, 10, 7, 2)
 
 
+# ===== ClientHistoryApiTestCase: grupo de pruebas de client history =====
 class ClientHistoryApiTestCase(APITestCase):
     def setUp(self):
         self.district = make_district()
@@ -105,19 +110,52 @@ class ClientHistoryApiTestCase(APITestCase):
         )
 
 
+# ===== ClientHistoryAccessTests: grupo de pruebas de client history access =====
 class ClientHistoryAccessTests(ClientHistoryApiTestCase):
     def test_admin_can_read_history(self):
+        """IT-CRM-001 - Prueba de Integración - admin can read history
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryAccessTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: admin can read history.
+        Código HTTP Esperado: 200 OK
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.get(self.admin)
 
         self.assertEqual(response.status_code, http_status.HTTP_200_OK)
         self.assertEqual(response["X-Total-Count"], "3")
 
     def test_assigned_agent_can_read_history(self):
+        """IT-CRM-002 - Prueba de Integración - assigned agent can read history
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryAccessTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: assigned agent can read history.
+        Código HTTP Esperado: 200 OK
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.get(self.agent)
 
         self.assertEqual(response.status_code, http_status.HTTP_200_OK)
+        self.assertEqual(response["X-Total-Count"], "3")
+        self.assertEqual(
+            [entry["type"] for entry in response.data["results"]],
+            ["STATUS_CHANGE", "STATUS_CHANGE", "APPOINTMENT"],
+        )
 
     def test_agent_without_assigned_appointments_gets_404(self):
+        """IT-CRM-003 - Prueba de Integración - agent without assigned appointments gets 404
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryAccessTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: agent without assigned appointments gets 404.
+        Código HTTP Esperado: 404 Not Found
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 404 Not Found y el efecto se refleja en el estado o la base de datos.
+        """
         self.assertProblem(
             self.get(self.agent, self.other_client),
             "resource_not_found",
@@ -125,6 +163,15 @@ class ClientHistoryAccessTests(ClientHistoryApiTestCase):
         )
 
     def test_client_role_is_forbidden(self):
+        """IT-CRM-004 - Prueba de Integración - client role is forbidden
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryAccessTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: client role is forbidden.
+        Código HTTP Esperado: 403 Forbidden
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 403 Forbidden y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.get(self.client_user),
             "forbidden",
@@ -139,6 +186,15 @@ class ClientHistoryAccessTests(ClientHistoryApiTestCase):
         self.assertEqual(problem["required_roles"], [ROLE_AGENT, ROLE_ADMIN])
 
     def test_anonymous_is_unauthorized(self):
+        """IT-CRM-005 - Prueba de Integración - anonymous is unauthorized
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryAccessTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: anonymous is unauthorized.
+        Código HTTP Esperado: 401 Unauthorized
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 401 Unauthorized y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(self.url(self.client_user))
 
         self.assertProblem(
@@ -146,6 +202,15 @@ class ClientHistoryAccessTests(ClientHistoryApiTestCase):
         )
 
     def test_nonexistent_client_gets_404(self):
+        """IT-CRM-006 - Prueba de Integración - nonexistent client gets 404
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryAccessTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: nonexistent client gets 404.
+        Código HTTP Esperado: 404 Not Found
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 404 Not Found y el efecto se refleja en el estado o la base de datos.
+        """
         self.client.force_authenticate(self.admin)
         self.assertProblem(
             self.client.get("/api/v1/clients/999999/history"),
@@ -154,8 +219,18 @@ class ClientHistoryAccessTests(ClientHistoryApiTestCase):
         )
 
 
+# ===== ClientHistoryContentTests: grupo de pruebas de client history content =====
 class ClientHistoryContentTests(ClientHistoryApiTestCase):
     def test_entries_are_ordered_newest_first(self):
+        """IT-CRM-007 - Prueba de Integración - entries are ordered newest first
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryContentTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: entries are ordered newest first.
+        Código HTTP Esperado: N/A
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.get(self.admin)
         results = response.data["results"]
 
@@ -169,6 +244,15 @@ class ClientHistoryContentTests(ClientHistoryApiTestCase):
         )
 
     def test_history_does_not_query_per_entry(self):
+        """IT-CRM-008 - Prueba de Integración - history does not query per entry
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryContentTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: history does not query per entry.
+        Código HTTP Esperado: 200 OK
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         with CaptureQueriesContext(connection) as queries:
             response = self.get(self.admin)
 
@@ -176,6 +260,15 @@ class ClientHistoryContentTests(ClientHistoryApiTestCase):
         self.assertLessEqual(len(queries), 6)
 
     def test_status_change_entry_describes_the_event(self):
+        """IT-CRM-009 - Prueba de Integración - status change entry describes the event
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryContentTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: status change entry describes the event.
+        Código HTTP Esperado: N/A
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.get(self.admin)
         entry = response.data["results"][0]
 
@@ -198,6 +291,15 @@ class ClientHistoryContentTests(ClientHistoryApiTestCase):
         )
 
     def test_appointment_entry_is_the_creation_event(self):
+        """IT-CRM-010 - Prueba de Integración - appointment entry is the creation event
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryContentTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: appointment entry is the creation event.
+        Código HTTP Esperado: N/A
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.get(self.admin)
         entry = response.data["results"][2]
 
@@ -214,8 +316,18 @@ class ClientHistoryContentTests(ClientHistoryApiTestCase):
         self.assertEqual(entry["id"], str(self.appointment.id))
 
 
+# ===== ClientHistoryFilterTests: grupo de pruebas de client history filter =====
 class ClientHistoryFilterTests(ClientHistoryApiTestCase):
     def test_type_filter_accepts_one_value(self):
+        """IT-CRM-011 - Prueba de Integración - type filter accepts one value
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryFilterTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: type filter accepts one value.
+        Código HTTP Esperado: 200 OK
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.get(self.admin, type="APPOINTMENT")
 
         self.assertEqual(response.status_code, http_status.HTTP_200_OK)
@@ -223,6 +335,15 @@ class ClientHistoryFilterTests(ClientHistoryApiTestCase):
         self.assertEqual(response.data["results"][0]["type"], "APPOINTMENT")
 
     def test_type_filter_accepts_repeated_values_as_or(self):
+        """IT-CRM-012 - Prueba de Integración - type filter accepts repeated values as or
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryFilterTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: type filter accepts repeated values as or.
+        Código HTTP Esperado: 200 OK
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.get(
             self.admin, type=("APPOINTMENT", "STATUS_CHANGE")
         )
@@ -231,6 +352,15 @@ class ClientHistoryFilterTests(ClientHistoryApiTestCase):
         self.assertEqual(response.data["count"], 3)
 
     def test_invalid_type_is_rejected(self):
+        """IT-CRM-013 - Prueba de Integración - invalid type is rejected
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryFilterTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: invalid type is rejected.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.get(self.admin, type="CHAT"),
             "invalid_query_parameter",
@@ -253,6 +383,15 @@ class ClientHistoryFilterTests(ClientHistoryApiTestCase):
         )
 
     def test_date_filter_uses_lima_boundaries(self):
+        """IT-CRM-014 - Prueba de Integración - date filter uses lima boundaries
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryFilterTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: date filter uses lima boundaries.
+        Código HTTP Esperado: 200 OK
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.get(
             self.admin,
             dateFrom="2026-10-06",
@@ -267,6 +406,15 @@ class ClientHistoryFilterTests(ClientHistoryApiTestCase):
         )
 
     def test_date_to_is_inclusive(self):
+        """IT-CRM-015 - Prueba de Integración - date to is inclusive
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryFilterTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: date to is inclusive.
+        Código HTTP Esperado: 200 OK
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.get(self.admin, dateTo="2026-10-05")
 
         self.assertEqual(response.status_code, http_status.HTTP_200_OK)
@@ -274,6 +422,15 @@ class ClientHistoryFilterTests(ClientHistoryApiTestCase):
         self.assertEqual(response.data["results"][0]["type"], "APPOINTMENT")
 
     def test_inverted_range_is_invalid_filter_range(self):
+        """IT-CRM-016 - Prueba de Integración - inverted range is invalid filter range
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryFilterTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: inverted range is invalid filter range.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.get(self.admin, dateFrom="2026-10-07", dateTo="2026-10-05"),
             "invalid_filter_range",
@@ -297,6 +454,15 @@ class ClientHistoryFilterTests(ClientHistoryApiTestCase):
         )
 
     def test_malformed_date_is_rejected(self):
+        """IT-CRM-017 - Prueba de Integración - malformed date is rejected
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryFilterTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: malformed date is rejected.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.get(self.admin, dateFrom="07-10-2026"),
             "invalid_query_parameter",
@@ -309,8 +475,18 @@ class ClientHistoryFilterTests(ClientHistoryApiTestCase):
         )
 
 
+# ===== ClientHistoryPaginationTests: grupo de pruebas de client history pagination =====
 class ClientHistoryPaginationTests(ClientHistoryApiTestCase):
     def test_limit_and_page_split_the_timeline(self):
+        """IT-CRM-018 - Prueba de Integración - limit and page split the timeline
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryPaginationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: limit and page split the timeline.
+        Código HTTP Esperado: 200 OK
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         first = self.get(self.admin, limit="1", page="1")
 
         self.assertEqual(first.status_code, http_status.HTTP_200_OK)
@@ -326,6 +502,15 @@ class ClientHistoryPaginationTests(ClientHistoryApiTestCase):
         )
 
     def test_out_of_range_page_returns_empty_results(self):
+        """IT-CRM-019 - Prueba de Integración - out of range page returns empty results
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryPaginationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: out of range page returns empty results.
+        Código HTTP Esperado: 200 OK
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.get(self.admin, page="99")
 
         self.assertEqual(response.status_code, http_status.HTTP_200_OK)
@@ -334,6 +519,15 @@ class ClientHistoryPaginationTests(ClientHistoryApiTestCase):
         self.assertEqual(response["X-Total-Count"], "3")
 
     def test_empty_history_has_zero_count(self):
+        """IT-CRM-020 - Prueba de Integración - empty history has zero count
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryPaginationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: empty history has zero count.
+        Código HTTP Esperado: 200 OK
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.get(self.admin, self.empty_client)
 
         self.assertEqual(response.status_code, http_status.HTTP_200_OK)
@@ -341,6 +535,15 @@ class ClientHistoryPaginationTests(ClientHistoryApiTestCase):
         self.assertEqual(response.data["results"], [])
 
     def test_date_parameters_are_preserved_in_next_link(self):
+        """IT-CRM-021 - Prueba de Integración - date parameters are preserved in next link
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientHistoryPaginationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: date parameters are preserved in next link.
+        Código HTTP Esperado: N/A
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.get(
             self.admin, limit="1", page="1", dateFrom="2026-10-05"
         )

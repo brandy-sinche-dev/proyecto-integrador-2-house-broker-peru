@@ -1,5 +1,7 @@
 """Pruebas de `GET /api/v1/clients/{id}/profile` (HU-CRM-03)."""
 
+import pytest
+
 from datetime import timedelta
 from datetime import timezone as dt_timezone
 
@@ -16,7 +18,10 @@ from apps.properties.tests.helpers import make_district, make_property, make_use
 
 from .helpers import make_appointment, make_client_profile
 
+pytestmark = pytest.mark.integration
 
+
+# ===== ClientProfileApiTestCase: grupo de pruebas de client profile =====
 class ClientProfileApiTestCase(APITestCase):
     def setUp(self):
         self.district = make_district()
@@ -107,8 +112,18 @@ class ClientProfileApiTestCase(APITestCase):
         )
 
 
+# ===== ClientProfileAccessTests: grupo de pruebas de client profile access =====
 class ClientProfileAccessTests(ClientProfileApiTestCase):
     def test_admin_can_read_any_client(self):
+        """IT-CRM-053 - Prueba de Integración - admin can read any client
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientProfileAccessTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: admin can read any client.
+        Código HTTP Esperado: 200 OK
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.get(self.admin)
 
         self.assertEqual(response.status_code, http_status.HTTP_200_OK)
@@ -121,11 +136,31 @@ class ClientProfileAccessTests(ClientProfileApiTestCase):
         self.assertTrue(response.data["is_active"])
 
     def test_assigned_agent_can_read(self):
+        """IT-CRM-054 - Prueba de Integración - assigned agent can read
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientProfileAccessTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: assigned agent can read.
+        Código HTTP Esperado: 200 OK
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.get(self.agent)
 
         self.assertEqual(response.status_code, http_status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], str(self.client_user.pk))
+        self.assertEqual(response.data["full_name"], "cliente")
 
     def test_agent_without_assigned_appointments_gets_404(self):
+        """IT-CRM-055 - Prueba de Integración - agent without assigned appointments gets 404
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientProfileAccessTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: agent without assigned appointments gets 404.
+        Código HTTP Esperado: 404 Not Found
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 404 Not Found y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.get(self.agent, self.other_client),
             "resource_not_found",
@@ -138,6 +173,15 @@ class ClientProfileAccessTests(ClientProfileApiTestCase):
         )
 
     def test_client_role_is_forbidden(self):
+        """IT-CRM-056 - Prueba de Integración - client role is forbidden
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientProfileAccessTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: client role is forbidden.
+        Código HTTP Esperado: 403 Forbidden
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 403 Forbidden y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.get(self.client_user),
             "forbidden",
@@ -152,6 +196,15 @@ class ClientProfileAccessTests(ClientProfileApiTestCase):
         self.assertEqual(problem["required_roles"], [ROLE_AGENT, ROLE_ADMIN])
 
     def test_anonymous_is_unauthorized(self):
+        """IT-CRM-057 - Prueba de Integración - anonymous is unauthorized
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientProfileAccessTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: anonymous is unauthorized.
+        Código HTTP Esperado: 401 Unauthorized
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 401 Unauthorized y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.get(self.url(self.client_user))
 
         self.assertProblem(
@@ -159,6 +212,15 @@ class ClientProfileAccessTests(ClientProfileApiTestCase):
         )
 
     def test_nonexistent_client_gets_404(self):
+        """IT-CRM-058 - Prueba de Integración - nonexistent client gets 404
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientProfileAccessTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: nonexistent client gets 404.
+        Código HTTP Esperado: 404 Not Found
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 404 Not Found y el efecto se refleja en el estado o la base de datos.
+        """
         self.client.force_authenticate(self.admin)
         self.assertProblem(
             self.client.get("/api/v1/clients/999999/profile"),
@@ -167,6 +229,15 @@ class ClientProfileAccessTests(ClientProfileApiTestCase):
         )
 
     def test_agent_account_is_not_a_client(self):
+        """IT-CRM-059 - Prueba de Integración - agent account is not a client
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientProfileAccessTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: agent account is not a client.
+        Código HTTP Esperado: 404 Not Found
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 404 Not Found y el efecto se refleja en el estado o la base de datos.
+        """
         self.assertProblem(
             self.get(self.admin, self.agent),
             "resource_not_found",
@@ -174,8 +245,18 @@ class ClientProfileAccessTests(ClientProfileApiTestCase):
         )
 
 
+# ===== ClientProfileContentTests: grupo de pruebas de client profile content =====
 class ClientProfileContentTests(ClientProfileApiTestCase):
     def test_crm_profile_fields_are_exposed(self):
+        """IT-CRM-060 - Prueba de Integración - crm profile fields are exposed
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientProfileContentTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: crm profile fields are exposed.
+        Código HTTP Esperado: 180, 250
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 180, 250 y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.get(self.admin)
         data = response.data
 
@@ -188,6 +269,15 @@ class ClientProfileContentTests(ClientProfileApiTestCase):
         self.assertEqual(data["interest_level"], 4)
 
     def test_client_without_crm_profile_returns_nulls(self):
+        """IT-CRM-061 - Prueba de Integración - client without crm profile returns nulls
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientProfileContentTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: client without crm profile returns nulls.
+        Código HTTP Esperado: 200 OK
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.get(self.admin, self.other_client)
         data = response.data
 
@@ -200,6 +290,15 @@ class ClientProfileContentTests(ClientProfileApiTestCase):
         self.assertIsNone(data["interest_level"])
 
     def test_summary_counts_client_activity(self):
+        """IT-CRM-062 - Prueba de Integración - summary counts client activity
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientProfileContentTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: summary counts client activity.
+        Código HTTP Esperado: N/A
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.get(self.admin)
         summary = response.data["summary"]
 
@@ -218,6 +317,15 @@ class ClientProfileContentTests(ClientProfileApiTestCase):
         )
 
     def test_summary_ignores_other_clients(self):
+        """IT-CRM-063 - Prueba de Integración - summary ignores other clients
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientProfileContentTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: summary ignores other clients.
+        Código HTTP Esperado: N/A
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.get(self.admin)
         summary = response.data["summary"]
 
@@ -225,6 +333,15 @@ class ClientProfileContentTests(ClientProfileApiTestCase):
         self.assertEqual(summary["properties_total"], 2)
 
     def test_profile_does_not_query_per_appointment(self):
+        """IT-CRM-064 - Prueba de Integración - profile does not query per appointment
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientProfileContentTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: profile does not query per appointment.
+        Código HTTP Esperado: 200 OK
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         with CaptureQueriesContext(connection) as queries:
             response = self.get(self.admin)
 
@@ -232,6 +349,15 @@ class ClientProfileContentTests(ClientProfileApiTestCase):
         self.assertLessEqual(len(queries), 5)
 
     def test_associated_properties_have_counts_and_order(self):
+        """IT-CRM-065 - Prueba de Integración - associated properties have counts and order
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: CRM / ClientProfileContentTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: associated properties have counts and order.
+        Código HTTP Esperado: N/A
+        Requisito: RF-CRM-03
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.get(self.admin)
         associated = response.data["associated_properties"]
 

@@ -6,6 +6,8 @@ código, cuerpo, idempotencia, `404` del inmueble y el `is_favorite` del
 catálogo.
 """
 
+import pytest
+
 from datetime import timedelta
 
 from django.db import connection
@@ -19,9 +21,12 @@ from apps.properties.models import Favorite, PropertyStatus
 from apps.properties.permissions import ROLE_AGENT, ROLE_CLIENT
 from apps.properties.tests.helpers import make_district, make_property, make_user
 
+pytestmark = pytest.mark.integration
+
 MISSING_UUID = "00000000-0000-4000-8000-000000000000"
 
 
+# ===== FavoriteApiTestCase: grupo de pruebas de favorite =====
 class FavoriteApiTestCase(APITestCase):
     """Base con un cliente, un inmueble activo y la URL de favoritos."""
 
@@ -42,8 +47,18 @@ class FavoriteApiTestCase(APITestCase):
         return serializers.DateTimeField().to_representation(value)
 
 
+# ===== FavoriteAuthTests: grupo de pruebas de favorite auth =====
 class FavoriteAuthTests(FavoriteApiTestCase):
     def test_anonymous_is_asked_to_authenticate_on_every_endpoint(self):
+        """IT-PROP-101 - Prueba de Integración - anonymous is asked to authenticate on every endpoint
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / FavoriteAuthTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: anonymous is asked to authenticate on every endpoint.
+        Código HTTP Esperado: 401 Unauthorized
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 401 Unauthorized y el efecto se refleja en el estado o la base de datos.
+        """
         endpoints = (
             ("get", self.favorites_url, None),
             ("post", self.favorites_url, {"property_id": str(self.property.id)}),
@@ -56,8 +71,18 @@ class FavoriteAuthTests(FavoriteApiTestCase):
                 self.assertEqual(response.json()["code"], "unauthorized")
 
 
+# ===== FavoriteListTests: grupo de pruebas de favorite list =====
 class FavoriteListTests(FavoriteApiTestCase):
     def test_empty_list_returns_zero_count(self):
+        """IT-PROP-102 - Prueba de Integración - empty list returns zero count
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / FavoriteListTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: empty list returns zero count.
+        Código HTTP Esperado: 200 OK
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         self.as_user()
 
         response = self.client.get(self.favorites_url)
@@ -68,6 +93,15 @@ class FavoriteListTests(FavoriteApiTestCase):
         self.assertEqual(response.data["results"], [])
 
     def test_list_returns_favorites_newest_first(self):
+        """IT-PROP-103 - Prueba de Integración - list returns favorites newest first
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / FavoriteListTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: list returns favorites newest first.
+        Código HTTP Esperado: 200 OK
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         older = make_property(self.district, self.agent, index=2, images=1)
         newest = Favorite.objects.create(
             user=self.user, property=self.property, created_at=timezone.now()
@@ -88,6 +122,15 @@ class FavoriteListTests(FavoriteApiTestCase):
         self.assertEqual(second["added_at"], self.iso(oldest.created_at))
 
     def test_list_card_carries_the_property_and_is_favorite(self):
+        """IT-PROP-104 - Prueba de Integración - list card carries the property and is favorite
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / FavoriteListTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: list card carries the property and is favorite.
+        Código HTTP Esperado: N/A
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         Favorite.objects.create(user=self.user, property=self.property)
         self.as_user()
 
@@ -101,6 +144,15 @@ class FavoriteListTests(FavoriteApiTestCase):
         self.assertIn("added_at", item)
 
     def test_list_is_scoped_to_the_requesting_user(self):
+        """IT-PROP-105 - Prueba de Integración - list is scoped to the requesting user
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / FavoriteListTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: list is scoped to the requesting user.
+        Código HTTP Esperado: N/A
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         other_prop = make_property(self.district, self.agent, index=3)
         Favorite.objects.create(user=self.user, property=self.property)
         Favorite.objects.create(user=self.other, property=other_prop)
@@ -114,6 +166,15 @@ class FavoriteListTests(FavoriteApiTestCase):
         )
 
     def test_favorites_of_a_deactivated_property_stay_listed(self):
+        """IT-PROP-106 - Prueba de Integración - favorites of a deactivated property stay listed
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / FavoriteListTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: favorites of a deactivated property stay listed.
+        Código HTTP Esperado: N/A
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         Favorite.objects.create(user=self.user, property=self.property)
         self.property.status = PropertyStatus.SUSPENDIDO
         self.property.is_active = False
@@ -127,6 +188,15 @@ class FavoriteListTests(FavoriteApiTestCase):
         self.assertTrue(item["property"]["is_favorite"])
 
     def test_query_count_does_not_grow_with_the_number_of_favorites(self):
+        """IT-PROP-107 - Prueba de Integración - query count does not grow with the number of favorites
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / FavoriteListTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: query count does not grow with the number of favorites.
+        Código HTTP Esperado: N/A
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         for index in range(2):
             prop = make_property(self.district, self.agent, index=100 + index, images=2)
             Favorite.objects.create(user=self.user, property=prop)
@@ -149,8 +219,18 @@ class FavoriteListTests(FavoriteApiTestCase):
         self.assertLessEqual(len(large), 4)
 
 
+# ===== FavoriteAddTests: grupo de pruebas de favorite add =====
 class FavoriteAddTests(FavoriteApiTestCase):
     def test_post_adds_and_answers_200_with_the_favorite(self):
+        """IT-PROP-108 - Prueba de Integración - post adds and answers 200 with the favorite
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / FavoriteAddTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: post adds and answers 200 with the favorite.
+        Código HTTP Esperado: 200 OK
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         self.as_user()
 
         response = self.client.post(
@@ -167,6 +247,15 @@ class FavoriteAddTests(FavoriteApiTestCase):
         self.assertEqual(favorite.property_id, self.property.id)
 
     def test_post_is_idempotent_and_keeps_the_original_added_at(self):
+        """IT-PROP-109 - Prueba de Integración - post is idempotent and keeps the original added at
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / FavoriteAddTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: post is idempotent and keeps the original added at.
+        Código HTTP Esperado: N/A
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         self.as_user()
 
         first = self.client.post(
@@ -180,6 +269,15 @@ class FavoriteAddTests(FavoriteApiTestCase):
         self.assertEqual(Favorite.objects.count(), 1)
 
     def test_post_with_malformed_uuid_is_400(self):
+        """IT-PROP-110 - Prueba de Integración - post with malformed uuid is 400
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / FavoriteAddTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: post with malformed uuid is 400.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         self.as_user()
 
         response = self.client.post(
@@ -192,6 +290,15 @@ class FavoriteAddTests(FavoriteApiTestCase):
         self.assertEqual(problem["errors"][0]["parameter"], "property_id")
 
     def test_post_with_unknown_property_is_404(self):
+        """IT-PROP-111 - Prueba de Integración - post with unknown property is 404
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / FavoriteAddTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: post with unknown property is 404.
+        Código HTTP Esperado: 404 Not Found
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 404 Not Found y el efecto se refleja en el estado o la base de datos.
+        """
         self.as_user()
 
         response = self.client.post(
@@ -203,6 +310,15 @@ class FavoriteAddTests(FavoriteApiTestCase):
         self.assertFalse(Favorite.objects.exists())
 
     def test_post_with_inactive_property_is_404(self):
+        """IT-PROP-112 - Prueba de Integración - post with inactive property is 404
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / FavoriteAddTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: post with inactive property is 404.
+        Código HTTP Esperado: 404 Not Found
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 404 Not Found y el efecto se refleja en el estado o la base de datos.
+        """
         inactive = make_property(self.district, self.agent, index=4, is_active=False)
         self.as_user()
 
@@ -214,6 +330,15 @@ class FavoriteAddTests(FavoriteApiTestCase):
         self.assertFalse(Favorite.objects.exists())
 
     def test_post_with_unknown_field_is_rejected(self):
+        """IT-PROP-113 - Prueba de Integración - post with unknown field is rejected
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / FavoriteAddTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: post with unknown field is rejected.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         self.as_user()
 
         response = self.client.post(
@@ -229,8 +354,18 @@ class FavoriteAddTests(FavoriteApiTestCase):
         self.assertFalse(Favorite.objects.exists())
 
 
+# ===== FavoriteRemoveTests: grupo de pruebas de favorite remove =====
 class FavoriteRemoveTests(FavoriteApiTestCase):
     def test_delete_removes_and_answers_204(self):
+        """IT-PROP-114 - Prueba de Integración - delete removes and answers 204
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / FavoriteRemoveTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: delete removes and answers 204.
+        Código HTTP Esperado: 204 No Content
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 204 No Content y el efecto se refleja en el estado o la base de datos.
+        """
         Favorite.objects.create(user=self.user, property=self.property)
         self.as_user()
 
@@ -240,6 +375,15 @@ class FavoriteRemoveTests(FavoriteApiTestCase):
         self.assertFalse(Favorite.objects.exists())
 
     def test_delete_is_idempotent_when_it_was_not_a_favorite(self):
+        """IT-PROP-115 - Prueba de Integración - delete is idempotent when it was not a favorite
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / FavoriteRemoveTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: delete is idempotent when it was not a favorite.
+        Código HTTP Esperado: 204 No Content
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 204 No Content y el efecto se refleja en el estado o la base de datos.
+        """
         self.as_user()
 
         first = self.client.delete(self.property_url)
@@ -249,6 +393,15 @@ class FavoriteRemoveTests(FavoriteApiTestCase):
         self.assertEqual(second.status_code, http_status.HTTP_204_NO_CONTENT)
 
     def test_delete_does_not_touch_other_users_favorites(self):
+        """IT-PROP-116 - Prueba de Integración - delete does not touch other users favorites
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / FavoriteRemoveTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: delete does not touch other users favorites.
+        Código HTTP Esperado: 204 No Content
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 204 No Content y el efecto se refleja en el estado o la base de datos.
+        """
         Favorite.objects.create(user=self.other, property=self.property)
         self.as_user()
 
@@ -258,6 +411,15 @@ class FavoriteRemoveTests(FavoriteApiTestCase):
         self.assertTrue(Favorite.objects.filter(user=self.other).exists())
 
     def test_delete_with_unknown_property_is_404(self):
+        """IT-PROP-117 - Prueba de Integración - delete with unknown property is 404
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / FavoriteRemoveTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: delete with unknown property is 404.
+        Código HTTP Esperado: 404 Not Found
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 404 Not Found y el efecto se refleja en el estado o la base de datos.
+        """
         self.as_user()
 
         response = self.client.delete(f"/api/v1/favorites/{MISSING_UUID}/")
@@ -266,6 +428,15 @@ class FavoriteRemoveTests(FavoriteApiTestCase):
         self.assertEqual(response.json()["code"], "resource_not_found")
 
     def test_delete_with_malformed_uuid_is_404_and_not_400(self):
+        """IT-PROP-118 - Prueba de Integración - delete with malformed uuid is 404 and not 400
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / FavoriteRemoveTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: delete with malformed uuid is 404 and not 400.
+        Código HTTP Esperado: 404 Not Found
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 404 Not Found y el efecto se refleja en el estado o la base de datos.
+        """
         self.as_user()
 
         response = self.client.delete("/api/v1/favorites/no-es-uuid/")
@@ -274,6 +445,15 @@ class FavoriteRemoveTests(FavoriteApiTestCase):
         self.assertEqual(response.json()["code"], "resource_not_found")
 
     def test_delete_works_on_a_deactivated_property(self):
+        """IT-PROP-119 - Prueba de Integración - delete works on a deactivated property
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / FavoriteRemoveTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: delete works on a deactivated property.
+        Código HTTP Esperado: 204 No Content
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 204 No Content y el efecto se refleja en el estado o la base de datos.
+        """
         Favorite.objects.create(user=self.user, property=self.property)
         self.property.status = PropertyStatus.SUSPENDIDO
         self.property.is_active = False
@@ -286,6 +466,7 @@ class FavoriteRemoveTests(FavoriteApiTestCase):
         self.assertFalse(Favorite.objects.exists())
 
 
+# ===== CatalogFavoriteTests: grupo de pruebas de catalog favorite =====
 class CatalogFavoriteTests(APITestCase):
     """`Property.is_favorite`: el corazón del catálogo (v1.8.0)."""
 
@@ -305,6 +486,15 @@ class CatalogFavoriteTests(APITestCase):
         )
 
     def test_is_favorite_marks_only_the_own_favorites(self):
+        """IT-PROP-120 - Prueba de Integración - is favorite marks only the own favorites
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFavoriteTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: is favorite marks only the own favorites.
+        Código HTTP Esperado: N/A
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         Favorite.objects.create(user=self.user, property=self.favorite_prop)
         self.client.force_authenticate(self.user)
 
@@ -312,15 +502,42 @@ class CatalogFavoriteTests(APITestCase):
         self.assertFalse(self.catalog_item(self.other_prop.id)["is_favorite"])
 
     def test_is_favorite_is_scoped_to_the_requesting_user(self):
+        """IT-PROP-121 - Prueba de Integración - is favorite is scoped to the requesting user
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFavoriteTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: is favorite is scoped to the requesting user.
+        Código HTTP Esperado: N/A
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         Favorite.objects.create(user=self.user, property=self.favorite_prop)
         self.client.force_authenticate(self.other)
 
         self.assertFalse(self.catalog_item(self.favorite_prop.id)["is_favorite"])
 
     def test_is_favorite_is_false_for_anonymous(self):
+        """IT-PROP-122 - Prueba de Integración - is favorite is false for anonymous
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFavoriteTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: is favorite is false for anonymous.
+        Código HTTP Esperado: N/A
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve N/A y el efecto se refleja en el estado o la base de datos.
+        """
         self.assertFalse(self.catalog_item(self.favorite_prop.id)["is_favorite"])
 
     def test_retrieve_carries_is_favorite(self):
+        """IT-PROP-123 - Prueba de Integración - retrieve carries is favorite
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Propiedades / CatalogFavoriteTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: retrieve carries is favorite.
+        Código HTTP Esperado: 200 OK
+        Requisito: N/A
+        Resultado Esperado: La respuesta devuelve 200 OK y el efecto se refleja en el estado o la base de datos.
+        """
         Favorite.objects.create(user=self.user, property=self.favorite_prop)
         self.client.force_authenticate(self.user)
 

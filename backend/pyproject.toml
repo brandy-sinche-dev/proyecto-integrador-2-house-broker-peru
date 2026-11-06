@@ -11,3 +11,32 @@ dependencies = [
     "gunicorn>=23.0.0",
     "psycopg[binary]>=3.3.5",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
+    "pytest-django>=4.14.0",
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.test_settings"
+testpaths = ["apps", "tests"]
+addopts = "-ra"
+markers = [
+    "unit: pruebas unitarias de serializers, modelos o servicios puros",
+    "integration: pruebas de integración de endpoints y vistas HTTP",
+]
+
+[tool.coverage.run]
+source = ["apps", "config"]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+fail_under = 93
+show_missing = true
+skip_covered = true

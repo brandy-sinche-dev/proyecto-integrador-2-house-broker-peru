@@ -6,6 +6,8 @@ que consume el formulario de reserva: código, `type`/`title` del sobre
 agenda y correos emitidos.
 """
 
+import pytest
+
 from datetime import datetime, time, timedelta
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
@@ -26,10 +28,13 @@ from apps.properties.tests.helpers import (
 
 from apps.appointments.models import Appointment, AppointmentSource, AppointmentStatus
 
+pytestmark = pytest.mark.integration
+
 LIMA = ZoneInfo("America/Lima")
 UTC = ZoneInfo("UTC")
 
 
+# ===== AppointmentApiTestCase: grupo de pruebas de appointment =====
 class AppointmentApiTestCase(APITestCase):
     """Inmueble con agenda de mañana, su agente y un cliente."""
 
@@ -87,8 +92,18 @@ class AppointmentApiTestCase(APITestCase):
         return problem
 
 
+# ===== AppointmentPermissionTests: grupo de pruebas de appointment permission =====
 class AppointmentPermissionTests(AppointmentApiTestCase):
     def test_anonymous_is_rejected_with_401(self):
+        """IT-CIT-012 - Prueba de Integración - anonymous is rejected with 401
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentPermissionTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: anonymous is rejected with 401.
+        Código HTTP Esperado: 401 Unauthorized
+        Requisito: RF-CRM-01
+        Resultado Esperado: La respuesta devuelve 401 Unauthorized y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.book(), "unauthorized", http_status.HTTP_401_UNAUTHORIZED
         )
@@ -100,6 +115,15 @@ class AppointmentPermissionTests(AppointmentApiTestCase):
         self.assertEqual(len(mail.outbox), 0)
 
     def test_client_cannot_book_on_behalf_of_someone_else(self):
+        """IT-CIT-013 - Prueba de Integración - client cannot book on behalf of someone else
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentPermissionTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: client cannot book on behalf of someone else.
+        Código HTTP Esperado: 403 Forbidden
+        Requisito: RF-CRM-01
+        Resultado Esperado: La respuesta devuelve 403 Forbidden y el efecto se refleja en el estado o la base de datos.
+        """
         other = make_user("otro", role=ROLE_CLIENT)
 
         problem = self.assertProblem(
@@ -115,8 +139,18 @@ class AppointmentPermissionTests(AppointmentApiTestCase):
         self.assertEqual(Appointment.objects.count(), 0)
 
 
+# ===== AppointmentCreationTests: grupo de pruebas de appointment creation =====
 class AppointmentCreationTests(AppointmentApiTestCase):
     def test_client_books_for_himself(self):
+        """IT-CIT-014 - Prueba de Integración - client books for himself
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentCreationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: client books for himself.
+        Código HTTP Esperado: 201 Created
+        Requisito: RF-CRM-01
+        Resultado Esperado: La respuesta devuelve 201 Created y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.book(self.client_user)
 
         self.assertEqual(response.status_code, http_status.HTTP_201_CREATED)
@@ -154,6 +188,15 @@ class AppointmentCreationTests(AppointmentApiTestCase):
         self.assertEqual(appointment.end_at, appointment.scheduled_at + timedelta(minutes=60))
 
     def test_agent_books_on_behalf_of_a_client(self):
+        """IT-CIT-015 - Prueba de Integración - agent books on behalf of a client
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentCreationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: agent books on behalf of a client.
+        Código HTTP Esperado: 201 Created
+        Requisito: RF-CRM-01
+        Resultado Esperado: La respuesta devuelve 201 Created y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.book(self.agent, client_id=str(self.client_user.id))
 
         self.assertEqual(response.status_code, http_status.HTTP_201_CREATED)
@@ -164,6 +207,15 @@ class AppointmentCreationTests(AppointmentApiTestCase):
         self.assertEqual(response.json()["client"]["id"], str(self.client_user.id))
 
     def test_admin_can_register_a_visit_too(self):
+        """IT-CIT-016 - Prueba de Integración - admin can register a visit too
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentCreationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: admin can register a visit too.
+        Código HTTP Esperado: 201 Created
+        Requisito: RF-CRM-01
+        Resultado Esperado: La respuesta devuelve 201 Created y el efecto se refleja en el estado o la base de datos.
+        """
         admin = make_user("admin", role=ROLE_ADMIN)
 
         response = self.book(admin, client_id=str(self.client_user.id))
@@ -174,6 +226,15 @@ class AppointmentCreationTests(AppointmentApiTestCase):
         )
 
     def test_agent_without_client_id_is_rejected(self):
+        """IT-CIT-017 - Prueba de Integración - agent without client id is rejected
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentCreationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: agent without client id is rejected.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: RF-CRM-01
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.book(self.agent),
             "invalid_query_parameter",
@@ -184,6 +245,15 @@ class AppointmentCreationTests(AppointmentApiTestCase):
         self.assertEqual(Appointment.objects.count(), 0)
 
     def test_unknown_property_is_not_found(self):
+        """IT-CIT-018 - Prueba de Integración - unknown property is not found
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentCreationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: unknown property is not found.
+        Código HTTP Esperado: 404 Not Found
+        Requisito: RF-CRM-01
+        Resultado Esperado: La respuesta devuelve 404 Not Found y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.book(self.client_user, property_id="00000000-0000-4000-8000-000000000000"),
             "resource_not_found",
@@ -195,6 +265,15 @@ class AppointmentCreationTests(AppointmentApiTestCase):
         )
 
     def test_unknown_client_id_is_not_found(self):
+        """IT-CIT-019 - Prueba de Integración - unknown client id is not found
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentCreationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: unknown client id is not found.
+        Código HTTP Esperado: 404 Not Found
+        Requisito: RF-CRM-01
+        Resultado Esperado: La respuesta devuelve 404 Not Found y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.book(
                 self.agent, client_id="00000000-0000-4000-8000-000000000000"
@@ -206,8 +285,18 @@ class AppointmentCreationTests(AppointmentApiTestCase):
         self.assertEqual(Appointment.objects.count(), 0)
 
 
+# ===== AppointmentValidationTests: grupo de pruebas de appointment validation =====
 class AppointmentValidationTests(AppointmentApiTestCase):
     def test_property_that_cannot_be_visited_is_rejected(self):
+        """IT-CIT-020 - Prueba de Integración - property that cannot be visited is rejected
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentValidationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: property that cannot be visited is rejected.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: RF-CRM-01
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         self.property.status = PropertyStatus.VENDIDO
         self.property.save(update_fields=["status"])
 
@@ -229,6 +318,15 @@ class AppointmentValidationTests(AppointmentApiTestCase):
         self.assertEqual(Appointment.objects.count(), 0)
 
     def test_unpublished_property_is_rejected(self):
+        """IT-CIT-021 - Prueba de Integración - unpublished property is rejected
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentValidationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: unpublished property is rejected.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: RF-CRM-01
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         self.property.status = PropertyStatus.SUSPENDIDO
         self.property.is_active = False
         self.property.save(update_fields=["status", "is_active"])
@@ -245,6 +343,15 @@ class AppointmentValidationTests(AppointmentApiTestCase):
         )
 
     def test_hour_outside_the_schedule_is_rejected(self):
+        """IT-CIT-022 - Prueba de Integración - hour outside the schedule is rejected
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentValidationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: hour outside the schedule is rejected.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: RF-CRM-01
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.book(self.client_user, scheduled_at=self.at(20)),
             "invalid_query_parameter",
@@ -258,6 +365,15 @@ class AppointmentValidationTests(AppointmentApiTestCase):
         self.assertIn("14:00 y 16:00", problem["errors"][0]["message"])
 
     def test_hour_inside_a_slot_but_not_on_its_start_is_rejected(self):
+        """IT-CIT-023 - Prueba de Integración - hour inside a slot but not on its start is rejected
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentValidationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: hour inside a slot but not on its start is rejected.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: RF-CRM-01
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.book(self.client_user, scheduled_at=self.at(14, 30)),
             "invalid_query_parameter",
@@ -268,6 +384,15 @@ class AppointmentValidationTests(AppointmentApiTestCase):
         self.assertEqual(Appointment.objects.count(), 0)
 
     def test_missing_scheduled_at_is_rejected(self):
+        """IT-CIT-024 - Prueba de Integración - missing scheduled at is rejected
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentValidationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: missing scheduled at is rejected.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: RF-CRM-01
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.book(self.client_user, scheduled_at=None),
             "invalid_query_parameter",
@@ -279,6 +404,15 @@ class AppointmentValidationTests(AppointmentApiTestCase):
     def test_past_visit_is_rejected(self):
         # `self.day` es mañana, así que la referencia es hoy y no el día
         # anterior a la agenda, que caería dentro del horizonte.
+        """IT-CIT-025 - Prueba de Integración - past visit is rejected
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentValidationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: past visit is rejected.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: RF-CRM-01
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         yesterday = timezone.localdate() - timedelta(days=1)
         problem = self.assertProblem(
             self.book(self.client_user, scheduled_at=self.at(14, day=yesterday)),
@@ -292,6 +426,15 @@ class AppointmentValidationTests(AppointmentApiTestCase):
         self.assertEqual(problem["errors"][0]["parameter"], "scheduled_at")
 
     def test_visit_beyond_the_sixty_day_horizon_is_rejected(self):
+        """IT-CIT-026 - Prueba de Integración - visit beyond the sixty day horizon is rejected
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentValidationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: visit beyond the sixty day horizon is rejected.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: RF-CRM-01
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         far = self.day + timedelta(days=61)
         problem = self.assertProblem(
             self.book(self.client_user, scheduled_at=self.at(14, day=far)),
@@ -305,6 +448,15 @@ class AppointmentValidationTests(AppointmentApiTestCase):
         )
 
     def test_unknown_field_is_rejected_instead_of_ignored(self):
+        """IT-CIT-027 - Prueba de Integración - unknown field is rejected instead of ignored
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentValidationTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: unknown field is rejected instead of ignored.
+        Código HTTP Esperado: 400 Bad Request
+        Requisito: RF-CRM-01
+        Resultado Esperado: La respuesta devuelve 400 Bad Request y el efecto se refleja en el estado o la base de datos.
+        """
         problem = self.assertProblem(
             self.book(self.client_user, motivo="Prefiero la tarde"),
             "invalid_query_parameter",
@@ -314,8 +466,18 @@ class AppointmentValidationTests(AppointmentApiTestCase):
         self.assertEqual([error["parameter"] for error in problem["errors"]], ["motivo"])
 
 
+# ===== AppointmentConflictTests: grupo de pruebas de appointment conflict =====
 class AppointmentConflictTests(AppointmentApiTestCase):
     def test_second_reservation_of_the_same_slot_conflicts(self):
+        """IT-CIT-028 - Prueba de Integración - second reservation of the same slot conflicts
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentConflictTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: second reservation of the same slot conflicts.
+        Código HTTP Esperado: 201 Created, 409 Conflict
+        Requisito: RF-CRM-01
+        Resultado Esperado: La respuesta devuelve 201 Created, 409 Conflict y el efecto se refleja en el estado o la base de datos.
+        """
         first = self.book(self.client_user)
         self.assertEqual(first.status_code, http_status.HTTP_201_CREATED)
 
@@ -339,6 +501,15 @@ class AppointmentConflictTests(AppointmentApiTestCase):
         self.assertEqual(len(mail.outbox), 2)
 
     def test_overlapping_slot_of_the_same_agent_conflicts(self):
+        """IT-CIT-029 - Prueba de Integración - overlapping slot of the same agent conflicts
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentConflictTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: overlapping slot of the same agent conflicts.
+        Código HTTP Esperado: 201 Created, 409 Conflict
+        Requisito: RF-CRM-01
+        Resultado Esperado: La respuesta devuelve 201 Created, 409 Conflict y el efecto se refleja en el estado o la base de datos.
+        """
         first = self.book(self.client_user)
         self.assertEqual(first.status_code, http_status.HTTP_201_CREATED)
 
@@ -358,6 +529,15 @@ class AppointmentConflictTests(AppointmentApiTestCase):
         self.assertEqual(Appointment.objects.count(), 1)
 
     def test_cancelled_appointment_frees_the_slot(self):
+        """IT-CIT-030 - Prueba de Integración - cancelled appointment frees the slot
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentConflictTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: cancelled appointment frees the slot.
+        Código HTTP Esperado: 201 Created
+        Requisito: RF-CRM-01
+        Resultado Esperado: La respuesta devuelve 201 Created y el efecto se refleja en el estado o la base de datos.
+        """
         booked = self.book(self.client_user)
         appointment = Appointment.objects.get(id=booked.json()["id"])
         appointment.status = AppointmentStatus.CANCELLED
@@ -369,8 +549,18 @@ class AppointmentConflictTests(AppointmentApiTestCase):
         self.assertEqual(Appointment.objects.count(), 2)
 
 
+# ===== AppointmentEmailTests: grupo de pruebas de appointment email =====
 class AppointmentEmailTests(AppointmentApiTestCase):
     def test_both_parties_are_notified_after_the_reservation(self):
+        """IT-CIT-031 - Prueba de Integración - both parties are notified after the reservation
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentEmailTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: both parties are notified after the reservation.
+        Código HTTP Esperado: 201 Created
+        Requisito: RF-CRM-01 y RF-SEC-05
+        Resultado Esperado: La respuesta devuelve 201 Created y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.book(self.client_user)
 
         self.assertEqual(response.status_code, http_status.HTTP_201_CREATED)
@@ -386,6 +576,15 @@ class AppointmentEmailTests(AppointmentApiTestCase):
         self.assertIn("America/Lima", client_mail.body)
 
     def test_mail_failure_does_not_revoke_the_appointment(self):
+        """IT-CIT-032 - Prueba de Integración - mail failure does not revoke the appointment
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentEmailTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: mail failure does not revoke the appointment.
+        Código HTTP Esperado: 201 Created
+        Requisito: RF-CRM-01 y RF-SEC-05
+        Resultado Esperado: La respuesta devuelve 201 Created y el efecto se refleja en el estado o la base de datos.
+        """
         with self.assertLogs("apps.appointments.emails", level="ERROR"):
             with patch(
                 "apps.appointments.emails.send_mail",
@@ -398,8 +597,18 @@ class AppointmentEmailTests(AppointmentApiTestCase):
         self.assertEqual(Appointment.objects.get().status, AppointmentStatus.PENDING)
 
 
+# ===== AppointmentUrlTests: grupo de pruebas de appointment url =====
 class AppointmentUrlTests(AppointmentApiTestCase):
     def test_trailing_slash_variant_redirects_to_the_canonical_url(self):
+        """IT-CIT-033 - Prueba de Integración - trailing slash variant redirects to the canonical url
+
+        Tipo de Prueba: [Prueba de Integración] Endpoint HTTP.
+        Módulo y Entidad: Citas / AppointmentUrlTests.
+        Propósito del Escenario: Comprueba el comportamiento descrito por la prueba: trailing slash variant redirects to the canonical url.
+        Código HTTP Esperado: 301 Moved Permanently
+        Requisito: RF-CRM-01
+        Resultado Esperado: La respuesta devuelve 301 Moved Permanently y el efecto se refleja en el estado o la base de datos.
+        """
         response = self.client.post(
             f"{self.url}/",
             {"property_id": str(self.property.id), "scheduled_at": self.at(14)},

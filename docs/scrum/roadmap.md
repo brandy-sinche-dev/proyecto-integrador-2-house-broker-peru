@@ -38,7 +38,7 @@
 
 > Catálogo paginado, detalle de propiedad y filtros dinámicos con accesibilidad WCAG 2.2 AA.
 
-### Sprint 3 (semanas 7–8) — Carga reducida (parciales)
+### Sprint 3 (semanas 7–8) — *Completado*
 
 | HU | Descripción | Prioridad |
 |---|---|:---:|
@@ -46,9 +46,9 @@
 | HU-SEC-02 | Recuperar contraseña | Media |
 | HU-PROP-04 | Gestionar disponibilidad de propiedades | Media |
 
-> Autenticación por roles (JWT) y gestión de disponibilidad. Carga reducida para no competir con parciales.
+> Autenticación por roles (JWT) y gestión de disponibilidad de propiedades para agentes. Carga completada con éxito.
 
-### Sprint 4 (semanas 9–10) → **APF 2**
+### Sprint 4 (semanas 9–10) — *Completado* → **APF 2**
 
 | HU | Descripción | Prioridad |
 |---|---|:---:|
@@ -56,9 +56,9 @@
 | HU-CRM-02 | Gestionar citas | Media |
 | HU-PROP-05 | Guardar propiedades favoritas | Media |
 
-> Módulo CRM inicial: agendamiento de visitas, calendario y favoritos.
+> Módulo CRM inicial: agendamiento de visitas con selector de fechas/horas, gestión de citas y favoritos con persistencia Full-Stack. Hito APF 2 aprobado.
 
-### Sprint 5 (semanas 11–12)
+### Sprint 5 (semanas 11–12) — *Completado*
 
 | HU | Descripción | Prioridad |
 |---|---|:---:|
@@ -66,9 +66,9 @@
 | HU-CRM-04 | Registrar observaciones de atención | Media |
 | HU-SEC-03 | Comunicarse con un agente mediante chat | Alta |
 
-> Complemento CRM + chat en tiempo real con WebSockets.
+> Consolidación de CRM (ficha integral y notas de atención) + chat en tiempo real con WebSockets (Django Channels y Redis).
 
-### Sprint 6 (semanas 13–14) → **APF 3**
+### Sprint 6 (semanas 13–14) — *En curso (Actual)* → **APF 3**
 
 | HU | Descripción | Prioridad |
 |---|---|:---:|
@@ -77,7 +77,7 @@
 | HU-AI-03 | Recibir recomendaciones personalizadas | Alta |
 | HU-AI-04 | Solicitar atención de un agente humano | Media |
 
-> Integración de IA: asistente virtual, scoring de preferencias y recomendaciones personalizadas.
+> Integración de IA: asistente virtual con Gemini, scoring ponderado de preferencias, recomendaciones personalizadas y derivación a agente humano. Hito APF 3 en desarrollo.
 
 ### Sprint 7 (semanas 15–18) → **Entrega Final**
 
