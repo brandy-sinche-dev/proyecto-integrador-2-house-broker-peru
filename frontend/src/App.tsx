@@ -379,6 +379,8 @@ function AppContent() {
         visitsCount={visits.length}
         onToggle={() => setIsAssistantOpen(!isAssistantOpen)}
         onNavigate={navigate}
+        onOpenProperty={openProperty}
+        onBookVisit={handleBookVisit}
       />
     </>
   )

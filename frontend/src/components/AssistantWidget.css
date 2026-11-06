@@ -49,7 +49,8 @@
   height: 8px;
   flex-shrink: 0;
   border-radius: 12px;
-  background: var(--brand-bronze);
+  background: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
 }
 
 .hai__msg {
@@ -73,6 +74,7 @@
   color: var(--white);
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
   transition: background 0.15s ease, transform 0.15s ease;
+  cursor: pointer;
 }
 
 .hai__btn:hover {
@@ -85,82 +87,425 @@
   height: 20px;
 }
 
+/* Panel expandido del chat */
 .hai__panel {
-  width: 349.56px;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  max-height: min(620px, calc(100vh - 100px));
+  display: flex;
+  flex-direction: column;
   padding: 16px;
   background: var(--white);
   border-radius: var(--radius);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 20px 30px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--line);
   animation: hfade-up 0.3s ease both;
 }
 
 .hai__panel-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--line);
 }
 
-.hai__panel-title {
+.hai__panel-title-wrap {
   flex: 1;
-  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.hai__panel-title {
+  font-size: 15px;
   line-height: 20px;
   font-weight: 700;
   color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hai__panel-subtitle {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 14px;
+}
+
+.hai__model-tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #f5efe6;
+  color: var(--brand-bronze);
+  border: 1px solid #e5d7c3;
 }
 
 .hai__close {
   border: none;
   background: none;
-  padding: 4px;
+  padding: 6px;
+  border-radius: 6px;
   display: grid;
   place-items: center;
   color: var(--muted-light);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
 }
 
 .hai__close svg {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
 }
 
 .hai__close:hover {
+  background: var(--field);
   color: var(--ink);
 }
 
+/* Área de mensajes con scroll */
 .hai__messages {
+  flex: 1;
+  min-height: 160px;
+  max-height: 320px;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px 0;
-  max-height: 220px;
-  overflow-y: auto;
+  gap: 10px;
+  padding: 12px 2px 12px 0;
+  scroll-behavior: smooth;
+}
+
+.hai__messages::-webkit-scrollbar {
+  width: 5px;
+}
+
+.hai__messages::-webkit-scrollbar-thumb {
+  background: #d8cbbb;
+  border-radius: 4px;
+}
+
+/* Burbujas */
+.hai__bubble-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hai__bubble-row--user {
+  align-items: flex-end;
+}
+
+.hai__bubble-row--bot {
+  align-items: flex-start;
 }
 
 .hai__bubble {
-  padding: 8px 12px;
-  border-radius: var(--radius);
-  background: var(--field);
-  font-size: 14px;
-  line-height: 20px;
-  color: var(--ink);
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  line-height: 19px;
+  max-width: 90%;
+  word-break: break-word;
+  margin: 0;
 }
 
+.hai__bubble--bot {
+  background: var(--field);
+  color: var(--ink);
+  border-bottom-left-radius: 4px;
+}
+
+.hai__bubble--user {
+  background: var(--brand-bronze);
+  color: var(--white);
+  border-bottom-right-radius: 4px;
+}
+
+/* Tarjetas de inmuebles recomendados en el chat */
+.hai__recs-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+  width: 100%;
+}
+
+.hai__rec-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--white);
+  border: 1px solid #e8dec8;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.hai__rec-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(163, 116, 62, 0.12);
+  border-color: var(--brand-bronze);
+}
+
+.hai__rec-thumb-wrap {
+  position: relative;
+  width: 100%;
+  height: 110px;
+  background: #f0e9df;
+  overflow: hidden;
+}
+
+.hai__rec-thumb {
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  transition: transform 0.3s;
+}
+
+.hai__rec-card:hover .hai__rec-thumb {
+  transform: scale(1.04);
+}
+
+.hai__match-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: linear-gradient(135deg, #a3743e 0%, #7d5423 100%);
+  color: var(--white);
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  letter-spacing: 0.3px;
+}
+
+.hai__rec-body {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hai__rec-price {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--brand-bronze-dark);
+}
+
+.hai__rec-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hai__rec-specs {
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hai__rec-highlight {
+  font-size: 11px;
+  color: #7d5423;
+  background: #faf4eb;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-top: 2px;
+  line-height: 14px;
+}
+
+.hai__rec-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.hai__rec-btn-detail {
+  flex: 1;
+  height: 28px;
+  background: #f5efe6;
+  color: var(--brand-bronze-dark);
+  border: 1px solid #dfcfbc;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.hai__rec-btn-detail:hover {
+  background: #ebe0d0;
+}
+
+.hai__rec-btn-visit {
+  flex: 1.2;
+  height: 28px;
+  background: var(--brand-bronze);
+  color: var(--white);
+  border: none;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.hai__rec-btn-visit:hover {
+  background: var(--brand-bronze-dark);
+}
+
+/* Indicador de pensando / escribiendo */
+.hai__thinking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--field);
+  border-radius: 12px;
+  align-self: flex-start;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.hai__dots {
+  display: flex;
+  gap: 4px;
+}
+
+.hai__dots span {
+  width: 5px;
+  height: 5px;
+  background: var(--brand-bronze);
+  border-radius: 50%;
+  animation: hdot-pulse 1.2s infinite ease-in-out both;
+}
+
+.hai__dots span:nth-child(1) { animation-delay: -0.32s; }
+.hai__dots span:nth-child(2) { animation-delay: -0.16s; }
+.hai__dots span:nth-child(3) { animation-delay: 0s; }
+
+@keyframes hdot-pulse {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1.1); opacity: 1; }
+}
+
+/* Chips de consultas frecuentes */
+.hai__chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 6px 0;
+  margin-top: 4px;
+}
+
+.hai__chips::-webkit-scrollbar {
+  display: none;
+}
+
+.hai__chip {
+  flex-shrink: 0;
+  background: #fbf8f4;
+  border: 1px solid #e5d8c8;
+  color: #634320;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.hai__chip:hover {
+  background: #f0e4d2;
+  border-color: var(--brand-bronze);
+  color: var(--brand-bronze-dark);
+}
+
+/* Formulario de entrada de texto */
+.hai__input-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.hai__input {
+  flex: 1;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--field);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.hai__input:focus {
+  outline: none;
+  border-color: var(--brand-bronze);
+  background: var(--white);
+}
+
+.hai__send-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: var(--brand-bronze);
+  color: var(--white);
+  border: none;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.hai__send-btn:hover:not(:disabled) {
+  background: var(--brand-bronze-dark);
+  transform: translateY(-1px);
+}
+
+.hai__send-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.hai__send-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Acciones rápidas tradicionales (guardados y visitas) */
 .hai__quick {
   display: flex;
   gap: 8px;
+  padding-top: 8px;
 }
 
 .hai__quick button {
   flex: 1;
-  height: 36px;
+  height: 32px;
   border: 1px solid var(--brand-bronze);
   border-radius: var(--radius-sm);
   background: none;
   color: var(--brand-bronze);
   font-family: var(--font);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
 }
 
 .hai__quick button:hover {
@@ -187,5 +532,6 @@
 
   .hai__panel {
     width: auto;
+    max-height: 80vh;
   }
 }
