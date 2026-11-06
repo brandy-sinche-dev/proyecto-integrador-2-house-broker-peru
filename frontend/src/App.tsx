@@ -372,7 +372,8 @@ function AppContent() {
         />
       )}
 
-      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />\n      <AssistantWidget
+      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
+      <AssistantWidget
         open={isAssistantOpen}
         savedCount={favoriteIds.size}
         visitsCount={visits.length}
