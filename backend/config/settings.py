@@ -104,6 +104,8 @@ if os.environ.get('DJANGO_DB_ENGINE') == 'sqlite':
 CORS_ALLOWED_ORIGINS = os.environ.get(
     'CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173'
 ).split(',')
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
 
 # Django REST Framework
 REST_FRAMEWORK = {
