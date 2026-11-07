@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMatch, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { AppointmentListTable } from '../crm/AppointmentListTable'
 import { ClientDirectory, ClientProfileView } from '../crm/ClientProfileView'
+import { MensajesChat, INITIAL_CONVERSATIONS } from './MensajesChat'
 import { Icon } from './icons'
 
 const C = {
@@ -40,6 +41,7 @@ const SPROP: Record<string, { color: string; bg: string }> = {
   VENDIDO:    { color: '#6b21a8', bg: '#f3e8ff' },
   SUSPENDIDO: { color: '#991b1b', bg: '#fee2e2' },
 }
+
 // ── Micro-componentes ──────────────────────────────────────────────────────
 function Badge({ text, s }: { text: string; s: { color: string; bg: string } }) {
   return <span style={{ background: s.bg, color: s.color, padding: '3px 10px', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap' }}>{text}</span>
@@ -58,17 +60,46 @@ function SectionTitle({ iconEl, children }: { iconEl: React.ReactNode; children:
 }
 
 // ── Secciones ──────────────────────────────────────────────────────────────
-function Dashboard() {
+function Dashboard({
+  unreadCount = 2,
+  onGoToChat,
+}: {
+  unreadCount?: number
+  onGoToChat?: () => void
+}) {
   const hoy = CITAS_MOCK.filter(c => c.fecha === 'Hoy')
   const confirmadas = CITAS_MOCK.filter(c => c.estado === 'CONFIRMED').length
   const pendientes  = CITAS_MOCK.filter(c => c.estado === 'PENDING').length
   const clientesConCitas = new Set(CITAS_MOCK.map(c => c.cliente)).size
 
-  const StatCard = ({ label, value, sub }: { label: string; value: string | number; sub: string }) => (
-    <div style={{ background: 'white', borderRadius: '12px', padding: '1.25rem 1.5rem', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', borderLeft: `4px solid ${C.gold}` }}>
-      <p style={{ margin: 0, fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
-      <p style={{ margin: '0.5rem 0 0', fontSize: '1.9rem', fontWeight: 800, color: C.bronze }}>{value}</p>
-      <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: '#9ca3af' }}>{sub}</p>
+  const StatCard = ({
+    label,
+    value,
+    sub,
+    highlight = false,
+    onClick,
+  }: {
+    label: string
+    value: string | number
+    sub: string
+    highlight?: boolean
+    onClick?: () => void
+  }) => (
+    <div
+      onClick={onClick}
+      style={{
+        background: highlight ? '#fffbeb' : 'white',
+        borderRadius: '12px',
+        padding: '1.25rem 1.5rem',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+        borderLeft: `4px solid ${highlight ? '#f59e0b' : C.gold}`,
+        cursor: onClick ? 'pointer' : 'default',
+        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+      }}
+    >
+      <p style={{ margin: 0, fontSize: '0.72rem', color: highlight ? '#92400e' : '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
+      <p style={{ margin: '0.5rem 0 0', fontSize: '1.9rem', fontWeight: 800, color: highlight ? '#b45309' : C.bronze }}>{value}</p>
+      <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: highlight ? '#d97706' : '#9ca3af' }}>{sub}</p>
     </div>
   )
 
@@ -76,10 +107,17 @@ function Dashboard() {
     <div>
       <SectionTitle iconEl={Icon.dashboard}>Dashboard de Actividad</SectionTitle>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-        <StatCard label="Citas hoy"        value={hoy.length}             sub={`${confirmadas} confirmadas`} />
-        <StatCard label="Pendientes"        value={pendientes}             sub="requieren acción" />
-        <StatCard label="Mis propiedades"   value={PROPIEDADES_MOCK.length} sub={`${PROPIEDADES_MOCK.filter(p => p.estado === 'DISPONIBLE').length} disponibles`} />
-        <StatCard label="Clientes con citas" value={clientesConCitas} sub="según la agenda mostrada" />
+        <StatCard label="Citas hoy"          value={hoy.length}             sub={`${confirmadas} confirmadas`} />
+        <StatCard label="Pendientes"          value={pendientes}             sub="requieren acción" />
+        <StatCard
+          label="Mensajes / Chat"
+          value={unreadCount}
+          sub={unreadCount > 0 ? 'nuevos por responder' : 'al día'}
+          highlight={unreadCount > 0}
+          onClick={onGoToChat}
+        />
+        <StatCard label="Mis propiedades"     value={PROPIEDADES_MOCK.length} sub={`${PROPIEDADES_MOCK.filter(p => p.estado === 'DISPONIBLE').length} disponibles`} />
+        <StatCard label="Clientes con citas"  value={clientesConCitas} sub="según la agenda mostrada" />
       </div>
 
       <Card>
@@ -133,16 +171,13 @@ function MisPropiedades() {
   )
 }
 
-function Clientes() {
-  return <ClientDirectory />
-}
-
 // ── Menú ───────────────────────────────────────────────────────────────────
 const MENU = [
-  { id: 'dashboard',   label: 'Dashboard',       iconEl: Icon.dashboard,  comp: Dashboard        },
-  { id: 'cronograma',  label: 'Cronograma',       iconEl: Icon.calendar,   comp: Cronograma       },
-  { id: 'propiedades', label: 'Mis Propiedades',  iconEl: Icon.properties, comp: MisPropiedades   },
-  { id: 'clientes',    label: 'Clientes',         iconEl: Icon.clients,    comp: Clientes         },
+  { id: 'dashboard',   label: 'Dashboard',       iconEl: Icon.dashboard },
+  { id: 'cronograma',  label: 'Cronograma',       iconEl: Icon.calendar },
+  { id: 'propiedades', label: 'Mis Propiedades',  iconEl: Icon.properties },
+  { id: 'clientes',    label: 'Clientes',         iconEl: Icon.clients },
+  { id: 'mensajes',    label: 'Mensajes / Chat',  iconEl: Icon.chat },
 ]
 
 // ── Panel ──────────────────────────────────────────────────────────────────
@@ -151,7 +186,46 @@ export function AgentePanel() {
   const navigate = useNavigate()
   const clientProfileMatch = useMatch('/agente/clientes/:clientId')
   const [activeTab, setActiveTab] = useState('dashboard')
-  const Active = MENU.find(m => m.id === activeTab)?.comp ?? Dashboard
+  const [selectedChatClient, setSelectedChatClient] = useState<string | null>(null)
+
+  // Calcular número de mensajes no leídos
+  const [unreadChatCount, setUnreadChatCount] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('hb_agent_chat_conversations')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed)) return parsed.filter((c: any) => c.unread).length
+      }
+    } catch {
+      // ignore
+    }
+    return INITIAL_CONVERSATIONS.filter((c) => c.unread).length
+  })
+
+  // Sincronizar unread count con eventos de chat
+  useEffect(() => {
+    const handleUpdate = () => {
+      try {
+        const saved = localStorage.getItem('hb_agent_chat_conversations')
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          if (Array.isArray(parsed)) {
+            setUnreadChatCount(parsed.filter((c: any) => c.unread).length)
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    window.addEventListener('hb_agent_new_message', handleUpdate)
+    window.addEventListener('storage', handleUpdate)
+    return () => {
+      window.removeEventListener('hb_agent_new_message', handleUpdate)
+      window.removeEventListener('storage', handleUpdate)
+    }
+  }, [])
+
   const selectedTab = clientProfileMatch ? 'clientes' : activeTab
 
   return (
@@ -170,6 +244,7 @@ export function AgentePanel() {
         <nav style={{ flex: 1, padding: '0.75rem 0' }}>
           {MENU.map(item => {
             const active = selectedTab === item.id
+            const isChat = item.id === 'mensajes'
             return (
               <button key={item.id} onClick={() => {
                 setActiveTab(item.id)
@@ -184,7 +259,25 @@ export function AgentePanel() {
                 borderLeft: active ? `4px solid ${C.bronze}` : '4px solid transparent',
                 transition: 'all 0.15s',
               }}>
-                {item.iconEl}{item.label}
+                {item.iconEl}
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {isChat && unreadChatCount > 0 && (
+                  <span
+                    aria-label={`${unreadChatCount} mensajes no leídos`}
+                    style={{
+                      background: '#ef4444',
+                      color: '#ffffff',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      padding: '2px 7px',
+                      borderRadius: '999px',
+                      lineHeight: 1,
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                    }}
+                  >
+                    {unreadChatCount}
+                  </span>
+                )}
               </button>
             )
           })}
@@ -202,10 +295,111 @@ export function AgentePanel() {
 
       {/* Main */}
       <main style={{ flex: 1, padding: '2rem', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {/* Banner de alerta de mensajes nuevos */}
+        {unreadChatCount > 0 && selectedTab !== 'mensajes' && (
+          <div
+            style={{
+              background: '#fffbeb',
+              border: '1px solid #fde68a',
+              borderLeft: '5px solid #f59e0b',
+              borderRadius: '10px',
+              padding: '0.85rem 1.25rem',
+              marginBottom: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '1rem',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+              <div
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  background: '#fef3c7',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#d97706',
+                  flexShrink: 0,
+                }}
+              >
+                {Icon.chat}
+              </div>
+              <div>
+                <p style={{ margin: 0, fontWeight: 700, color: '#92400e', fontSize: '0.92rem' }}>
+                  💬 Tienes {unreadChatCount} {unreadChatCount === 1 ? 'nuevo mensaje' : 'nuevos mensajes'} de clientes esperando respuesta
+                </p>
+                <p style={{ margin: '3px 0 0', color: '#b45309', fontSize: '0.8rem' }}>
+                  Carlos Pérez y María Ríos enviaron consultas sobre inmuebles a través del Concierge IA.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('mensajes')
+                if (clientProfileMatch) navigate('/agente')
+              }}
+              style={{
+                background: '#d97706',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '0.5rem 1rem',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                transition: 'background 0.15s ease',
+              }}
+            >
+              Atender en Chat ({unreadChatCount})
+            </button>
+          </div>
+        )}
+
         <div style={{ flex: 1 }}>
-          {clientProfileMatch
-            ? <ClientProfileView clientId={clientProfileMatch.params.clientId ?? ''} />
-            : <Active />}
+          {clientProfileMatch ? (
+            <ClientProfileView clientId={clientProfileMatch.params.clientId ?? ''} />
+          ) : selectedTab === 'dashboard' ? (
+            <Dashboard
+              unreadCount={unreadChatCount}
+              onGoToChat={() => setActiveTab('mensajes')}
+            />
+          ) : selectedTab === 'cronograma' ? (
+            <Cronograma />
+          ) : selectedTab === 'propiedades' ? (
+            <MisPropiedades />
+          ) : selectedTab === 'clientes' ? (
+            <ClientDirectory
+              onSelectChat={(clientName) => {
+                setSelectedChatClient(clientName)
+                setActiveTab('mensajes')
+              }}
+            />
+          ) : selectedTab === 'mensajes' ? (
+            <div>
+              <SectionTitle iconEl={Icon.chat}>Centro de Mensajes y Coordinación con Clientes</SectionTitle>
+              <MensajesChat
+                initialClientId={selectedChatClient}
+                onNavigateTab={(tab) => {
+                  setActiveTab(tab)
+                  if (clientProfileMatch) navigate('/agente')
+                }}
+                onOpenCrmProfile={(id) => navigate(`/agente/clientes/${encodeURIComponent(id)}`)}
+                onUnreadCountChange={(count) => setUnreadChatCount(count)}
+              />
+            </div>
+          ) : (
+            <Dashboard
+              unreadCount={unreadChatCount}
+              onGoToChat={() => setActiveTab('mensajes')}
+            />
+          )}
         </div>
         <footer style={{ marginTop: '3rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb', textAlign: 'center', color: '#9ca3af', fontSize: '0.78rem' }}>
           © {new Date().getFullYear()} House Broker Perú &nbsp;·&nbsp; Panel de Agente

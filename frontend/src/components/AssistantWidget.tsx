@@ -128,6 +128,54 @@ export function AssistantWidget({
       }
 
       setMessages((prev) => [...prev, botMsg])
+
+      // Notificar al panel del agente si se solicitó un asesor
+      if (response.agentTransfer) {
+        try {
+          const STORAGE_KEY = 'hb_agent_chat_conversations'
+          const existingRaw = localStorage.getItem(STORAGE_KEY)
+          const convs = existingRaw ? JSON.parse(existingRaw) : []
+          const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          const newMsg = {
+            id: 'msg-' + Date.now(),
+            sender: 'client',
+            text: query,
+            time: nowStr,
+          }
+          const existingIndex = convs.findIndex((c: any) => c.clientId === 'client-web-live')
+          if (existingIndex >= 0) {
+            convs[existingIndex].unread = true
+            convs[existingIndex].lastTime = 'Justo ahora'
+            convs[existingIndex].messages.push(newMsg)
+          } else {
+            convs.unshift({
+              id: 'conv-web-' + Date.now(),
+              clientId: 'client-web-live',
+              clientName: 'Cliente Web (Concierge IA)',
+              clientPhone: '+51 908 941 175',
+              clientEmail: 'cliente.web@housebroker.pe',
+              propertyTitle: 'Transferencia directa desde Concierge IA',
+              propertyPrice: 'Consulta activa',
+              unread: true,
+              online: true,
+              lastTime: 'Justo ahora',
+              messages: [
+                {
+                  id: 'sys-' + Date.now(),
+                  sender: 'system',
+                  text: '🤖 Cliente en vivo solicitó contactar a un asesor inmobiliario desde el portal web.',
+                  time: nowStr,
+                },
+                newMsg,
+              ],
+            })
+          }
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(convs))
+          window.dispatchEvent(new CustomEvent('hb_agent_new_message', { detail: { query } }))
+        } catch {
+          // ignore storage error
+        }
+      }
     } catch {
       setMessages((prev) => [
         ...prev,

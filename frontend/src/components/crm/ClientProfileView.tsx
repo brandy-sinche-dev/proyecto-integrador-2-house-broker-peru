@@ -124,7 +124,7 @@ export function ActivityTimeline({ appointments }: { appointments: Appointment[]
   )
 }
 
-export function ClientDirectory() {
+export function ClientDirectory({ onSelectChat }: { onSelectChat?: (clientName: string) => void } = {}) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const appointmentsQuery = useQuery(queryForAgent(user?.id))
@@ -163,13 +163,42 @@ export function ClientDirectory() {
                 <p>{entry.appointment.client.phone ?? 'Teléfono no disponible'}</p>
               </div>
               <span>{entry.count} {entry.count === 1 ? 'cita' : 'citas'}</span>
-              <button
-                type="button"
-                aria-label={`Abrir ficha CRM de ${entry.appointment.client.full_name}`}
-                onClick={() => navigate(`/agente/clientes/${encodeURIComponent(id)}`)}
-              >
-                Abrir ficha CRM
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  aria-label={`Chatear con ${entry.appointment.client.full_name}`}
+                  onClick={() => {
+                    if (onSelectChat) {
+                      onSelectChat(entry.appointment.client.full_name)
+                    } else {
+                      navigate(`/agente`)
+                    }
+                  }}
+                  style={{
+                    background: 'var(--brand-gold, #cfa861)',
+                    color: 'var(--brand-bronze-deep, #562B05)',
+                    border: 'none',
+                    borderRadius: '5px',
+                    padding: '0.4rem 0.75rem',
+                    fontWeight: 700,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    minHeight: '2.25rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                  }}
+                >
+                  💬 Chatear
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Abrir ficha CRM de ${entry.appointment.client.full_name}`}
+                  onClick={() => navigate(`/agente/clientes/${encodeURIComponent(id)}`)}
+                >
+                  Abrir ficha CRM
+                </button>
+              </div>
             </li>
           ))}
         </ul>
