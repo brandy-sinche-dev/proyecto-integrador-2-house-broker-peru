@@ -123,6 +123,7 @@ export function AssistantWidget({
         sender: 'bot',
         text: response.reply,
         recommendations: response.recommendations,
+        agentTransfer: response.agentTransfer,
         timestamp: new Date().toISOString(),
       }
 
@@ -185,6 +186,41 @@ export function AssistantWidget({
                 className={`hai__bubble-row hai__bubble-row--${m.sender}`}
               >
                 <p className={`hai__bubble hai__bubble--${m.sender}`}>{m.text}</p>
+
+                {m.agentTransfer && (
+                  <div className="hai__agent-card">
+                    <div className="hai__agent-head">
+                      <div className="hai__agent-avatar" aria-hidden="true">👨‍💼</div>
+                      <div className="hai__agent-meta">
+                        <span className="hai__agent-status">🟢 Asesor en línea ahora</span>
+                        <strong className="hai__agent-name">{m.agentTransfer.name}</strong>
+                        <span className="hai__agent-role">{m.agentTransfer.role}</span>
+                      </div>
+                    </div>
+                    <p className="hai__agent-hint">
+                      Puedes coordinar tu visita directamente con tu asesor por WhatsApp o llamando:
+                    </p>
+                    <div className="hai__agent-actions">
+                      <a
+                        href={m.agentTransfer.whatsappUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hai__agent-btn-wa"
+                      >
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+                          <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.99.59 3.92 1.71 5.56L2 22l4.67-1.78c1.58 1.02 3.44 1.57 5.37 1.57h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01C17.18 2.99 14.69 2 12.04 2z" />
+                        </svg>
+                        Chatear por WhatsApp
+                      </a>
+                      <a
+                        href={'tel:' + m.agentTransfer.phone.replace(/\s+/g, '')}
+                        className="hai__agent-btn-call"
+                      >
+                        📞 Llamar
+                      </a>
+                    </div>
+                  </div>
+                )}
 
                 {m.recommendations && m.recommendations.length > 0 && (
                   <div className="hai__recs-container">

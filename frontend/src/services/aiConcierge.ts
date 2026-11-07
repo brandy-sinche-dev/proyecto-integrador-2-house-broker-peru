@@ -6,21 +6,40 @@ export interface RecommendedProperty {
   highlightReason: string
 }
 
+export interface AgentTransferInfo {
+  name: string
+  role: string
+  phone: string
+  email: string
+  whatsappUrl: string
+}
+
 export interface ChatMessage {
   id: string
   sender: 'bot' | 'user'
   text: string
   recommendations?: RecommendedProperty[]
+  agentTransfer?: AgentTransferInfo
   timestamp: string
 }
 
 export interface ConciergeResponse {
   reply: string
   recommendations: RecommendedProperty[]
+  agentTransfer?: AgentTransferInfo
 }
 
 const GEMINI_API_KEY = (import.meta.env.VITE_GEMINI_API_KEY as string | undefined)?.trim()
 const GEMINI_MODEL = (import.meta.env.VITE_GEMINI_MODEL as string | undefined)?.trim() || 'gemini-3.5-flash-lite'
+
+const DEFAULT_AGENT: AgentTransferInfo = {
+  name: 'Yohan Nato',
+  role: 'Asesor Inmobiliario Senior · House Broker Perú',
+  phone: '+51 908 941 175',
+  email: 'yohan.nato@housebroker.pe',
+  whatsappUrl:
+    'https://api.whatsapp.com/send?phone=51908941175&text=Hola%20Yohan,%20te%20contacto%20desde%20el%20portal%20de%20House%20Broker%20Per%C3%BA%20para%20coordinar%20asesor%C3%ADa%20personalizada.',
+}
 
 /**
  * Normaliza un texto removiendo tildes y pasando a minúsculas.
@@ -40,6 +59,23 @@ export function matchPropertiesLocally(
   properties: Property[]
 ): ConciergeResponse {
   const q = normalize(query)
+
+  // Detección de solicitud de asesor humano
+  if (
+    q.includes('asesor') ||
+    q.includes('agente') ||
+    q.includes('humano') ||
+    q.includes('persona') ||
+    q.includes('contacto') ||
+    q.includes('hablar')
+  ) {
+    return {
+      reply:
+        '¡Con gusto! Te pongo en contacto directo con Yohan Nato (+51 908 941 175), nuestro asesor inmobiliario senior asignado para que coordines tu visita de inmediato:',
+      recommendations: [],
+      agentTransfer: DEFAULT_AGENT,
+    }
+  }
 
   // Filtro por distritos frecuentes
   const districts = [
@@ -106,7 +142,6 @@ export function matchPropertiesLocally(
   const top = scored.slice(0, 3).filter((item) => item.score > 60)
 
   if (top.length === 0) {
-    // Si no hubo filtro específico o no hubo match claro
     if (q.includes('hola') || q.includes('buenos') || q.includes('buenas')) {
       return {
         reply:
@@ -115,15 +150,6 @@ export function matchPropertiesLocally(
       }
     }
 
-    if (q.includes('asesor') || q.includes('contacto') || q.includes('humano') || q.includes('agente')) {
-      return {
-        reply:
-          '¡Con gusto! Puedes comunicarte directamente con nuestro equipo de asesores VIP al +51 908 941 175 o mediante el botón de WhatsApp en la parte superior.',
-        recommendations: [],
-      }
-    }
-
-    // Devolver las 2 propiedades más destacadas como propuesta
     const featured = properties.filter((p) => p.destacado && p.is_active !== false).slice(0, 2)
     return {
       reply:
@@ -151,7 +177,7 @@ export function matchPropertiesLocally(
 
 /**
  * Consulta a Gemini 3.5 Flash Lite para procesar la consulta con inteligencia conversacional
- * y devolver respuestas contextuales con propiedades coincidentes.
+ * y devolver respuestas contextuales con propiedades coincidentes o derivación a asesor humano.
  */
 export async function askConciergeAI(
   userPrompt: string,
@@ -185,13 +211,14 @@ ${JSON.stringify(catalogContext)}
 
 REGLAS ESTRICTAS:
 1. Responde en español en tono elegante (1 a 3 oraciones).
-2. Si el usuario saluda o pregunta en general, responde cordialmente y deja "recommendations" vacío [].
+2. Si el usuario solicita hablar con un agente, asesor humano o persona, responde presentándole con mucho gusto a nuestro asesor senior Yohan Nato e incluye "transferToAgent": true en el JSON.
 3. Si el usuario busca inmuebles, analiza distrito, tipo, dormitorios o presupuesto y selecciona de 1 a 3 inmuebles del catálogo.
 4. Para cada recomendación asigna un "matchScore" entre 82 y 99 y un "highlight" de una línea justificando la elección.
 5. Si no hay inmuebles que coincidan exactamente, explica amablemente y sugiere la opción más cercana del catálogo.
 6. Responde EXCLUSIVAMENTE con un JSON válido con este formato:
 {
   "reply": "Texto de respuesta",
+  "transferToAgent": false,
   "recommendations": [
     { "id": "id_del_inmueble", "matchScore": 98, "highlight": "Motivo clave" }
   ]
@@ -230,6 +257,7 @@ REGLAS ESTRICTAS:
 
     const parsed = JSON.parse(rawText) as {
       reply?: string
+      transferToAgent?: boolean
       recommendations?: Array<{ id: string; matchScore?: number; highlight?: string }>
     }
 
@@ -247,9 +275,22 @@ REGLAS ESTRICTAS:
       }
     }
 
+    const q = normalize(userPrompt)
+    const isAgentRequested =
+      Boolean(parsed.transferToAgent) ||
+      q.includes('agente') ||
+      q.includes('asesor') ||
+      q.includes('humano') ||
+      q.includes('persona') ||
+      q.includes('contacto') ||
+      q.includes('hablar') ||
+      normalize(parsed.reply || '').includes('asesor') ||
+      normalize(parsed.reply || '').includes('agente')
+
     return {
       reply: parsed.reply || 'Aquí tienes las opciones seleccionadas según tus preferencias.',
       recommendations: mappedRecs,
+      agentTransfer: isAgentRequested ? DEFAULT_AGENT : undefined,
     }
   } catch (err) {
     console.error('Error invoking Gemini API:', err)

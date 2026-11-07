@@ -60,7 +60,7 @@ const INITIAL_APPOINTMENTS: Appointment[] = [
     },
     agent: {
       id: MOCK_SELLER.id,
-      full_name: MOCK_SELLER.full_name,
+      full_name: MOCK_SELLER.full_name || 'Yohan Nato',
       email: MOCK_SELLER.email,
       phone: MOCK_SELLER.phone,
     },
@@ -86,7 +86,7 @@ const INITIAL_APPOINTMENTS: Appointment[] = [
     },
     agent: {
       id: MOCK_SELLER.id,
-      full_name: MOCK_SELLER.full_name,
+      full_name: MOCK_SELLER.full_name || 'Yohan Nato',
       email: MOCK_SELLER.email,
       phone: MOCK_SELLER.phone,
     },
@@ -112,7 +112,7 @@ const INITIAL_APPOINTMENTS: Appointment[] = [
     },
     agent: {
       id: MOCK_SELLER.id,
-      full_name: MOCK_SELLER.full_name,
+      full_name: MOCK_SELLER.full_name || 'Yohan Nato',
       email: MOCK_SELLER.email,
       phone: MOCK_SELLER.phone,
     },
@@ -139,7 +139,7 @@ const INITIAL_APPOINTMENTS: Appointment[] = [
     },
     agent: {
       id: MOCK_SELLER.id,
-      full_name: MOCK_SELLER.full_name,
+      full_name: MOCK_SELLER.full_name || 'Yohan Nato',
       email: MOCK_SELLER.email,
       phone: MOCK_SELLER.phone,
     },
@@ -158,7 +158,7 @@ const seedMockSession = () => {
   const user: SessionUser = {
     id: MOCK_SELLER.id,
     role: 'AGENTE',
-    full_name: MOCK_SELLER.full_name,
+    full_name: MOCK_SELLER.full_name || 'Yohan Nato',
     email: MOCK_SELLER.email,
   }
   try {
